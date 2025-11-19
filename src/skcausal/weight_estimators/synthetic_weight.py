@@ -4,11 +4,8 @@ import numpy as np
 import polars as pl
 from sklearn.base import ClassifierMixin, TransformerMixin
 from sklearn.preprocessing import SplineTransformer
-from sklearn.utils.class_weight import compute_class_weight
-from tqdm import tqdm
 from skcausal.utils.polars import ALL_DTYPES, convert_categorical_to_dummies
 from skcausal.weight_estimators.base import BaseBalancingWeightRegressor
-from skcausal.sklearn.classification.averaging_classifier import AveragingClassifier
 
 __all__ = [
     "SyntheticWeightRegressor",
@@ -78,6 +75,7 @@ class SyntheticWeightRegressor(BaseBalancingWeightRegressor):
         self.fit_mode = fit_mode
         self.drop_not_converged = drop_not_converged
         self.mean_type = mean_type
+        self.classifiers_ = None
 
         super().__init__()
 
@@ -96,6 +94,7 @@ class SyntheticWeightRegressor(BaseBalancingWeightRegressor):
             self._treatment_transformation.fit(t.to_numpy().reshape(X.shape[0], -1))
 
         self.classifier_ = copy.deepcopy(self.classifier)
+        self.classifiers_ = None
 
         if self.fit_mode == "ensemble":
             self._fit_ensemble(X, t)
@@ -168,8 +167,13 @@ class SyntheticWeightRegressor(BaseBalancingWeightRegressor):
                 continue
 
             self.classifiers_.append(_classif)
+        if not self.classifiers_:
+            raise ValueError(
+                "No ensemble members converged; consider relaxing constraints."
+            )
 
-        self.classifier_ = AveragingClassifier(self.classifiers_, mean=self.mean_type)
+        # Ensemble predictions are computed via _predict_with_classifiers.
+        self.classifier_ = None
 
     def _predict_sample_weight(self, X, t):
 
@@ -182,17 +186,13 @@ class SyntheticWeightRegressor(BaseBalancingWeightRegressor):
         n_samples = Xt.shape[0]
 
         if n_samples <= batch_size:
-            # If the dataset is smaller than the batch size, predict in one go
-            probas = self.classifier_.predict_proba(Xt)
-
+            probas = self._predict_with_classifiers(Xt)
         else:
-            # If dataset is larger, process in batches
             probas = []
-
             for start in range(0, n_samples, batch_size):
                 end = min(start + batch_size, n_samples)
                 batch_Xt = Xt[start:end]
-                batch_probas = self.classifier_.predict_proba(batch_Xt)
+                batch_probas = self._predict_with_classifiers(batch_Xt)
                 probas.append(batch_probas)
 
             probas = np.vstack(probas)
@@ -206,6 +206,36 @@ class SyntheticWeightRegressor(BaseBalancingWeightRegressor):
             t = self._treatment_transformation.fit_transform(t)
         Xt = np.concatenate([X, t], axis=1)
         return Xt
+
+    def _predict_with_classifiers(self, Xt):
+        """Run the trained classifier(s) on Xt."""
+
+        if self.classifiers_:
+            return self._aggregate_classifier_predictions(Xt)
+
+        if self.classifier_ is None:
+            raise ValueError(
+                "SyntheticWeightRegressor must be fitted before predicting."
+            )
+
+        return self.classifier_.predict_proba(Xt)
+
+    def _aggregate_classifier_predictions(self, Xt):
+        probas = [clf.predict_proba(Xt) for clf in self.classifiers_]
+
+        if not probas:
+            raise ValueError("No classifiers available for aggregation.")
+
+        probas = np.stack(probas, axis=0)
+        if self.mean_type == "geometric":
+            # Avoid division by zero by adding small epsilon? not necessary maybe.
+            return np.prod(probas, axis=0) ** (1 / probas.shape[0])
+        if self.mean_type == "arithmetic":
+            return np.mean(probas, axis=0)
+
+        raise ValueError(
+            f"Unsupported mean_type '{self.mean_type}'. Use 'arithmetic' or 'geometric'."
+        )
 
     @classmethod
     def get_test_params(self):

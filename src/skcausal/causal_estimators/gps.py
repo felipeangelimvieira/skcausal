@@ -7,12 +7,12 @@ import pandas as pd
 import polars as pl
 from sklearn.base import BaseEstimator
 
-from skcausal.causal_estimators.base import BaseCausalResponseEstimator, to_dummies
+from skcausal.causal_estimators.base import BaseAverageCausalResponseEstimator, to_dummies
 from skcausal.utils.polars import convert_categorical_to_dummies
 from skcausal.weight_estimators.base import BaseBalancingWeightRegressor
 
 
-class GPS(BaseCausalResponseEstimator):
+class GPS(BaseAverageCausalResponseEstimator):
     """
     The Generalized Propensity Score (GPS) method of Hirano and Imbens (2004).
 
@@ -37,7 +37,6 @@ class GPS(BaseCausalResponseEstimator):
     """
 
     _tags = {
-        "capability:predicts_individual": True,
         "capability:supports_multidimensional_treatment": True,
         "t_inner_mtype": pl.DataFrame,
         "store_X": True,
@@ -235,43 +234,7 @@ class GPS(BaseCausalResponseEstimator):
             axis=1,
         )
         return treat_gps
-
-    def _predict_individual(self, X: np.ndarray, t: np.ndarray):
-        """Predict individual treatment effect
-
-        Parameters
-        ----------
-        X : np.ndarray
-            The input data
-        t : np.ndarray
-            The treatment values
-
-        Returns
-        -------
-        np.ndarray
-            The predicted individual treatment effect for each sample in X.
-        """
-
-        treat_gps = self.make_treatment_gps_array(X, t)
-        return self.outcome_regressor_.predict(treat_gps)
-
-    def _predict_average_treatment_effect(self, X, t) -> float:
-        """Predict the average treatment effect for the given treatment values t.
-
-        Parameters
-        ----------
-        X : np.ndarray
-            The input data
-        t : np.ndarray
-            The treatment values
-
-        Returns
-        -------
-        float
-            The average treatment effect for the given treatment values t.
-        """
-
-        return np.array(self._predict_adrf(X, t)).reshape((-1, 1)).mean()
+   
 
     def _predict_adrf(self, X: np.ndarray, t: pl.DataFrame) -> list[float]:
         """

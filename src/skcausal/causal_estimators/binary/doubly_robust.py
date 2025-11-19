@@ -5,7 +5,7 @@ import pandas as pd
 import polars as pl
 from sklearn.base import BaseEstimator
 
-from skcausal.causal_estimators.base import BaseCausalResponseEstimator
+from skcausal.causal_estimators.base import BaseAverageCausalResponseEstimator
 from skcausal.weight_estimators.base import BaseBalancingWeightRegressor
 
 __all__ = [
@@ -13,7 +13,7 @@ __all__ = [
 ]
 
 
-class BinaryDoublyRobust(BaseCausalResponseEstimator):
+class BinaryDoublyRobust(BaseAverageCausalResponseEstimator):
     """
     Uses Propensity Score Weighting to forecast the average treatment effect of Discrete Treatments.
 
@@ -24,7 +24,6 @@ class BinaryDoublyRobust(BaseCausalResponseEstimator):
     """
 
     _tags = {
-        "capability:predicts_individual": False,
         "capability:supports_multidimensional_treatment": False,
         "t_inner_mtype": pl.DataFrame,
         "store_X": True,

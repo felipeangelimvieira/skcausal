@@ -10,13 +10,13 @@ import pandas as pd
 from sklearn.base import RegressorMixin
 from sklearn.pipeline import Pipeline
 import polars as pl
-from skcausal.causal_estimators.base import BaseCausalResponseEstimator
+from skcausal.causal_estimators.base import BaseAverageCausalResponseEstimator
 from skcausal.weight_estimators.base import BaseBalancingWeightRegressor
 
 __all__ = ["WeightedDirectRegressor", "WeightedIndividualDirectRegressor"]
 
 
-class WeightedDirectRegressor(BaseCausalResponseEstimator):
+class WeightedDirectRegressor(BaseAverageCausalResponseEstimator):
     """
     Perform direct regression with optional weighted samples.
 
@@ -34,7 +34,6 @@ class WeightedDirectRegressor(BaseCausalResponseEstimator):
     """
 
     _tags = {
-        "capability:predicts_individual": False,
         "t_inner_mtype": pl.DataFrame,
     }
 
@@ -114,41 +113,6 @@ class WeightedDirectRegressor(BaseCausalResponseEstimator):
         if not isinstance(t, np.ndarray):
             t = t.to_numpy()
         return np.concatenate([X, t.reshape((X.shape[0], -1))], axis=1)
-
-    def _predict_individual(
-        self, X: np.ndarray, t: np.ndarray
-    ) -> np.ndarray:  # -> Any:
-        """Predict the individual treatment effect for each sample in X, given t.
-
-        Parameters
-        ----------
-        X : np.ndarray
-            Input data
-        t : np.ndarray
-            Treatment values
-
-        Returns
-        -------
-        np.ndarray
-            Array with predicted individual treatment effects.
-        """
-        return self.outcome_regressor.predict(self._prepare_input_array(X, t))
-
-    def _predict_average_treatment_effect(self, X: np.ndarray, t: np.ndarray):
-        """Predict the average treatment effect for the given treatment values t.
-
-        Uses `predict_individual`  and takes the average of the sample.
-
-        Parameters
-        ----------
-        X : np.ndarray
-            Input data
-        t : np.ndarray
-            Treatment values
-        """
-
-        ate = self.predict_individual(X, t).mean()
-        return ate
 
     def _predict_adrf(self, X: pd.DataFrame, t: list[float]) -> list[float]:
         """Predict the Average Dose-Response Curve for a list of treatment values.

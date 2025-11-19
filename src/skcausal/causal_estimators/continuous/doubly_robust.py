@@ -7,7 +7,7 @@ from sklearn.base import BaseEstimator
 from sklearn.gaussian_process.kernels import RBF, Kernel
 from sklearn.kernel_ridge import KernelRidge
 
-from skcausal.causal_estimators.base import BaseCausalResponseEstimator
+from skcausal.causal_estimators.base import BaseAverageCausalResponseEstimator
 from skcausal.weight_estimators.base import BaseBalancingWeightRegressor
 from typing import Optional
 from sklearn.neighbors import KernelDensity
@@ -15,7 +15,7 @@ from sklearn.neighbors import KernelDensity
 __all__ = ["DoublyRobustPseudoOutcome"]
 
 
-class DoublyRobustPseudoOutcome(BaseCausalResponseEstimator):
+class DoublyRobustPseudoOutcome(BaseAverageCausalResponseEstimator):
     """
     Doubly-Robust pseudo-outcome for a continuous treatment A.
 

@@ -13,7 +13,7 @@ from skcausal.utils.polars import (
 from skcausal.utils.mtype import convert_mtype
 
 
-class BaseCausalResponseEstimator(_BaseEstimator):
+class BaseAverageCausalResponseEstimator(_BaseEstimator):
     """Base class for ADRF Estimators.
 
     Subclasses must override `fit`, and `predict_individual` if the estimator
@@ -30,7 +30,6 @@ class BaseCausalResponseEstimator(_BaseEstimator):
     """
 
     _tags = {
-        "capability:predicts_individual": True,
         "capability:supports_multidimensional_treatment": False,
         "supported_t_dtypes": [pl.Enum, pl.Boolean, *INTEGER_DTYPES, *FLOAT_DTYPES],
         "t_inner_mtype": np.ndarray,
@@ -125,44 +124,6 @@ class BaseCausalResponseEstimator(_BaseEstimator):
         """
         raise NotImplementedError("This method must be implemented by subclasses.")
 
-    def predict_individual(self, X, t):
-        """
-        Predict the individual treatment effect for each sample in X, given t.
-
-        Abstract method that must be implemented by subclasses.
-
-        Parameters
-        ----------
-        X : np.ndarray
-            Input features.
-        t : np.ndarray
-            Treatment variable.
-
-        Returns
-        -------
-        np.ndarray
-            The predicted individual treatment effect for each sample in X.
-
-        Raises
-        ------
-        ValueError
-            If not implemented by the subclass and has `capability:predicts_individual` tag
-            set to True.
-        """
-
-        X_inner = self._check_and_transform_X(X)
-        _, _, t_inner = self._prepare_treatment_inputs(t, check_schema=True)
-
-        predicts_individual = self.get_tag("capability:predicts_individual", True)
-
-        if not predicts_individual:
-            return np.array(self._predict_adrf(X_inner, t_inner)).reshape((-1, 1))
-
-        return self._predict_individual(X_inner, t_inner)
-
-    def _predict_individual(self, X, t):
-        raise NotImplementedError("This method must be implemented by subclasses.")
-
     def predict_adrf(self, X, t):
         """
         Predict the average treatment effect for each treatment value in t.
@@ -179,49 +140,7 @@ class BaseCausalResponseEstimator(_BaseEstimator):
         Predict the average treatment effect for each treatment value in t.
         """
 
-        t_df = self._to_polars_dataframe(t, variable_name="t")
-        n_samples = self._get_n_samples(X)
-        ys = []
-
-        for treatment_row in t_df.iter_slices(1):
-            repeated_df = pl.concat([treatment_row] * n_samples)
-            processed_df = self._preprocess_treatment_dataframe(repeated_df)
-            repeated_inner = self._convert_treatment_to_inner(processed_df)
-            ate = self._predict_average_treatment_effect(X, repeated_inner)
-            ys.append(ate)
-
-        return ys
-
-    def predict_average_treatment_effect(self, X, t):
-        """Predict the average treatment effect for the given treatment values t.
-
-        Uses `predict_individual`  and takes the average of the sample.
-
-        Parameters
-        ----------
-        X : np.ndarray
-            Input data
-        t : np.ndarray
-            Treatment values
-        """
-        if not self.get_tag("capability:predicts_individual", True):
-            raise ValueError(
-                "This estimator does not support individual predictions,"
-                + "so predict_average_treatment_effect should be "
-                + "implemented by the estimator."
-            )
-
-        X_inner = self._check_and_transform_X(X)
-        _, _, t_inner = self._prepare_treatment_inputs(t, check_schema=True)
-
-        return self._predict_average_treatment_effect(X_inner, t_inner)
-
-    def _predict_average_treatment_effect(self, X, t):
-        """
-        Predict the average treatment effect for the given treatment values t.
-        """
-        ate = self._predict_individual(X, t).mean()
-        return ate
+        raise NotImplementedError("This method must be implemented by subclasses.")
 
     def _preprocess_treatment_dataframe(self, t: pl.DataFrame) -> pl.DataFrame:
         """Apply deterministic preprocessing steps to the treatment dataframe."""

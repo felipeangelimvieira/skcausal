@@ -135,20 +135,8 @@ def test_causal_estimators_support_configured_mtypes(
 
     estimator.fit(scenario.X_polars, scenario.y_numpy, scenario.t_polars)
 
-    if estimator.get_tag("capability:predicts_individual", True):
-        ate = estimator.predict_average_treatment_effect(
-            scenario.X_numpy, scenario.t_numpy
-        )
-        ate_array = np.atleast_1d(np.asarray(ate, dtype=float))
-        assert np.all(np.isfinite(ate_array))
-
     adrf = estimator.predict_adrf(scenario.X_polars, scenario.t_grid_polars)
     adrf_array = np.atleast_1d(np.asarray(adrf, dtype=float))
     assert adrf_array.shape[0] == scenario.t_grid_polars.height
     assert np.all(np.isfinite(adrf_array))
 
-    if estimator.get_tag("capability:predicts_individual", True):
-        ite = estimator.predict_individual(scenario.X_polars, scenario.t_numpy)
-        assert isinstance(ite, np.ndarray)
-        assert ite.shape[0] == scenario.X_polars.height
-        assert np.all(np.isfinite(ite))

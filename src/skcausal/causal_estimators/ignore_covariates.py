@@ -2,11 +2,11 @@ import numpy as np
 import polars as pl
 from sklearn.base import BaseEstimator, clone
 
-from skcausal.causal_estimators.base import BaseCausalResponseEstimator
+from skcausal.causal_estimators.base import BaseAverageCausalResponseEstimator
 from skcausal.utils.polars import convert_categorical_to_dummies
 
 
-class DirectNoCovariates(BaseCausalResponseEstimator):
+class DirectNoCovariates(BaseAverageCausalResponseEstimator):
     """
     Predicts E[Y|T] directly, ignoring covariates X.
 
@@ -20,7 +20,6 @@ class DirectNoCovariates(BaseCausalResponseEstimator):
     """
 
     _tags = {
-        "capability:predicts_individual": True,
         "capability:supports_multidimensional_treatment": True,
         "t_inner_mtype": pl.DataFrame,
         "store_X": True,
@@ -81,43 +80,6 @@ class DirectNoCovariates(BaseCausalResponseEstimator):
         t = t.to_numpy().astype(np.float32)
 
         return t
-
-    def _predict_individual(self, X: np.ndarray, t: np.ndarray):
-        """Predict individual treatment effect
-
-        Parameters
-        ----------
-        X : np.ndarray
-            The input data
-        t : np.ndarray
-            The treatment values
-
-        Returns
-        -------
-        np.ndarray
-            The predicted individual treatment effect for each sample in X.
-        """
-
-        t = self._prepare_t(t)
-        return self.outcome_regressor_.predict(t)
-
-    def _predict_average_treatment_effect(self, X, t) -> float:
-        """Predict the average treatment effect for the given treatment values t.
-
-        Parameters
-        ----------
-        X : np.ndarray
-            The input data
-        t : np.ndarray
-            The treatment values
-
-        Returns
-        -------
-        float
-            The average treatment effect for the given treatment values t.
-        """
-
-        return np.array(self._predict_adrf(X, t)).reshape((-1, 1)).mean()
 
     def _predict_adrf(self, X: np.ndarray, t: pl.DataFrame) -> list[float]:
         """

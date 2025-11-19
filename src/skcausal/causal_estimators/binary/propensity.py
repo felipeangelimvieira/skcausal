@@ -8,7 +8,7 @@ from sklearn.base import BaseEstimator
 from sklearn.gaussian_process.kernels import RBF, Kernel
 from sklearn.kernel_ridge import KernelRidge
 
-from skcausal.causal_estimators.base import BaseCausalResponseEstimator, to_dummies
+from skcausal.causal_estimators.base import BaseAverageCausalResponseEstimator, to_dummies
 from skcausal.utils.polars import convert_categorical_to_dummies
 from skcausal.weight_estimators.base import BaseBalancingWeightRegressor
 from sklearn.neighbors import KernelDensity
@@ -19,7 +19,7 @@ __all__ = [
 ]
 
 
-class BinaryPropensityWeighting(BaseCausalResponseEstimator):
+class BinaryPropensityWeighting(BaseAverageCausalResponseEstimator):
     """
     Uses Propensity Score Weighting to forecast the average treatment effect of Discrete Treatments.
 
@@ -30,7 +30,6 @@ class BinaryPropensityWeighting(BaseCausalResponseEstimator):
     """
 
     _tags = {
-        "capability:predicts_individual": False,
         "capability:supports_multidimensional_treatment": False,
         "t_inner_mtype": pl.DataFrame,
         "store_X": True,
