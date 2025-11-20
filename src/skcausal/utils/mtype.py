@@ -247,4 +247,9 @@ def convert_mtype(
 ) -> Any:
     """Convenience function using the module-level default converter."""
 
+    start_type = type(value)
+    if to_type.__name__ == start_type.__name__ or (
+        isinstance(to_type, tuple) and any(start_type == t for t in to_type)
+    ):
+        return value
     return default_converter.convert(value, to_type, **kwargs)

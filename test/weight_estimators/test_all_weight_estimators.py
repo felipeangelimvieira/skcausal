@@ -134,6 +134,8 @@ class TestAllBalancingWeightRegressor(TestAllObjects):
         "one_hot_encode_enum_columns",
         "capability:supports_multidimensional_treatment",
         "supported_t_dtypes",
+        "balancing_weight_type",
+        "utility:scale_treatment",
     ]
 
     object_type_filter = BaseBalancingWeightRegressor
@@ -191,7 +193,11 @@ class TestAllBalancingWeightRegressor(TestAllObjects):
 
         # Check that the output is a numpy array with the correct shape
         assert isinstance(sample_weights, np.ndarray), "Output is not a numpy array"
-        assert sample_weights.shape[0] == X.shape[0], "Output shape is incorrect"
+        assert (
+            sample_weights.shape[0] == X.shape[0]
+        ), "Output shape {} is incorrect, expected {}".format(
+            sample_weights.shape[0], X.shape[0]
+        )
         assert (
             sample_weights.ndim == 2 and sample_weights.shape[1] == 1
         ), "Output shape is incorrect"

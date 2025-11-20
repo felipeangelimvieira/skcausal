@@ -6,6 +6,7 @@ from sklearn.base import ClassifierMixin, TransformerMixin
 from sklearn.preprocessing import SplineTransformer
 from skcausal.utils.polars import ALL_DTYPES, convert_categorical_to_dummies
 from skcausal.weight_estimators.base import BaseBalancingWeightRegressor
+from skcausal.utils.sklearn import _resolve_sample_weight_fit_args
 
 __all__ = [
     "SyntheticWeightRegressor",
@@ -122,7 +123,10 @@ class SyntheticWeightRegressor(BaseBalancingWeightRegressor):
                 )
             )
 
-            self.classifier_.fit(X_classif, y_classif, sample_weight=sample_weights)
+            fit_kwargs = _resolve_sample_weight_fit_args(
+                self.classifier_, sample_weights
+            )
+            self.classifier_.fit(X_classif, y_classif, **fit_kwargs)
 
             probas = self.classifier_.predict_proba(X_classif)
 
@@ -155,8 +159,12 @@ class SyntheticWeightRegressor(BaseBalancingWeightRegressor):
                 )
             )
 
+            fit_kwargs = _resolve_sample_weight_fit_args(
+                self.classifier_, sample_weights
+            )
+
             _classif = copy.deepcopy(self.classifier_).fit(
-                X_classif, y_classif, sample_weight=sample_weights
+                X_classif, y_classif, **fit_kwargs
             )
             probas = _classif.predict_proba(X_classif)
 

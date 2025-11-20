@@ -175,4 +175,4 @@ class BaseTorchBalancingWeightRegressor(BaseBalancingWeightRegressor):
         # Check no nans
         if np.any(np.isnan(y_pred)):
             raise ValueError("NaN values found in predictions.")
-        return y_pred.flatten()
+        return y_pred.reshape((-1, 1))

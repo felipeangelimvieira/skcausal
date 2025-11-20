@@ -13,7 +13,7 @@ from skcausal._pytorch.proba_linear_interpolation.lightning_module import (
 from skcausal._pytorch.utils.data import (
     ArgsDataset,
 )
-
+from skcausal.utils.polars import INTEGER_DTYPES, FLOAT_DTYPES
 from skcausal.weight_estimators.nn.base import BaseTorchBalancingWeightRegressor
 
 __all__ = [
@@ -25,9 +25,10 @@ class InterpolateNeuralWeightRegressor(BaseTorchBalancingWeightRegressor):
 
     _tags = {
         "t_inner_mtype": "np.ndarray",
-        "one_hot_encode_enum_columns": False,
+        "one_hot_encode_enum_columns": True,
         "balancing_weight_type": "propensity_score",
         "utility:scale_treatment": "minmax",
+        "supported_t_dtypes": [pl.Boolean, *FLOAT_DTYPES, *INTEGER_DTYPES],
     }
 
     def __init__(
@@ -93,3 +94,14 @@ class InterpolateNeuralWeightRegressor(BaseTorchBalancingWeightRegressor):
             else:
                 raise ValueError(f"Invalid treatment type: {dtype}")
         return treatment_heads
+
+    @classmethod
+    def get_test_params(cls, parameter_set="default"):
+        return [
+            {
+                "n_layers": 1,
+                "n_units": 10,
+                "n_epochs": 2,
+                "batch_size": 512,
+            }
+        ]

@@ -4,7 +4,7 @@ import pytest
 from sklearn.linear_model import LinearRegression
 from sklearn.tree import DecisionTreeRegressor
 
-from skcausal.causal_estimators.base import BaseCausalResponseEstimator
+from skcausal.causal_estimators.base import BaseAverageCausalResponseEstimator
 from skcausal.causal_estimators.direct_method import WeightedDirectRegressor
 from skcausal.causal_estimators.continuous.doubly_robust import (
     DoublyRobustPseudoOutcome,
@@ -131,7 +131,7 @@ def test_causal_estimators_support_configured_mtypes(
 ):
     scenario = SCENARIOS[scenario_key]()
 
-    estimator: BaseCausalResponseEstimator = estimator_cls(**init_params)
+    estimator: BaseAverageCausalResponseEstimator = estimator_cls(**init_params)
 
     estimator.fit(scenario.X_polars, scenario.y_numpy, scenario.t_polars)
 
@@ -139,4 +139,3 @@ def test_causal_estimators_support_configured_mtypes(
     adrf_array = np.atleast_1d(np.asarray(adrf, dtype=float))
     assert adrf_array.shape[0] == scenario.t_grid_polars.height
     assert np.all(np.isfinite(adrf_array))
-

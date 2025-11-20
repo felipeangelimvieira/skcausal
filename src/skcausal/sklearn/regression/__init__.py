@@ -1,6 +1,3 @@
-from .mlp_regressor import MLPRegressor
+from .local_linear_regression import LocalLinearRegression
 
-
-__all__ = [
-    "MLPRegressor",
-]
+__all__ = ["LocalLinearRegression"]

@@ -1,7 +1,6 @@
 import copy
 from typing import List, Callable
 import numpy as np
-import polars as pl
 from tqdm import tqdm
 from skcausal.utils.polars import ALL_DTYPES, convert_categorical_to_dummies
 from skcausal.weight_estimators.base import BaseBalancingWeightRegressor
@@ -35,7 +34,7 @@ class OptunaSearchWeightRegressor(BaseBalancingWeightRegressor):
     """
 
     _tags = {
-        "t_inner_mtype": pl.DataFrame,
+        "t_inner_mtype": pd.DataFrame,
         "one_hot_encode_enum_columns": False,
         "supported_t_dtypes": ALL_DTYPES,
         "balancing_weight_type": None,

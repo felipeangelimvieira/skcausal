@@ -27,7 +27,7 @@ def to_dummies(df: pl.DataFrame, column: str) -> pl.DataFrame:
             pl.when(pl.col(column) == cat)
             .then(1)
             .otherwise(0)
-            .cast(pl.Binary)
+            .cast(pl.Boolean)
             .alias(f"{column}__dummy_{cat}")
         )
     return df.drop(column)
