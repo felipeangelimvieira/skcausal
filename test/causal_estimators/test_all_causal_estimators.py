@@ -109,7 +109,6 @@ ESTIMATOR_CONFIGS = [
             "treatment_regressor": DummyWeightEstimator(),
             "outcome_regressor": LinearRegression(),
             "pseudo_outcome_regressor": LinearRegression(),
-            "n_treatments_to_predict": 10,
         },
         "binary",
     ),
