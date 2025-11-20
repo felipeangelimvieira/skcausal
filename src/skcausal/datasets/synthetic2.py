@@ -6,7 +6,7 @@ There are also some variations, which weren't considered on the paper
 
 import numpy as np
 from scipy.stats import beta, norm
-
+import polars as pl
 from skcausal.datasets.base import BaseDataset
 
 __all__ = [
@@ -169,4 +169,4 @@ class SyntheticDataset2Discrete(SyntheticDataset2):
 
     def get_grid(self, n: int = 100):
         data = [True, False]
-        return pd.DataFrame(data, columns=["treatment"]).astype(self.TREATMENT_SCHEMA)
+        return pl.DataFrame(data, schema=self.TREATMENT_SCHEMA)

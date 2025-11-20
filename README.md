@@ -45,7 +45,7 @@ Contains methods for estimating balancing weights used in causal inference.
 #### Key Classes:
 - `BaseBalancingWeightRegressor` - Base class for balancing weight estimation.
 - `BinaryClassifierWeightRegressor` - Learns propensity scores via binary classification.
-- `SyntheticWeightRegressor` - Creates a synthetic classification problem to estimate inverse probability of treatment weights (IPTW).
+- `DiscriminativeWeightRegressor` - Creates a synthetic classification problem to estimate inverse probability of treatment weights (IPTW).
 - `TreatmentDensityRatioRegressor` - Uses a deep learning model to estimate density ratio weights.
 - `InterpolateNeuralWeightRegressor` - A neural network-based method for weight estimation with linear interpolation.
 

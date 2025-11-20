@@ -2,20 +2,28 @@ project:
   type: website
 
 website:
-  title: "docs"
+  title: "skcausal"
+  search:
+    location: navbar
+    limit: 5
+    type: textbox
   navbar:
+    search: true
     left:
-      - href: index.qmd
-        text: Home
-      - about.qmd
+      - href: getting-started.qmd
+        text: "Getting Started"
+      - href: examples.qmd
+        text: "Examples"
 
 format:
   html:
+    mermaid:
+      theme: neutral
+    toc: true
+    toc-expand: true
     theme:
       - cosmo
       - brand
-    css: styles.css
-    toc: true
 
 
 

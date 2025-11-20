@@ -133,7 +133,7 @@ class BaseAverageCausalResponseEstimator(_BaseEstimator):
         X_inner = self._check_and_transform_X(X)
         _, _, t_inner = self._prepare_treatment_inputs(t, check_schema=True)
 
-        return self._predict_adrf(X_inner, t_inner)
+        return np.array(self._predict_adrf(X_inner, t_inner))
 
     def _predict_adrf(self, X, t):
         """

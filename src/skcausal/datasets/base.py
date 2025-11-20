@@ -106,7 +106,11 @@ class BaseDataset(ABC):
 
         treatments = self._to_polars(treatments)
 
-        return covariates, treatments, outcomes
+        return (
+            pl.DataFrame(covariates),
+            pl.DataFrame(treatments),
+            pl.DataFrame(outcomes),
+        )
 
     def _to_polars(self, treatments: np.ndarray) -> np.ndarray:
 
@@ -174,7 +178,7 @@ class BaseDataset(ABC):
             outcomes = self.get_mean_outcomes(covariates, treatments)
             adrf.append(outcomes.mean())
 
-        return adrf
+        return np.array(adrf)
 
     def pdf_treatments(self, treatments, covariates: np.ndarray) -> np.ndarray:
         raise NotImplementedError(

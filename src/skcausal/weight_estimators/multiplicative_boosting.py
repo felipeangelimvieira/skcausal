@@ -15,8 +15,12 @@ from skcausal.weight_estimators.synthetic_weight import (
 )
 from skcausal.utils.sklearn import _resolve_sample_weight_fit_args
 
+__all__ = [
+    "DiscriminativeWeightBoosting",
+]
 
-class SyntheticWeightBoosting(BaseBalancingWeightRegressor):
+
+class DiscriminativeWeightBoosting(BaseBalancingWeightRegressor):
     """Boosted classifier-based balancing weights via density-ratio factorization.
 
     Learns 1 / rho(x,t) multiplicatively from a sequence of synthetic
@@ -166,7 +170,9 @@ class SyntheticWeightBoosting(BaseBalancingWeightRegressor):
     def _predict_sample_weight(self, X, t):
         """Return balancing weights w_i ≈ rho(x_i, t_i) for the chosen target."""
         if not hasattr(self, "classifiers_") or not self.classifiers_:
-            raise NotFittedError("SyntheticWeightBoosting instance is not fitted yet.")
+            raise NotFittedError(
+                "DiscriminativeWeightBoosting instance is not fitted yet."
+            )
 
         # Build a fresh pooled dataset (same construction as in training).
         dataset_size = int(X.shape[0] * self.num_synthetic_dataset_generations)

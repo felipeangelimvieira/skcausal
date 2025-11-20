@@ -1,4 +1,4 @@
-import datetime
+from typing import Optional
 from copy import deepcopy
 
 import warnings
@@ -7,7 +7,10 @@ import pandas as pd
 import polars as pl
 from sklearn.base import BaseEstimator
 
-from skcausal.causal_estimators.base import BaseAverageCausalResponseEstimator, to_dummies
+from skcausal.causal_estimators.base import (
+    BaseAverageCausalResponseEstimator,
+    to_dummies,
+)
 from skcausal.utils.polars import convert_categorical_to_dummies
 from skcausal.weight_estimators.base import BaseBalancingWeightRegressor
 
@@ -51,6 +54,7 @@ class GPS(BaseAverageCausalResponseEstimator):
         propensity_split_ratio: float = 0.8,
         include_in_outcome_dataset: str = "both",
         random_state=0,
+        predict_subsample_size: Optional[int] = None,
     ):
         self.treatment_regressor = treatment_regressor
         self.outcome_regressor = outcome_regressor
@@ -58,6 +62,7 @@ class GPS(BaseAverageCausalResponseEstimator):
         self.propensity_split_ratio = propensity_split_ratio
         self.include_in_outcome_dataset = include_in_outcome_dataset
         self.random_state = random_state
+        self.predict_subsample_size = predict_subsample_size
 
         super().__init__()
 
@@ -234,7 +239,6 @@ class GPS(BaseAverageCausalResponseEstimator):
             axis=1,
         )
         return treat_gps
-   
 
     def _predict_adrf(self, X: np.ndarray, t: pl.DataFrame) -> list[float]:
         """
@@ -260,8 +264,17 @@ class GPS(BaseAverageCausalResponseEstimator):
             repeated_X, repeated_treat_values
         ).reshape((len(t), X.shape[0], -1))
         for i in range(t.shape[0]):
-
-            effect = self.outcome_regressor_.predict(treat_gps[i]).mean()
+            _data = treat_gps[i]
+            if (
+                self.predict_subsample_size is not None
+                and self.predict_subsample_size < X.shape[0]
+            ):
+                rng = np.random.default_rng(self.random_state)
+                indices = rng.choice(
+                    X.shape[0], size=self.predict_subsample_size, replace=False
+                )
+                _data = treat_gps[i][indices]
+            effect = self.outcome_regressor_.predict(_data).mean()
             effects.append(effect)
 
         return effects

@@ -9,11 +9,11 @@ from skcausal.weight_estimators.base import BaseBalancingWeightRegressor
 from skcausal.utils.sklearn import _resolve_sample_weight_fit_args
 
 __all__ = [
-    "SyntheticWeightRegressor",
+    "DiscriminativeWeightRegressor",
 ]
 
 
-class SyntheticWeightRegressor(BaseBalancingWeightRegressor):
+class DiscriminativeWeightRegressor(BaseBalancingWeightRegressor):
     """Estimate balancing weights via a synthetic classification task.
 
     The estimator augments the observed data with synthetic observations whose
@@ -223,7 +223,7 @@ class SyntheticWeightRegressor(BaseBalancingWeightRegressor):
 
         if self.classifier_ is None:
             raise ValueError(
-                "SyntheticWeightRegressor must be fitted before predicting."
+                "DiscriminativeWeightRegressor must be fitted before predicting."
             )
 
         return self.classifier_.predict_proba(Xt)

@@ -1,0 +1,190 @@
+# Dose Response Curve Example
+
+
+
+```{python}
+from skcausal.datasets.synthetic2 import SyntheticDataset2
+
+dataset = SyntheticDataset2(n_features=6)
+dataset.prepare(n=1000, split_seed=42, preparation_seed=42)
+
+X, t, y = dataset.retrieve()
+
+
+X
+```
+
+```{python}
+import numpy as np
+import polars as pl
+
+treatment_grid = pl.DataFrame(np.linspace(0, 1, 100), schema=t.schema)
+true_adrf = dataset.get_adrf(X, t)
+```
+
+
+```{python}
+
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots()
+plt.scatter(t, y, alpha=0.3)
+# Argsort true_adrf for plotting
+sorted_indices = np.argsort(t.to_numpy().flatten())
+plt.plot(
+    t[sorted_indices],
+    true_adrf[sorted_indices],
+    color="red",
+    linewidth=2,
+)
+fig.show()
+```
+
+```{python}
+from skcausal.causal_estimators.ignore_covariates import DirectNoCovariates
+
+from sklearn.ensemble import RandomForestRegressor
+
+estimator = DirectNoCovariates(outcome_regressor=RandomForestRegressor(min_samples_leaf=30))
+estimator.fit(X, t=t, y=y)
+```
+
+```{python}
+y_pred = estimator.predict_adrf(X, t)
+```
+
+```{python}
+
+fig, ax = plt.subplots()
+plt.scatter(t, y, alpha=0.3)
+# Argsort true_adrf for plotting
+sorted_indices = np.argsort(t.to_numpy().flatten())
+plt.plot(
+    t[sorted_indices],
+    true_adrf[sorted_indices],
+    color="red",
+    linewidth=2,
+)
+plt.plot(
+    t[sorted_indices],
+    y_pred[sorted_indices],
+    color="green",
+    linewidth=2,
+)
+fig.show()
+```
+
+```{python}
+from skcausal.causal_estimators.continuous.doubly_robust import (
+    DoublyRobustPseudoOutcome,
+)
+from skcausal.weight_estimators.multiplicative_boosting import (
+    DiscriminativeWeightBoosting,
+)
+from sklearn.ensemble import RandomForestClassifier
+
+dr = DoublyRobustPseudoOutcome(
+    treatment_regressor=DiscriminativeWeightBoosting(
+        classifier=RandomForestClassifier(min_samples_leaf=30),
+        n_boosting_iter=5,
+        method="balanced",
+        complexity_factor=5,
+    ),
+    outcome_regressor=RandomForestRegressor(min_samples_leaf=30),
+    pseudo_outcome_regressor=RandomForestRegressor(min_samples_leaf=30),
+)
+dr.fit(X, t=t, y=y)
+
+```
+
+```{python}
+y_dr_pred = dr.predict_adrf(X, t)
+```
+
+
+```{python}
+from skcausal.causal_estimators.gps import GPS
+
+gps = GPS(
+    treatment_regressor=DiscriminativeWeightBoosting(
+        classifier=RandomForestClassifier(min_samples_leaf=30),
+        n_boosting_iter=5,
+        method="uniform",
+        complexity_factor=5,
+    ),
+    outcome_regressor=RandomForestRegressor(min_samples_leaf=30),
+    include_in_outcome_dataset="both",
+    predict_subsample_size=100,
+)
+```
+
+
+```{python}
+gps.fit(X, t=t, y=y)
+y_gps_pred = gps.predict_adrf(X, t)
+```
+
+
+```{python}
+from skcausal.causal_estimators.continuous import PropensityPseudoOutcomeContinuous
+from sklearn.neural_network import MLPClassifier
+
+pw = PropensityPseudoOutcomeContinuous(
+    treatment_regressor=DiscriminativeWeightBoosting(
+        classifier=MLPClassifier(hidden_layer_sizes=(25, 25), max_iter=500),
+        n_boosting_iter=10,
+        method="uniform",
+        complexity_factor=1.1,
+    ),
+    pseudo_outcome_regressor=RandomForestRegressor(min_samples_leaf=30),
+)
+```
+
+```{python}
+pw.fit(X, t=t, y=y)
+y_pw_pred = pw.predict_adrf(X, t)
+```
+
+```{python}
+
+fig, ax = plt.subplots()
+plt.scatter(t, y, alpha=0.3)
+# Argsort true_adrf for plotting
+sorted_indices = np.argsort(t.to_numpy().flatten())
+plt.plot(
+    t[sorted_indices],
+    true_adrf[sorted_indices],
+    color="red",
+    linewidth=2,
+)
+plt.plot(
+    t[sorted_indices],
+    y_pred[sorted_indices],
+    color="green",
+    linewidth=2,
+    label="DirectNoCovariates",
+)
+plt.plot(
+    t[sorted_indices],
+    y_dr_pred[sorted_indices],
+    color="blue",
+    linewidth=2,
+    label="DoublyRobustPseudoOutcome",
+)
+plt.plot(
+    t[sorted_indices],
+    y_gps_pred[sorted_indices],
+    color="orange",
+    linewidth=2,
+    label="GPS",
+)
+plt.plot(
+    t[sorted_indices],
+    y_pw_pred[sorted_indices],
+    color="purple",
+    linewidth=2,
+    label="PropensityPseudoOutcomeContinuous",
+)
+plt.legend()
+fig.show()
+```
