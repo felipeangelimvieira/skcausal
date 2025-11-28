@@ -23,8 +23,8 @@
   {
     "objectID": "index.html",
     "href": "index.html",
-    "title": "docs",
+    "title": "Skcausal documention",
     "section": "",
-    "text": "This is a Quarto website.\nTo learn more about Quarto websites visit https://quarto.org/docs/websites."
+    "text": "NoteEstimate causal effects for continuous treatments\n\n\n\nCheckout how to fit and predict dose-response curves using different causal estimators for continuous treatments in skcausal.\n\nClick here!"
   }
 ]
