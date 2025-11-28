@@ -12,7 +12,7 @@ website:
     left:
       - href: getting-started.qmd
         text: "Getting Started"
-      - href: examples.qmd
+      - href: examples
         text: "Examples"
 
 format:

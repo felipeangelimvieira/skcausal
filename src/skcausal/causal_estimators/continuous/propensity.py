@@ -8,7 +8,10 @@ from sklearn.base import BaseEstimator
 from sklearn.gaussian_process.kernels import RBF, Kernel
 from sklearn.kernel_ridge import KernelRidge
 
-from skcausal.causal_estimators.base import BaseAverageCausalResponseEstimator, to_dummies
+from skcausal.causal_estimators.base import (
+    BaseAverageCausalResponseEstimator,
+    to_dummies,
+)
 from skcausal.utils.polars import convert_categorical_to_dummies
 from skcausal.weight_estimators.base import BaseBalancingWeightRegressor
 from sklearn.neighbors import KernelDensity
