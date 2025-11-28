@@ -10,10 +10,8 @@ website:
   navbar:
     search: true
     left:
-      - href: getting-started.qmd
-        text: "Getting Started"
-      - href: examples
-        text: "Examples"
+      - href: examples/dose_response_curve.qmd
+        text: "Example"
 
 format:
   html:
