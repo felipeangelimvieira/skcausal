@@ -1,6 +1,10 @@
 # Dose Response Curve Example
 
+In this tutorial, we will demonstrate how to estimate the Dose Response Curve (or Average Dose Response Function - ADRF) using `skcausal`. We will use a synthetic dataset where the true causal effect is known, allowing us to compare different estimation methods.
 
+## Data Generation
+
+First, we generate a synthetic dataset. This dataset includes covariates ($X$), a continuous treatment ($t$), and an outcome ($y$). We use `SyntheticDataset2` which simulates a scenario with confounding variables.
 
 ```{python}
 from skcausal.datasets.synthetic2 import SyntheticDataset2
@@ -14,6 +18,10 @@ X, t, y = dataset.retrieve()
 X
 ```
 
+## The True Average Dose Response Function (ADRF)
+
+Since this is synthetic data, we can calculate the true ADRF. This represents the actual expected outcome for each treatment level if we were to assign that treatment to the entire population. This serves as our ground truth for evaluation.
+
 ```{python}
 import numpy as np
 import polars as pl
@@ -22,6 +30,9 @@ treatment_grid = pl.DataFrame(np.linspace(0, 1, 100), schema=t.schema)
 true_adrf = dataset.get_adrf(X, t)
 ```
 
+## Visualizing the Data
+
+Let's visualize the observed data (scatter plot) and the true ADRF (red line). The scatter plot shows the observed outcomes for given treatments, which are influenced by confounding. The red line shows the underlying causal relationship we want to recover.
 
 ```{python}
 
@@ -40,6 +51,10 @@ plt.plot(
 fig.show()
 ```
 
+## 1. Naive Approach: Direct Estimation (Ignoring Covariates)
+
+As a baseline, we first use a "direct" estimator that ignores covariates. It simply models $Y$ as a function of $T$, $E[Y|T]$. In the presence of confounding, this estimator is likely to be biased because it mistakes correlation for causation.
+
 ```{python}
 from skcausal.causal_estimators.ignore_covariates import DirectNoCovariates
 
@@ -52,6 +67,8 @@ estimator.fit(X, t=t, y=y)
 ```{python}
 y_pred = estimator.predict_adrf(X, t)
 ```
+
+We can now plot the predictions of this naive estimator (green) against the true ADRF (red).
 
 ```{python}
 
@@ -73,6 +90,14 @@ plt.plot(
 )
 fig.show()
 ```
+
+## 2. Doubly Robust Estimation
+
+Now we employ a more rigorous method: **Doubly Robust (DR) Estimation**. This approach combines two models:
+1.  A **propensity model** (treatment model) that estimates the probability density of the treatment given covariates.
+2.  An **outcome model** that estimates the outcome given treatment and covariates.
+
+The DR estimator is consistent if *either* the propensity model *or* the outcome model is correctly specified. Here, we use `DoublyRobustPseudoOutcome`.
 
 ```{python}
 from skcausal.causal_estimators.continuous.doubly_robust import (
@@ -101,6 +126,12 @@ dr.fit(X, t=t, y=y)
 y_dr_pred = dr.predict_adrf(X, t)
 ```
 
+## 3. Generalized Propensity Score (GPS)
+
+The **Generalized Propensity Score (GPS)** method adjusts for confounding by conditioning on the generalized propensity score. It involves:
+1.  Estimating the conditional density of the treatment given covariates (the GPS).
+2.  Estimating the conditional expectation of the outcome given the treatment and the GPS.
+3.  Averaging over the GPS to estimate the ADRF.
 
 ```{python}
 from skcausal.causal_estimators.gps import GPS
@@ -124,6 +155,9 @@ gps.fit(X, t=t, y=y)
 y_gps_pred = gps.predict_adrf(X, t)
 ```
 
+## 4. Propensity Weighting (Pseudo-Outcome)
+
+Another approach is **Propensity Weighting**. This method uses the inverse of the propensity score (or related weights) to re-weight the data, creating a pseudo-population where the treatment is independent of covariates. We use `PropensityPseudoOutcomeContinuous` here.
 
 ```{python}
 from skcausal.causal_estimators.continuous import PropensityPseudoOutcomeContinuous
@@ -144,6 +178,10 @@ pw = PropensityPseudoOutcomeContinuous(
 pw.fit(X, t=t, y=y)
 y_pw_pred = pw.predict_adrf(X, t)
 ```
+
+## Final Comparison
+
+Finally, let's compare all the estimated curves against the true ADRF. This plot will show how well each method recovers the true causal effect compared to the naive baseline.
 
 ```{python}
 
