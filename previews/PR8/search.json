@@ -1,0 +1,86 @@
+[
+  {
+    "objectID": "about.html",
+    "href": "about.html",
+    "title": "About",
+    "section": "",
+    "text": "About this site"
+  },
+  {
+    "objectID": "examples/index.html",
+    "href": "examples/index.html",
+    "title": "Examples",
+    "section": "",
+    "text": "Examples"
+  },
+  {
+    "objectID": "examples/dose_response_curve.html",
+    "href": "examples/dose_response_curve.html",
+    "title": "Dose Response Curve Example",
+    "section": "",
+    "text": "In this tutorial, we will demonstrate how to estimate the Dose Response Curve (or Average Dose Response Function - ADRF) using skcausal. We will use a synthetic dataset where the true causal effect is known, allowing us to compare different estimation methods."
+  },
+  {
+    "objectID": "examples/dose_response_curve.html#data-generation",
+    "href": "examples/dose_response_curve.html#data-generation",
+    "title": "Dose Response Curve Example",
+    "section": "Data Generation",
+    "text": "Data Generation\nFirst, we generate a synthetic dataset. This dataset includes covariates (\\(X\\)), a continuous treatment (\\(t\\)), and an outcome (\\(y\\)). We use SyntheticDataset2 which simulates a scenario with confounding variables.\n\nfrom skcausal.datasets.synthetic2 import SyntheticDataset2\n\ndataset = SyntheticDataset2(n_features=6)\ndataset.prepare(n=1000, split_seed=42, preparation_seed=42)\n\nX, t, y = dataset.retrieve()\n\n\nX\n\n\nshape: (1_000, 6)\n\n\n\ncolumn_0\ncolumn_1\ncolumn_2\ncolumn_3\ncolumn_4\ncolumn_5\n\n\nf64\nf64\nf64\nf64\nf64\nf64\n\n\n\n\n0.460742\n2.017809\n0.17723\n2.447803\n0.177521\n0.02248\n\n\n0.288838\n-0.333125\n1.689823\n1.342182\n0.632839\n0.378467\n\n\n0.661478\n-0.875629\n-0.647278\n0.494931\n-0.624121\n-2.117243\n\n\n-0.600697\n0.589961\n0.723263\n-0.768546\n-0.493024\n-2.225363\n\n\n0.740014\n0.636906\n0.340791\n-1.783611\n0.083621\n-0.556192\n\n\n…\n…\n…\n…\n…\n…\n\n\n-0.406134\n-1.028504\n-0.217144\n0.277344\n-0.494748\n0.553954\n\n\n0.623291\n0.347934\n-0.232851\n1.915435\n-0.906937\n0.004308\n\n\n-0.487116\n1.651992\n-0.104985\n0.149484\n1.203782\n0.585139\n\n\n-0.034656\n-1.426693\n-0.582354\n-0.279591\n-0.011291\n0.479733\n\n\n-0.262104\n-0.725858\n-1.215503\n-1.413517\n-2.339748\n-1.056346"
+  },
+  {
+    "objectID": "examples/dose_response_curve.html#the-true-average-dose-response-function-adrf",
+    "href": "examples/dose_response_curve.html#the-true-average-dose-response-function-adrf",
+    "title": "Dose Response Curve Example",
+    "section": "The True Average Dose Response Function (ADRF)",
+    "text": "The True Average Dose Response Function (ADRF)\nSince this is synthetic data, we can calculate the true ADRF. This represents the actual expected outcome for each treatment level if we were to assign that treatment to the entire population. This serves as our ground truth for evaluation.\n\nimport numpy as np\nimport polars as pl\n\ntreatment_grid = pl.DataFrame(np.linspace(0, 1, 100), schema=t.schema)\ntrue_adrf = dataset.get_adrf(X, t)"
+  },
+  {
+    "objectID": "examples/dose_response_curve.html#visualizing-the-data",
+    "href": "examples/dose_response_curve.html#visualizing-the-data",
+    "title": "Dose Response Curve Example",
+    "section": "Visualizing the Data",
+    "text": "Visualizing the Data\nLet’s visualize the observed data (scatter plot) and the true ADRF (red line). The scatter plot shows the observed outcomes for given treatments, which are influenced by confounding. The red line shows the underlying causal relationship we want to recover.\n\nimport matplotlib.pyplot as plt\n\nfig, ax = plt.subplots()\nplt.scatter(t, y, alpha=0.3)\n# Argsort true_adrf for plotting\nsorted_indices = np.argsort(t.to_numpy().flatten())\nplt.plot(\n    t[sorted_indices],\n    true_adrf[sorted_indices],\n    color=\"red\",\n    linewidth=2,\n)\nfig.show()"
+  },
+  {
+    "objectID": "examples/dose_response_curve.html#naive-approach-direct-estimation-ignoring-covariates",
+    "href": "examples/dose_response_curve.html#naive-approach-direct-estimation-ignoring-covariates",
+    "title": "Dose Response Curve Example",
+    "section": "1. Naive Approach: Direct Estimation (Ignoring Covariates)",
+    "text": "1. Naive Approach: Direct Estimation (Ignoring Covariates)\nAs a baseline, we first use a “direct” estimator that ignores covariates. It simply models \\(Y\\) as a function of \\(T\\), \\(E[Y|T]\\). In the presence of confounding, this estimator is likely to be biased because it mistakes correlation for causation.\n\nfrom skcausal.causal_estimators.ignore_covariates import DirectNoCovariates\n\nfrom sklearn.ensemble import RandomForestRegressor\n\nestimator = DirectNoCovariates(outcome_regressor=RandomForestRegressor(min_samples_leaf=30))\nestimator.fit(X, t=t, y=y)\n\n/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/sklearn/base.py:1336: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples,), for example using ravel().\n  return fit_method(estimator, *args, **kwargs)\n\n\nDirectNoCovariates(outcome_regressor=RandomForestRegressor(min_samples_leaf=30))Please rerun this cell to show the HTML repr or trust the notebook.DirectNoCovariatesDirectNoCovariates(outcome_regressor=RandomForestRegressor(min_samples_leaf=30))RandomForestRegressorRandomForestRegressor(min_samples_leaf=30)\n\n\n\ny_pred = estimator.predict_adrf(X, t)\n\nWe can now plot the predictions of this naive estimator (green) against the true ADRF (red).\n\nfig, ax = plt.subplots()\nplt.scatter(t, y, alpha=0.3)\n# Argsort true_adrf for plotting\nsorted_indices = np.argsort(t.to_numpy().flatten())\nplt.plot(\n    t[sorted_indices],\n    true_adrf[sorted_indices],\n    color=\"red\",\n    linewidth=2,\n)\nplt.plot(\n    t[sorted_indices],\n    y_pred[sorted_indices],\n    color=\"green\",\n    linewidth=2,\n)\nfig.show()"
+  },
+  {
+    "objectID": "examples/dose_response_curve.html#doubly-robust-estimation",
+    "href": "examples/dose_response_curve.html#doubly-robust-estimation",
+    "title": "Dose Response Curve Example",
+    "section": "2. Doubly Robust Estimation",
+    "text": "2. Doubly Robust Estimation\nNow we employ a more rigorous method: Doubly Robust (DR) Estimation. This approach combines two models: 1. A propensity model (treatment model) that estimates the probability density of the treatment given covariates. 2. An outcome model that estimates the outcome given treatment and covariates.\nThe DR estimator is consistent if either the propensity model or the outcome model is correctly specified. Here, we use DoublyRobustPseudoOutcome.\n\nfrom skcausal.causal_estimators.continuous.doubly_robust import (\n    DoublyRobustPseudoOutcome,\n)\nfrom skcausal.weight_estimators.multiplicative_boosting import (\n    DiscriminativeWeightBoosting,\n)\nfrom sklearn.ensemble import RandomForestClassifier\n\ndr = DoublyRobustPseudoOutcome(\n    treatment_regressor=DiscriminativeWeightBoosting(\n        classifier=RandomForestClassifier(min_samples_leaf=30),\n        n_boosting_iter=5,\n        method=\"balanced\",\n        complexity_factor=5,\n    ),\n    outcome_regressor=RandomForestRegressor(min_samples_leaf=30),\n    pseudo_outcome_regressor=RandomForestRegressor(min_samples_leaf=30),\n)\ndr.fit(X, t=t, y=y)\n\nDoublyRobustPseudoOutcome(outcome_regressor=RandomForestRegressor(min_samples_leaf=30),\n                          pseudo_outcome_regressor=RandomForestRegressor(min_samples_leaf=30),\n                          treatment_regressor=DiscriminativeWeightBoosting(classifier=RandomForestClassifier(min_samples_leaf=30),\n                                                                           complexity_factor=5,\n                                                                           method='balanced',\n                                                                           n_boosting_iter=5))Please rerun this cell to show the HTML repr or trust the notebook.DoublyRobustPseudoOutcomeDoublyRobustPseudoOutcome(outcome_regressor=RandomForestRegressor(min_samples_leaf=30),\n                          pseudo_outcome_regressor=RandomForestRegressor(min_samples_leaf=30),\n                          treatment_regressor=DiscriminativeWeightBoosting(classifier=RandomForestClassifier(min_samples_leaf=30),\n                                                                           complexity_factor=5,\n                                                                           method='balanced',\n                                                                           n_boosting_iter=5))RandomForestRegressorRandomForestRegressor(min_samples_leaf=30)RandomForestRegressorRandomForestRegressor(min_samples_leaf=30)RandomForestClassifierRandomForestClassifier(min_samples_leaf=30)\n\n\n\ny_dr_pred = dr.predict_adrf(X, t)"
+  },
+  {
+    "objectID": "examples/dose_response_curve.html#generalized-propensity-score-gps",
+    "href": "examples/dose_response_curve.html#generalized-propensity-score-gps",
+    "title": "Dose Response Curve Example",
+    "section": "3. Generalized Propensity Score (GPS)",
+    "text": "3. Generalized Propensity Score (GPS)\nThe Generalized Propensity Score (GPS) method adjusts for confounding by conditioning on the generalized propensity score. It involves: 1. Estimating the conditional density of the treatment given covariates (the GPS). 2. Estimating the conditional expectation of the outcome given the treatment and the GPS. 3. Averaging over the GPS to estimate the ADRF.\n\nfrom skcausal.causal_estimators.gps import GPS\n\ngps = GPS(\n    treatment_regressor=DiscriminativeWeightBoosting(\n        classifier=RandomForestClassifier(min_samples_leaf=30),\n        n_boosting_iter=5,\n        method=\"uniform\",\n        complexity_factor=5,\n    ),\n    outcome_regressor=RandomForestRegressor(min_samples_leaf=30),\n    include_in_outcome_dataset=\"both\",\n    predict_subsample_size=100,\n)\n\n\ngps.fit(X, t=t, y=y)\ny_gps_pred = gps.predict_adrf(X, t)\n\n/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/sklearn/base.py:1336: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples,), for example using ravel().\n  return fit_method(estimator, *args, **kwargs)"
+  },
+  {
+    "objectID": "examples/dose_response_curve.html#propensity-weighting-pseudo-outcome",
+    "href": "examples/dose_response_curve.html#propensity-weighting-pseudo-outcome",
+    "title": "Dose Response Curve Example",
+    "section": "4. Propensity Weighting (Pseudo-Outcome)",
+    "text": "4. Propensity Weighting (Pseudo-Outcome)\nAnother approach is Propensity Weighting. This method uses the inverse of the propensity score (or related weights) to re-weight the data, creating a pseudo-population where the treatment is independent of covariates. We use PropensityPseudoOutcomeContinuous here.\n\nfrom skcausal.causal_estimators.continuous import PropensityPseudoOutcomeContinuous\nfrom sklearn.neural_network import MLPClassifier\n\npw = PropensityPseudoOutcomeContinuous(\n    treatment_regressor=DiscriminativeWeightBoosting(\n        classifier=MLPClassifier(hidden_layer_sizes=(25, 25), max_iter=500),\n        n_boosting_iter=10,\n        method=\"uniform\",\n        complexity_factor=1.1,\n    ),\n    pseudo_outcome_regressor=RandomForestRegressor(min_samples_leaf=30),\n)\n\n\npw.fit(X, t=t, y=y)\ny_pw_pred = pw.predict_adrf(X, t)\n\n/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/sklearn/neural_network/_multilayer_perceptron.py:785: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (500) reached and the optimization hasn't converged yet.\n  warnings.warn(\n/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/sklearn/neural_network/_multilayer_perceptron.py:785: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (500) reached and the optimization hasn't converged yet.\n  warnings.warn(\n/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/sklearn/neural_network/_multilayer_perceptron.py:785: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (500) reached and the optimization hasn't converged yet.\n  warnings.warn(\n/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/sklearn/neural_network/_multilayer_perceptron.py:785: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (500) reached and the optimization hasn't converged yet.\n  warnings.warn(\n/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/sklearn/neural_network/_multilayer_perceptron.py:785: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (500) reached and the optimization hasn't converged yet.\n  warnings.warn(\n/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/sklearn/neural_network/_multilayer_perceptron.py:785: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (500) reached and the optimization hasn't converged yet.\n  warnings.warn(\n/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/sklearn/neural_network/_multilayer_perceptron.py:785: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (500) reached and the optimization hasn't converged yet.\n  warnings.warn(\n/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/sklearn/neural_network/_multilayer_perceptron.py:785: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (500) reached and the optimization hasn't converged yet.\n  warnings.warn(\n/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/sklearn/neural_network/_multilayer_perceptron.py:785: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (500) reached and the optimization hasn't converged yet.\n  warnings.warn("
+  },
+  {
+    "objectID": "examples/dose_response_curve.html#final-comparison",
+    "href": "examples/dose_response_curve.html#final-comparison",
+    "title": "Dose Response Curve Example",
+    "section": "Final Comparison",
+    "text": "Final Comparison\nFinally, let’s compare all the estimated curves against the true ADRF. This plot will show how well each method recovers the true causal effect compared to the naive baseline.\n\nfig, ax = plt.subplots()\nplt.scatter(t, y, alpha=0.3)\n# Argsort true_adrf for plotting\nsorted_indices = np.argsort(t.to_numpy().flatten())\nplt.plot(\n    t[sorted_indices],\n    true_adrf[sorted_indices],\n    color=\"red\",\n    linewidth=2,\n)\nplt.plot(\n    t[sorted_indices],\n    y_pred[sorted_indices],\n    color=\"green\",\n    linewidth=2,\n    label=\"DirectNoCovariates\",\n)\nplt.plot(\n    t[sorted_indices],\n    y_dr_pred[sorted_indices],\n    color=\"blue\",\n    linewidth=2,\n    label=\"DoublyRobustPseudoOutcome\",\n)\nplt.plot(\n    t[sorted_indices],\n    y_gps_pred[sorted_indices],\n    color=\"orange\",\n    linewidth=2,\n    label=\"GPS\",\n)\nplt.plot(\n    t[sorted_indices],\n    y_pw_pred[sorted_indices],\n    color=\"purple\",\n    linewidth=2,\n    label=\"PropensityPseudoOutcomeContinuous\",\n)\nplt.legend()\nfig.show()"
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Skcausal documention",
+    "section": "",
+    "text": "NoteEstimate causal effects for continuous treatments\n\n\n\nCheckout how to fit and predict dose-response curves using different causal estimators for continuous treatments in skcausal.\n\nClick here!"
+  }
+]
