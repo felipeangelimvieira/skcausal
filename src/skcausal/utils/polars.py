@@ -13,11 +13,16 @@ INTEGER_DTYPES = [
 
 FLOAT_DTYPES = [pl.Float32, pl.Float64]
 
-ALL_DTYPES = [pl.Boolean, pl.Enum, *INTEGER_DTYPES, *FLOAT_DTYPES]
+ALL_DTYPES = [pl.Boolean, pl.Enum, pl.Utf8, pl.String, pl.Categorical, *INTEGER_DTYPES, *FLOAT_DTYPES]
 
 
 def assert_schema_equal(df_a: pl.Schema, df_b: pl.Schema) -> bool:
-    assert df_a == df_b
+    if df_a != df_b:
+        raise ValueError(
+            f"Schema mismatch between fit and predict data.\n"
+            f"  Fit schema:     {dict(df_b)}\n"
+            f"  Predict schema: {dict(df_a)}"
+        )
 
 
 def to_dummies(df: pl.DataFrame, column: str) -> pl.DataFrame:

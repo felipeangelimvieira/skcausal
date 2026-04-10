@@ -1,0 +1,42 @@
+---
+title: "Density Estimators"
+---
+
+Density estimators model the treatment assignment mechanism rather than the outcome model. In skcausal, the public interface is intentionally small:
+
+```python
+estimator.fit(X, t)
+scores = estimator.predict_density(X, t)
+```
+
+The documented density estimators take `polars.DataFrame` inputs for both covariates `X` and treatment `t`. The continuous estimators covered here work with a single treatment column and return a NumPy array with one row per observation.
+
+## What `predict_density` means
+
+skcausal currently exposes two kinds of density-like outputs.
+
+| `density_kind` | Quantity | Interpretation |
+| --- | --- | --- |
+| `"conditional"` | $p(t \mid x)$ | A conditional treatment density. |
+| `"stabilized"` | $p(t \mid x) / p(t)$ | A stabilized density ratio on the treatment scale. |
+
+You can inspect this with `estimator.get_tag("density_kind")` before comparing estimators or choosing an evaluation metric.
+
+## Continuous estimators
+
+This section currently documents the two estimators used for single-column continuous treatments.
+
+| Estimator | Returns | Core idea |
+| --- | --- | --- |
+| `SkproDensityEstimator` | Conditional density | Wrap a skpro probabilistic regressor and evaluate its `pdf` at the supplied treatment values. |
+| `PermutationWeighting` | Stabilized density ratio | Train a classifier to separate observed `(X, t)` pairs from pairs with permuted treatments. |
+
+[Continue to the continuous density guide](continuous.qmd).
+
+## Related APIs
+
+`CompositeFactorizedDensityEstimator` handles multi-column treatments by fitting one estimator per treatment dimension and combining the resulting densities under a factorized or autoregressive decomposition.
+
+`evaluate` in `skcausal.density.performance_evaluation.evaluate` runs cross-validation for a density estimator and uses `LogLikelihoodMetric()` by default.
+
+Because `LogLikelihoodMetric()` applies `log` to the output of `predict_density`, it is directly interpretable as a log-likelihood when `density_kind` is `"conditional"`. For `"stabilized"` estimators, it becomes a log-score on the returned ratio scale instead.

@@ -7,6 +7,8 @@ __pycache__/
 # C extensions
 *.so
 
+docs/_site/
+
 # Distribution / packaging
 .Python
 build/

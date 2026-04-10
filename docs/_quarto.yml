@@ -10,6 +10,12 @@ website:
   navbar:
     search: true
     left:
+      - text: "Density"
+        menu:
+          - href: density/index.qmd
+            text: "Overview"
+          - href: density/continuous.qmd
+            text: "Continuous Treatments"
       - href: examples/dose_response_curve.qmd
         text: "Example"
 

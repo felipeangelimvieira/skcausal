@@ -1,7 +1,4 @@
-from skbase.base import BaseObject
-
-
-class BaseMetric(BaseObject): ...
+from skcausal.metrics.base import BaseMetric
 
 
 class BaseBalancingWeightMetric(BaseMetric):

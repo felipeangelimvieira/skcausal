@@ -1,11 +1,21 @@
 ---
-title: "Skcausal documention"
+title: "skcausal documentation"
 ---
+
+Use the guides below to learn the package in the order you need it.
+
+::: {.callout-note appearance="simple"}
+## Density estimators
+
+Start here if you need the treatment density API, the difference between conditional densities and stabilized ratios, or the continuous density estimators currently documented in the package.
+
+[**Open the density guide**](density/index.qmd)
+:::
 
 ::: {.callout-note appearance="simple"}
 ## Estimate causal effects for continuous treatments
 
-Checkout how to fit and predict dose-response curves using different causal estimators for continuous treatments in skcausal.
+See an end-to-end dose-response example using the causal estimators for continuous treatments.
 
 ---
   
