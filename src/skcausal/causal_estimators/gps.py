@@ -13,6 +13,7 @@ from skcausal.causal_estimators.base import (
 )
 from skcausal.utils.polars import convert_categorical_to_dummies
 from skcausal.weight_estimators.base import BaseBalancingWeightRegressor
+from sklearn.model_selection import KFold
 
 
 class GPS(BaseAverageCausalResponseEstimator):
@@ -275,6 +276,186 @@ class GPS(BaseAverageCausalResponseEstimator):
                 )
                 _data = treat_gps[i][indices]
             effect = self.outcome_regressor_.predict(_data).mean()
+            effects.append(effect)
+
+        return effects
+
+
+class GPSOut(BaseAverageCausalResponseEstimator):
+    """
+    The Generalized Propensity Score (GPS) method of Hirano and Imbens (2004).
+
+    Uses the Propensity Score to create an estimation Y | P(T|X), T, then
+    averages the results over the samples to obtain the expected value of Y.
+
+    The estimation of P(T|X) is executed using cross-validation, and we store
+    out-of-sample estimates to later feed Y | P(T|X), T for training.
+
+    When predicting, we use a density regressor fitted on the whole dataset to
+    estimate P(T|X) for the new samples, and then feed those estimates to the
+    outcome regressor to predict Y.
+
+
+    Parameters
+    ----------
+    density_regressor : BaseSampleWeightRegressor
+        Regressor to estimate the propensity score.
+
+    outcome_regressor : BaseEstimator
+        Regressor to estimate the outcome
+
+    cv : int, default=5
+        Number of cross-validation folds to use when estimating the
+        propensity score.
+    """
+
+    _tags = {
+        "capability:supports_multidimensional_treatment": True,
+        "t_inner_mtype": pl.DataFrame,
+        "store_X": True,
+        "one_hot_encode_enum_columns": False,
+    }
+
+    def __init__(
+        self,
+        density_regressor: BaseBalancingWeightRegressor,
+        outcome_regressor: BaseEstimator,
+        cv: int = 5,
+        random_state=0,
+    ):
+        if density_regressor is None:
+            raise ValueError("GPSOut requires a non-null density_regressor.")
+
+        self.density_regressor = density_regressor
+        self.outcome_regressor = outcome_regressor
+        self.cv = cv
+        self.random_state = random_state
+
+        super().__init__()
+
+    def make_treatment_gps_array(
+        self,
+        X: np.ndarray,
+        t: pl.DataFrame,
+        density_regressor: Optional[BaseBalancingWeightRegressor] = None,
+    ) -> np.ndarray:
+        """Return the pair (GPS, T) for each sample in X."""
+
+        density_regressor = (
+            self.treatment_regressor_
+            if density_regressor is None
+            else density_regressor
+        )
+
+        if density_regressor is not None:
+            sample_weight = density_regressor.predict_sample_weight(X, t)
+            if sample_weight.std() < 1e-9:
+                print(
+                    "The propensity score is constant. This may be due to the fact that the treatment regressor is not able to predict the treatment values."
+                )
+                warnings.warn(
+                    "The propensity score is constant. This may be due to the fact that the treatment regressor is not able to predict the treatment values."
+                )
+                raise ValueError(
+                    "The propensity score is constant. This may be due to the fact that the treatment regressor is not able to predict the treatment values."
+                )
+        else:
+            sample_weight = np.ones(X.shape[0])
+
+        gps = (sample_weight + 1e-8) ** -1
+        if not isinstance(gps, np.ndarray):
+            gps = gps.to_numpy()
+
+        if self.get_tag("one_hot_encode_enum_columns", False):
+            for col, dtype in zip(t.columns, t.dtypes):
+                if not dtype.is_numeric():
+                    t = to_dummies(t, col)
+
+        t = convert_categorical_to_dummies(t)
+        t = t.to_numpy().astype(np.float32)
+
+        return np.concatenate((gps.reshape((-1, 1)), t), axis=1)
+
+    def _fit(self, X: np.ndarray, y: np.ndarray, t: pl.DataFrame):
+        """Fit the outcome model on out-of-fold GPS features."""
+
+        self._X = X
+        self._y = y
+        self._t = t
+
+        n_samples = X.shape[0]
+        if n_samples == 0:
+            raise ValueError("GPSOut requires at least one sample to fit.")
+
+        if isinstance(self.cv, bool) or not isinstance(self.cv, (int, np.integer)):
+            raise TypeError("cv must be an integer greater than or equal to 2.")
+
+        n_splits = int(self.cv)
+        if n_splits < 2:
+            raise ValueError("cv must be an integer greater than or equal to 2.")
+
+        self.outcome_regressor_ = deepcopy(self.outcome_regressor)
+
+        self.fold_density_regressors_ = []
+        self.fold_test_indices_ = []
+        self.oof_test_indices_ = []
+        self.cv_splitter_ = None
+        oof_treatment_gps = []
+
+        if n_splits > n_samples:
+            raise ValueError(
+                "cv cannot be greater than the number of training samples when density_regressor is provided."
+            )
+
+        self.cv_splitter_ = KFold(
+            n_splits=n_splits,
+            shuffle=True,
+            random_state=self.random_state,
+        )
+
+        for train_indices, test_indices in self.cv_splitter_.split(X):
+            fold_density_regressor = self.density_regressor.clone()
+
+            train_t = t[train_indices.tolist()]
+            test_t = t[test_indices.tolist()]
+
+            fold_density_regressor.fit(X[train_indices], train_t)
+            self.fold_density_regressors_.append(fold_density_regressor)
+            self.fold_test_indices_.append(np.asarray(test_indices, dtype=int))
+            self.oof_test_indices_.extend(test_indices.tolist())
+
+            fold_treatment_gps = self.make_treatment_gps_array(
+                X[test_indices],
+                test_t,
+                density_regressor=fold_density_regressor,
+            )
+            oof_treatment_gps.append(fold_treatment_gps)
+
+        self.density_regressor_ = self.density_regressor.clone()
+        self.density_regressor_.fit(X, t)
+        self.treatment_regressor_ = self.density_regressor_
+
+        self.oof_test_indices_ = np.asarray(self.oof_test_indices_, dtype=int)
+        self.oof_treatment_gps_ = np.concatenate(oof_treatment_gps, axis=0)
+        outcome_y = y[self.oof_test_indices_]
+
+        self.outcome_regressor_.fit(self.oof_treatment_gps_, outcome_y)
+
+        return self
+
+    def _predict_adrf(self, X: np.ndarray, t: pl.DataFrame) -> list[float]:
+        """Predict the average response for each treatment value in t."""
+
+        effects = []
+        repeated_treat_values = t[np.repeat(np.arange(t.shape[0]), X.shape[0])]
+        repeated_X = np.tile(X, (len(t), 1))
+        treat_gps = self.make_treatment_gps_array(
+            repeated_X,
+            repeated_treat_values,
+        ).reshape((len(t), X.shape[0], -1))
+
+        for i in range(t.shape[0]):
+            effect = self.outcome_regressor_.predict(treat_gps[i]).mean()
             effects.append(effect)
 
         return effects

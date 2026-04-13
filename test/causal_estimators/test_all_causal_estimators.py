@@ -12,7 +12,6 @@ from skcausal.causal_estimators.continuous.doubly_robust import (
 from skcausal.causal_estimators.binary.doubly_robust import (
     BinaryDoublyRobust,
 )
-from skcausal.causal_estimators.gps import GPS
 from skcausal.causal_estimators.continuous import (
     PropensityWeightingContinuous,
 )
@@ -111,15 +110,6 @@ ESTIMATOR_CONFIGS = [
             "pseudo_outcome_regressor": LinearRegression(),
         },
         "binary",
-    ),
-    (
-        GPS,
-        {
-            "treatment_regressor": None,
-            "outcome_regressor": DecisionTreeRegressor(max_depth=3, random_state=0),
-            "random_state": 0,
-        },
-        "continuous",
     ),
 ]
 

@@ -36,3 +36,8 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/skcausal"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.10",
+]

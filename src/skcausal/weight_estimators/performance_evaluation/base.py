@@ -1,4 +1,6 @@
-from skcausal.metrics.base import BaseMetric
+from skcausal.density.performance_evaluation.metrics.base import (
+    BaseDensityMetric as BaseMetric,
+)
 
 
 class BaseBalancingWeightMetric(BaseMetric):

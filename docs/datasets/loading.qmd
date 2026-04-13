@@ -1,0 +1,46 @@
+
+```{python}
+from skcausal.datasets import PolynomialDataset
+import matplotlib.pyplot as plt
+
+dataset = PolynomialDataset(n=10000, treatment_dim_types=["continuous"],
+x_to_y_degree=2, covariate_effect_scale=20, joint_effect_scale=.1, treatment_effect_scale=1)
+
+X, t, y = dataset.load()
+
+adrf = dataset.predict_adrf(X, t)
+
+```
+
+```{python}
+
+plt.figure()
+plt.scatter(t, y, alpha=0.5)
+# argsort t (pl.DataFrame)
+sorted_indices = t.to_numpy().argsort(axis=0).flatten()
+plt.plot(t.to_numpy()[sorted_indices], adrf[sorted_indices], color="red")
+plt.show()
+```
+
+```{python}
+from skcausal.causal_estimators.ignore_covariates import DirectNoCovariates
+from sklearn.neural_network import MLPRegressor
+estimator = DirectNoCovariates(
+    outcome_regressor=MLPRegressor(hidden_layer_sizes=(100, 100), max_iter=500)
+)
+estimator.fit(X, y=y, t=t)
+
+
+```
+
+```{python}
+adrf_pred = estimator.predict_adrf(X, t)
+
+plt.figure()
+plt.scatter(t, y, alpha=0.5)
+# argsort t (pl.DataFrame)
+sorted_indices = t.to_numpy().argsort(axis=0).flatten()
+plt.plot(t.to_numpy()[sorted_indices], adrf[sorted_indices], color="black")
+plt.plot(t.to_numpy()[sorted_indices], adrf_pred[sorted_indices], color="red")
+plt.show()
+```
