@@ -113,10 +113,10 @@ class OptunaSearchDensityEstimator(BaseDensityEstimator):
         super().__init__()
 
         self.set_tags(
-            supported_t_dtypes=estimator.get_tag(
-                "supported_t_dtypes", self.get_tag("supported_t_dtypes")
-            ),
             **{
+                "capability:t_type": estimator.get_tag(
+                    "capability:t_type", self.get_tag("capability:t_type")
+                ),
                 "capability:multidimensional_treatment": estimator.get_tag(
                     "capability:multidimensional_treatment",
                     self.get_tag("capability:multidimensional_treatment"),
@@ -124,7 +124,7 @@ class OptunaSearchDensityEstimator(BaseDensityEstimator):
                 "density_kind": estimator.get_tag(
                     "density_kind", self.get_tag("density_kind")
                 ),
-            },
+            }
         )
 
         if cv is None:
@@ -263,8 +263,20 @@ class OptunaSearchDensityEstimator(BaseDensityEstimator):
             raise RuntimeError("No Optuna trials were executed.")
 
         rank_column = "rank_score"
-        best_row_idx = int(self.cv_results_[rank_column].argmin())
-        best_row = self.cv_results_.iloc[best_row_idx]
+        ranked_results = self.cv_results_[self.cv_results_[rank_column].notna()]
+        if len(ranked_results) == 0:
+            error_messages = [
+                row["error"] for row in trial_rows if row.get("error") is not None
+            ]
+            error_suffix = (
+                f" First error: {error_messages[0]}" if error_messages else ""
+            )
+            raise RuntimeError(
+                "All Optuna trials failed during evaluation." + error_suffix
+            )
+
+        best_row_idx = int(ranked_results[rank_column].idxmin())
+        best_row = self.cv_results_.loc[best_row_idx]
 
         self.best_index_ = best_row_idx
         self.best_score_ = float(best_row["mean_score"])
@@ -312,9 +324,7 @@ class OptunaSearchDensityEstimator(BaseDensityEstimator):
     def get_test_params(cls, parameter_set="default"):
         class _GaussianToyDensityEstimator(BaseDensityEstimator):
             _tags = {
-                "t_inner_mtype": np.ndarray,
-                "X_inner_mtype": np.ndarray,
-                "supported_t_dtypes": [pl.Float32, pl.Float64],
+                "capability:t_type": ["continuous"],
                 "density_kind": "conditional",
             }
 
@@ -328,6 +338,11 @@ class OptunaSearchDensityEstimator(BaseDensityEstimator):
                 return self
 
             def _predict_density(self, X: np.ndarray, t: np.ndarray) -> np.ndarray:
+                if hasattr(X, "to_numpy"):
+                    X = X.to_numpy()
+                if hasattr(t, "to_numpy"):
+                    t = t.to_numpy()
+
                 scale = max(float(self.scale), 1e-6)
                 mean = self.bias + self.mean_weight * X[:, [0]]
                 z = (t - mean) / scale

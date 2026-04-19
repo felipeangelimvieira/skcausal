@@ -2,13 +2,25 @@ from skbase.testing.test_all_objects import TestAllObjects
 import polars as pl
 from skbase.utils.dependencies import _check_soft_dependencies
 from skcausal.density.base import BaseDensityEstimator
-from skcausal.utils.polars import ALL_DTYPES
+from skcausal.density.naive import NaiveDensityEstimator
+from skcausal.density.optuna import OptunaSearchDensityEstimator
+from skcausal.density.performance_evaluation.metrics.likelihood import (
+    LogLikelihoodMetric,
+)
+from skcausal.datatypes import collect_column_types
 from sklearn.datasets import make_regression, make_classification
+from skcausal.testing._filter_scenarios import run_test_if, object_not_instance_of
 import numpy as np
 
-DTYPE_ITERABLES = (list, tuple, set)
-
 RAND_SEED = 42
+INFORMATIVE_SCENARIO_NAMES = {
+    "continuous_treatment",
+    "boolean_treatment",
+    "float32_treatment",
+    "two_continuous_treatments",
+    "continuous_binary_treatments",
+    "two_binary_treatments",
+}
 
 
 class ContinuousTreatmentScenario:
@@ -185,24 +197,6 @@ class TwoBinaryTreatmentScenario:
         self.t_dtypes = tuple(t.dtypes)
 
 
-def _flatten_supported_dtypes(dtypes):
-    """Flatten nested iterables of dtypes into a flat list."""
-    flat = []
-    for dtype in dtypes:
-        if isinstance(dtype, DTYPE_ITERABLES):
-            flat.extend(_flatten_supported_dtypes(dtype))
-        else:
-            flat.append(dtype)
-    return flat
-
-
-def _get_scenario_dtypes(scenario):
-    """Return all treatment dtypes declared by a scenario."""
-    if hasattr(scenario, "t_dtypes"):
-        return tuple(scenario.t_dtypes)
-    return (scenario.t_dtype,)
-
-
 def _get_single_treatment_scenarios():
     """Return default single-treatment scenarios used by object tests."""
     return [
@@ -246,12 +240,11 @@ def _get_all_treatment_scenarios():
 
 
 def _filter_supported_scenarios(object_instance, scenarios, scenario_names):
-    """Filter scenarios by dimensionality and per-column dtype support."""
+    """Filter scenarios by dimensionality and treatment type support."""
     if object_instance is None:
         return scenarios, scenario_names
 
-    supported_dtypes = object_instance.get_tag("supported_t_dtypes", [])
-    flat_supported_dtypes = _flatten_supported_dtypes(supported_dtypes)
+    capability_t_type = set(object_instance.get_tag("capability:t_type", []))
     supports_multidimensional_treatment = object_instance.get_tag(
         "capability:multidimensional_treatment", False
     )
@@ -262,12 +255,32 @@ def _filter_supported_scenarios(object_instance, scenarios, scenario_names):
         if scenario.t.shape[1] > 1 and not supports_multidimensional_treatment:
             continue
 
-        scenario_dtypes = _get_scenario_dtypes(scenario)
-        if all(dtype in flat_supported_dtypes for dtype in scenario_dtypes):
-            filtered_scenarios.append(scenario)
-            filtered_scenario_names.append(name)
+        scenario_t_types = set(collect_column_types(scenario.t).values())
+        if not scenario_t_types.issubset(capability_t_type):
+            continue
+
+        filtered_scenarios.append(scenario)
+        filtered_scenario_names.append(name)
 
     return filtered_scenarios, filtered_scenario_names
+
+
+def _filter_informative_scenarios(scenarios, scenario_names):
+    filtered_scenarios = []
+    filtered_scenario_names = []
+
+    for scenario, name in zip(scenarios, scenario_names):
+        if name not in INFORMATIVE_SCENARIO_NAMES:
+            continue
+
+        filtered_scenarios.append(scenario)
+        filtered_scenario_names.append(name)
+
+    return filtered_scenarios, filtered_scenario_names
+
+
+def _split_holdout(frame, n_train):
+    return frame.slice(0, n_train), frame.slice(n_train, len(frame) - n_train)
 
 
 class TestAllDensityEstimators(TestAllObjects):
@@ -275,9 +288,8 @@ class TestAllDensityEstimators(TestAllObjects):
 
     package_name = "skcausal.density"
     valid_tags = [
-        "t_inner_mtype",
-        "X_inner_mtype",
-        "supported_t_dtypes",
+        "backend",
+        "capability:t_type",
         "capability:multidimensional_treatment",
         "density_kind",
         "soft_dependencies",
@@ -316,7 +328,23 @@ class TestAllDensityEstimators(TestAllObjects):
         object_instance = kwargs.get("object_instance")
 
         scenarios, scenario_names = _get_all_treatment_scenarios()
-        return _filter_supported_scenarios(object_instance, scenarios, scenario_names)
+        scenarios, scenario_names = _filter_supported_scenarios(
+            object_instance, scenarios, scenario_names
+        )
+
+        if test_name == "test_estimators_outperform_naive_density":
+            scenarios, scenario_names = _filter_informative_scenarios(
+                scenarios, scenario_names
+            )
+
+        test_fn = getattr(self, test_name)
+        if hasattr(test_fn, "_scenario_filter"):
+            filter_fn = test_fn._scenario_filter
+            mask = filter_fn(object_instance, scenarios)
+            scenarios = [s for s, m in zip(scenarios, mask) if m]
+            scenario_names = [n for n, m in zip(scenario_names, mask) if m]
+
+        return scenarios, scenario_names
 
     def test_fit_predict_density(self, object_instance, scenario):
         """Test that fit and predict_density run without errors and return expected shapes."""
@@ -338,11 +366,36 @@ class TestAllDensityEstimators(TestAllObjects):
         assert np.isfinite(density).all(), "Output contains NaN or Inf values"
         assert (density >= 0).all(), "Density values must be non-negative"
 
+    @run_test_if(
+        object_not_instance_of(OptunaSearchDensityEstimator, NaiveDensityEstimator)
+    )
+    def test_estimators_outperform_naive_density(self, object_instance, scenario):
+        n_train = int(0.7 * len(scenario.X))
+        X_train, X_test = _split_holdout(scenario.X, n_train)
+        t_train, t_test = _split_holdout(scenario.t, n_train)
 
-def test_multidimensional_scenarios_are_filtered_by_capability_and_dtype_support():
-    class _FloatOnlyMultidimensionalDensity(BaseDensityEstimator):
+        density_kind = object_instance.get_tag("density_kind")
+        naive_estimator = NaiveDensityEstimator(density_kind=density_kind).fit(
+            X_train, t_train
+        )
+        object_instance.fit(X_train, t_train)
+
+        metric = LogLikelihoodMetric()
+        naive_score = float(metric.evaluate(naive_estimator, X_test, t_test))
+        estimator_score = float(metric.evaluate(object_instance, X_test, t_test))
+
+        assert estimator_score > naive_score + 1e-6, (
+            f"{object_instance.__class__.__name__} should outperform the naive "
+            f"treatment prior on scenario {scenario.__class__.__name__}. "
+            f"Observed estimator_score={estimator_score:.4f}, "
+            f"naive_score={naive_score:.4f}."
+        )
+
+
+def test_scenarios_are_filtered_by_capability_and_t_type():
+    class _ContinuousOnlyDensity(BaseDensityEstimator):
         _tags = {
-            "supported_t_dtypes": [pl.Float32, pl.Float64],
+            "capability:t_type": ["continuous"],
             "capability:multidimensional_treatment": True,
         }
 
@@ -352,9 +405,20 @@ def test_multidimensional_scenarios_are_filtered_by_capability_and_dtype_support
         def _predict_density(self, X, t):
             return np.ones((len(X), 1), dtype=float)
 
-    class _AllDtypesSingleTreatmentDensity(BaseDensityEstimator):
+    class _CategoricalOnlyDensity(BaseDensityEstimator):
         _tags = {
-            "supported_t_dtypes": ALL_DTYPES,
+            "capability:t_type": ["categorical"],
+            "capability:multidimensional_treatment": True,
+        }
+
+        def _fit(self, X, t):
+            return self
+
+        def _predict_density(self, X, t):
+            return np.ones((len(X), 1), dtype=float)
+
+    class _AllTypesSingleTreatmentDensity(BaseDensityEstimator):
+        _tags = {
             "capability:multidimensional_treatment": False,
         }
 
@@ -364,9 +428,8 @@ def test_multidimensional_scenarios_are_filtered_by_capability_and_dtype_support
         def _predict_density(self, X, t):
             return np.ones((len(X), 1), dtype=float)
 
-    class _AllDtypesMultidimensionalDensity(BaseDensityEstimator):
+    class _AllTypesMultidimensionalDensity(BaseDensityEstimator):
         _tags = {
-            "supported_t_dtypes": ALL_DTYPES,
             "capability:multidimensional_treatment": True,
         }
 
@@ -376,41 +439,48 @@ def test_multidimensional_scenarios_are_filtered_by_capability_and_dtype_support
         def _predict_density(self, X, t):
             return np.ones((len(X), 1), dtype=float)
 
-    tester = TestAllDensityEstimators()
-    multidimensional_scenarios, multidimensional_scenario_names = (
-        _get_multidimensional_treatment_scenarios()
-    )
+    all_scenarios, all_names = _get_all_treatment_scenarios()
 
-    _, float_only_names = _filter_supported_scenarios(
-        _FloatOnlyMultidimensionalDensity(),
-        multidimensional_scenarios,
-        multidimensional_scenario_names,
+    # Continuous-only: passes continuous scenarios, rejects categorical
+    _, continuous_only_names = _filter_supported_scenarios(
+        _ContinuousOnlyDensity(), all_scenarios, all_names
     )
-    assert "two_continuous_treatments" in float_only_names
-    assert "continuous_binary_treatments" not in float_only_names
-    assert "two_binary_treatments" not in float_only_names
+    assert "continuous_treatment" in continuous_only_names
+    assert "integer_treatment" in continuous_only_names
+    assert "float32_treatment" in continuous_only_names
+    assert "enum_treatment" not in continuous_only_names
+    assert "two_continuous_treatments" in continuous_only_names
 
+    # Categorical-only: passes categorical scenarios, rejects continuous
+    _, categorical_only_names = _filter_supported_scenarios(
+        _CategoricalOnlyDensity(), all_scenarios, all_names
+    )
+    assert "enum_treatment" in categorical_only_names
+    assert "continuous_treatment" not in categorical_only_names
+    assert "integer_treatment" not in categorical_only_names
+    assert "float32_treatment" not in categorical_only_names
+    assert "two_continuous_treatments" not in categorical_only_names
+
+    # Single treatment: rejects all multidimensional scenarios
     _, single_treatment_names = _filter_supported_scenarios(
-        _AllDtypesSingleTreatmentDensity(),
-        multidimensional_scenarios,
-        multidimensional_scenario_names,
+        _AllTypesSingleTreatmentDensity(), all_scenarios, all_names
     )
     assert "two_continuous_treatments" not in single_treatment_names
     assert "continuous_binary_treatments" not in single_treatment_names
     assert "two_binary_treatments" not in single_treatment_names
 
+    # Multidimensional: passes all multidimensional scenarios
     _, multidimensional_names = _filter_supported_scenarios(
-        _AllDtypesMultidimensionalDensity(),
-        multidimensional_scenarios,
-        multidimensional_scenario_names,
+        _AllTypesMultidimensionalDensity(), all_scenarios, all_names
     )
     assert "two_continuous_treatments" in multidimensional_names
     assert "continuous_binary_treatments" in multidimensional_names
     assert "two_binary_treatments" in multidimensional_names
 
+    tester = TestAllDensityEstimators()
     _, default_object_test_names = tester._generate_scenario(
         "test_fit_predict_density",
-        object_instance=_AllDtypesMultidimensionalDensity(),
+        object_instance=_AllTypesMultidimensionalDensity(),
     )
     assert "two_continuous_treatments" in default_object_test_names
     assert "continuous_binary_treatments" in default_object_test_names

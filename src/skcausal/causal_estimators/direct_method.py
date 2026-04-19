@@ -2,7 +2,7 @@
 
 Direct regression methods try to approximate $\mathbb{E}[Y|X, T]$ directly, using
 both X and T as inputs to the regressor. This regression can be weighted, so that
-each sample weight is proportional to the inverse of the propensity score $P(t_i|x_i)$.
+each sample weight is proportional to the inverse treatment density $1 / P(t_i|x_i)$.
 """
 
 import numpy as np
@@ -11,12 +11,13 @@ from sklearn.base import RegressorMixin
 from sklearn.pipeline import Pipeline
 import polars as pl
 from skcausal.causal_estimators.base import BaseAverageCausalResponseEstimator
-from skcausal.weight_estimators.base import BaseBalancingWeightRegressor
+from skcausal.causal_estimators._density_utils import predict_inverse_density_weight
+from skcausal.density.base import BaseDensityEstimator
 
-__all__ = ["WeightedDirectRegressor", "WeightedIndividualDirectRegressor"]
+__all__ = ["DirectRegressor"]
 
 
-class WeightedDirectRegressor(BaseAverageCausalResponseEstimator):
+class DirectRegressor(BaseAverageCausalResponseEstimator):
     """
     Perform direct regression with optional weighted samples.
 
@@ -28,19 +29,17 @@ class WeightedDirectRegressor(BaseAverageCausalResponseEstimator):
     outcome_regressor : RegressorMixin
         Sklearn-like regressor to use for estimating the outcome.
 
-    sample_weight_regressor : BaseSampleWeightRegressor, optional
-        SampleWeight regressor to use for estimating the sample weights.
+    sample_weight_regressor : BaseDensityEstimator, optional
+        Density estimator used to derive inverse-density sample weights.
         Default is None, which means no sample weights are used.
     """
 
-    _tags = {
-        "t_inner_mtype": pl.DataFrame,
-    }
+    _tags = {"backend": "pandas"}
 
     def __init__(
         self,
         outcome_regressor: RegressorMixin,
-        sample_weight_regressor: BaseBalancingWeightRegressor = None,
+        sample_weight_regressor: BaseDensityEstimator = None,
     ):
 
         self.outcome_regressor = outcome_regressor
@@ -69,13 +68,15 @@ class WeightedDirectRegressor(BaseAverageCausalResponseEstimator):
         """
         if self.sample_weight_regressor is not None:
             self.sample_weight_regressor.fit(X, t)
-            self.weights_ = self.sample_weight_regressor.predict_sample_weight(
-                X=X, t=t
-            ).flatten()
+            self.weights_ = predict_inverse_density_weight(
+                self.sample_weight_regressor,
+                X,
+                t,
+            ).reshape(-1)
         else:
             self.weights_ = None
 
-        self.fit_kwargs_ = self._prepare_fit_kwargs(X, y, t, self.weights_)
+        self.fit_kwargs_ = self._prepare_fit_kwargs(X, t, y, self.weights_)
         self.outcome_regressor.fit(**self.fit_kwargs_)
         return self
 
@@ -114,7 +115,7 @@ class WeightedDirectRegressor(BaseAverageCausalResponseEstimator):
             t = t.to_numpy()
         return np.concatenate([X, t.reshape((X.shape[0], -1))], axis=1)
 
-    def _predict_adrf(self, X: pd.DataFrame, t: list[float]) -> list[float]:
+    def _predict(self, X: pd.DataFrame, t: list[float]) -> list[float]:
         """Predict the Average Dose-Response Curve for a list of treatment values.
 
         Parameters

@@ -54,9 +54,6 @@ class PermutationWeighting(BaseDensityEstimator):
     """
 
     _tags = {
-        "t_inner_mtype": pl.DataFrame,
-        "X_inner_mtype": pl.DataFrame,
-        "supported_t_dtypes": ALL_DTYPES,
         "capability:multidimensional_treatment": False,
         "density_kind": "stabilized",
     }

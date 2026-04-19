@@ -3,7 +3,10 @@
 import numpy as np
 import polars as pl
 from skbase.base import BaseEstimator as _BaseEstimator
-
+from skcausal.datatypes import (
+    convert,
+    collect_column_types,
+)
 from skcausal.utils.polars import (
     FLOAT_DTYPES,
     INTEGER_DTYPES,
@@ -11,9 +14,10 @@ from skcausal.utils.polars import (
     to_dummies,
 )
 from skcausal.utils.mtype import convert_mtype
+from skcausal.base.mixin import TreatmentCheckMixin
 
 
-class BaseAverageCausalResponseEstimator(_BaseEstimator):
+class BaseAverageCausalResponseEstimator(TreatmentCheckMixin, _BaseEstimator):
     """Base class for ADRF Estimators.
 
     Subclasses must override `fit`, and `predict_individual` if the estimator
@@ -30,22 +34,14 @@ class BaseAverageCausalResponseEstimator(_BaseEstimator):
     """
 
     _tags = {
-        "capability:supports_multidimensional_treatment": False,
-        "supported_t_dtypes": [pl.Enum, pl.Boolean, *INTEGER_DTYPES, *FLOAT_DTYPES],
-        "t_inner_mtype": np.ndarray,
-        "X_inner_mtype": np.ndarray,
-        "y_inner_mtype": np.ndarray,
-        "store_X": False,
-        "one_hot_encode_enum_columns": True,
-        "tests:core": True,
+        "backend": "polars",
+        "capability:t_type": ["continuous", "categorical"],
+        "capability:multidimensional_treatment": False,
     }
 
-    def __init__(self):
+    def __init__(self): ...
 
-        self._t_schema = None
-        self._t_preprocessed_schema = None
-
-    def fit(self, X, y, t):
+    def fit(self, X, t, y):
         """
         Fit the estimator to the data.
 
@@ -70,34 +66,12 @@ class BaseAverageCausalResponseEstimator(_BaseEstimator):
         ValueError
             If not implemented by the subclass.
         """
+        X, t, y = self._check_and_transform(X, t, y, is_fit=True)
 
-        raw_t_df = self._to_polars_dataframe(t, variable_name="t")
-
-        if not self.get_tag("capability:supports_multidimensional_treatment", False):
-            if raw_t_df.width > 1:
-                raise ValueError(
-                    "This estimator does not support multi-dimensional treatments. The treatment variable must be 1-dimensional."
-                )
-
-        self._t_schema = raw_t_df.schema
-        self._check_treatment_dtypes(raw_t_df)
-
-        processed_t_df = self._preprocess_treatment_dataframe(raw_t_df)
-
-        X_inner = self._check_and_transform_X(X)
-        y_inner = self._check_and_transform_y(y)
-        t_inner = self._convert_treatment_to_inner(processed_t_df)
-
-        self._validate_input_shapes(X_inner, y_inner, t_inner)
-
-        if self.get_tag("store_X", False):
-            self._X = X_inner
-
-        self._fit(X_inner, y_inner, t_inner)
-
+        self._fit(X=X, t=t, y=y)
         return self
 
-    def _fit(self, X, y, t):
+    def _fit(self, X, t, y):
         """
         Fit the estimator to the data.
 
@@ -124,18 +98,17 @@ class BaseAverageCausalResponseEstimator(_BaseEstimator):
         """
         raise NotImplementedError("This method must be implemented by subclasses.")
 
-    def predict_adrf(self, X, t):
+    def predict(self, X, t):
         """
         Predict the average treatment effect for each treatment value in t.
 
         """
 
-        X_inner = self._check_and_transform_X(X)
-        _, _, t_inner = self._prepare_treatment_inputs(t, check_schema=True)
+        X, t, _ = self._check_and_transform(X, t, y=None, is_fit=False)
 
-        return np.array(self._predict_adrf(X_inner, t_inner))
+        return np.array(self._predict(X, t))
 
-    def _predict_adrf(self, X, t):
+    def _predict(self, X, t):
         """
         Predict the average treatment effect for each treatment value in t.
         """
@@ -191,7 +164,7 @@ class BaseAverageCausalResponseEstimator(_BaseEstimator):
 
         return converted
 
-    def _check_and_transform_X(self, X):
+    def _check_and_transform_X(self, X, is_fit=False):
         inner_mtype = self._resolve_inner_mtype("X_inner_mtype", np.ndarray)
         if inner_mtype is np.ndarray:
             if isinstance(X, np.ndarray):
@@ -213,53 +186,9 @@ class BaseAverageCausalResponseEstimator(_BaseEstimator):
 
         return result
 
-    def _check_and_transform_y(self, y):
-        inner_mtype = self._resolve_inner_mtype("y_inner_mtype", np.ndarray)
-        if inner_mtype is np.ndarray:
-            if isinstance(y, np.ndarray):
-                result = y
-            try:
-                result = convert_mtype(y, np.ndarray)
-            except Exception:  # pragma: no cover - fallback for array-likes
-                result = np.asarray(y)
-        else:
-            if isinstance(y, inner_mtype):
-                result = y
-            else:
-                result = convert_mtype(y, inner_mtype)
-
-        if not isinstance(result, inner_mtype):
-            raise TypeError(
-                f"Expected y to be converted to {inner_mtype}, got {type(result)} instead."
-            )
-
-        return result
-
-    def _to_polars_dataframe(self, value, *, variable_name: str) -> pl.DataFrame:
-        if isinstance(value, pl.DataFrame):
-            return value
-        convert_kwargs = {}
-        if self._t_schema is not None and isinstance(value, np.ndarray):
-            expected_columns = list(self._t_schema.keys())
-            if value.ndim == 1 and len(expected_columns) == 1:
-                convert_kwargs["column_names"] = expected_columns
-            elif value.ndim == 2 and value.shape[1] == len(expected_columns):
-                convert_kwargs["column_names"] = expected_columns
-        try:
-            return convert_mtype(value, pl.DataFrame, **convert_kwargs)
-        except Exception as exc:  # pragma: no cover - defensive
-            raise TypeError(
-                f"{self.__class__.__name__} expected `{variable_name}` to be a polars.DataFrame or convertible to one, "
-                f"but received {type(value).__name__}."
-            ) from exc
-
-    def _check_treatment_dtypes(self, t: pl.DataFrame) -> None:
-        supported_dtypes = self.get_tag("supported_t_dtypes", [])
-        for column_name, dtype in zip(t.columns, t.dtypes):
-            if supported_dtypes and dtype not in supported_dtypes:
-                raise ValueError(
-                    f"Column '{column_name}' has dtype {dtype}, which is not supported. Expected dtypes: {supported_dtypes}."
-                )
+    def _check_and_transform_y(self, y, is_fit=False):
+        y = convert(y, self.get_tag("backend"))
+        return y
 
     def _get_n_samples(self, value) -> int:
         if isinstance(value, np.ndarray):
@@ -274,30 +203,27 @@ class BaseAverageCausalResponseEstimator(_BaseEstimator):
             f"Cannot infer number of samples from object of type {type(value).__name__}."
         )
 
-    def _validate_input_shapes(self, X, y, t) -> None:
-        n_samples = self._get_n_samples(X)
-        n_targets = self._get_n_samples(y)
-        n_treatments = self._get_n_samples(t)
+    def _assert_same_number_of_samples(self, **kwargs) -> None:
 
-        if n_samples != n_targets or n_samples != n_treatments:
+        n_samples = [
+            (name, self._get_n_samples(value))
+            for name, value in kwargs.items()
+            if value is not None
+        ]
+
+        if not all(n == n_samples[0][1] for _, n in n_samples):
             raise ValueError(
-                "Inconsistent number of samples: "
-                f"X has {n_samples}, y has {n_targets}, t has {n_treatments}."
+                "Inconsistent number of samples across inputs: "
+                + ", ".join(f"{name} has {n} samples" for name, n in n_samples)
             )
 
-    def _resolve_inner_mtype(self, tag_key: str, default):
-        inner_mtype = self.get_tag(tag_key, default)
-        if inner_mtype == "np.ndarray":
-            return np.ndarray
-        if inner_mtype in {"pl.DataFrame", "polars.DataFrame"}:
-            return pl.DataFrame
-        return inner_mtype
+    def _check_and_tranform(self, X, t, y=None, is_fit=False):
+        X = self._check_and_transform_X(X, is_fit=is_fit)
+        t = self._check_and_transform_t(t, is_fit=is_fit)
+        if y is not None:
+            y = self._check_and_transform_y(y, is_fit=is_fit)
 
-    def _assert_treatment_schema(self, t):
-        if self._t_schema is None:
-            return
+        self._assert_t_metadata_valid(metadata=self._t_metadata)
+        self._assert_same_number_of_samples(X=X, t=t, y=y)
 
-        if not isinstance(t, pl.DataFrame):
-            t = convert_mtype(t, pl.DataFrame)
-
-        assert_schema_equal(t.schema, self._t_schema)
+        return X, t, y

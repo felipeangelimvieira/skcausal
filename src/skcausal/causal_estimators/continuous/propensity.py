@@ -8,12 +8,17 @@ from sklearn.base import BaseEstimator
 from sklearn.gaussian_process.kernels import RBF, Kernel
 from sklearn.kernel_ridge import KernelRidge
 
+from skcausal.causal_estimators._density_utils import (
+    is_stabilized_density,
+    predict_density_array,
+    predict_inverse_density_weight,
+)
 from skcausal.causal_estimators.base import (
     BaseAverageCausalResponseEstimator,
     to_dummies,
 )
+from skcausal.density.base import BaseDensityEstimator
 from skcausal.utils.polars import convert_categorical_to_dummies
-from skcausal.weight_estimators.base import BaseBalancingWeightRegressor
 from sklearn.neighbors import KernelDensity
 
 
@@ -29,12 +34,12 @@ class PropensityWeightingContinuous(BaseAverageCausalResponseEstimator):
 
     Parameters
     ----------
-    treatment_regressor : BaseSampleWeightRegressor
-        Regressor to estimate the propensity score.
+    treatment_regressor : BaseDensityEstimator
+        Density estimator used to derive inverse-density weights.
     """
 
     _tags = {
-        "capability:supports_multidimensional_treatment": False,
+        "capability:multidimensional_treatment": False,
         "t_inner_mtype": pl.DataFrame,
         "store_X": True,
         "one_hot_encode_enum_columns": False,
@@ -42,7 +47,7 @@ class PropensityWeightingContinuous(BaseAverageCausalResponseEstimator):
 
     def __init__(
         self,
-        treatment_regressor: BaseBalancingWeightRegressor,
+        treatment_regressor: BaseDensityEstimator,
         kernel: Optional[Union[Kernel, KernelDensity]] = None,
         self_normalized: bool = False,
         random_state=0,
@@ -87,7 +92,11 @@ class PropensityWeightingContinuous(BaseAverageCausalResponseEstimator):
         if self.treatment_regressor is not None:
             self.treatment_regressor_ = self.treatment_regressor.clone()
             self.treatment_regressor_.fit(X, t)
-            self._w = self.treatment_regressor_.predict_sample_weight(X, t).reshape(-1)
+            self._w = predict_inverse_density_weight(
+                self.treatment_regressor_,
+                X,
+                t,
+            ).reshape(-1)
         else:
             self.treatment_regressor_ = None
             self._w = np.ones(X.shape[0])
@@ -116,9 +125,9 @@ class PropensityWeightingContinuous(BaseAverageCausalResponseEstimator):
             The average treatment effect for the given treatment values t.
         """
 
-        return np.array(self._predict_adrf(X, t)).reshape((-1, 1)).mean()
+        return np.array(self._predict(X, t)).reshape((-1, 1)).mean()
 
-    def _predict_adrf(self, X: np.ndarray, t: pl.DataFrame) -> list[float]:
+    def _predict(self, X: np.ndarray, t: pl.DataFrame) -> list[float]:
         """
         Predict the average response for each treatment value in t.
 
@@ -145,13 +154,13 @@ class PropensityWeightingContinuous(BaseAverageCausalResponseEstimator):
         K = _evaluate_kernel_matrix(self._kernel, t_obs, t_grid)  # (n, m)
         K = K / K.sum(axis=0, keepdims=True)  # normalize per column
         num = (K * (w[:, None] * y[:, None])).sum(axis=0)  # length m
-        is_stabilized = self.treatment_regressor_.get_tag("balancing_weight_type")
+        is_stabilized = is_stabilized_density(self.treatment_regressor_)
         if self.self_normalized:
             den = (K * w[:, None]).sum(axis=0)
         elif is_stabilized:
-            den = 1
-        elif not is_stabilized:
-            den = self._X.shape[0]
+            den = 1.0
+        else:
+            den = float(self._X.shape[0])
         # n_samples = self._X.shape[0]
         # den = n_samples
 
@@ -229,28 +238,23 @@ class PropensityPseudoOutcomeContinuous(BaseAverageCausalResponseEstimator):
     """Pseudo-outcome estimator that relies solely on propensity score weights.
 
     Steps:
-      1) Fit treatment model that outputs sample weights ``w(X, a)``.
-         We assume ``w ≈ 1 / π(a|X)`` (unstabilized) or ``w ≈ g(a) / π(a|X)`` (stabilized),
-         where ``g(a)`` is the marginal density of ``A``.
+        1) Fit a treatment density model that outputs ``d(X, a)``.
+            We assume ``d ≈ π(a|X)`` (conditional) or ``d ≈ π(a|X) / g(a)`` (stabilized),
+            where ``g(a)`` is the marginal density of ``A``.
       2) For each observation ``i`` compute:
-         - ``π_hat(A_i|X_i) ∝ 1 / w_i``
+            - ``π_hat_like(A_i|X_i) = d(X_i, A_i)``
          - ``π̄_hat(A_i)``:
-              * if weights are stabilized:          ``π̄_hat(A_i) = 1``
-              * if not stabilized:                  ``π̄_hat(A_i) = g_hat(A_i)`` via 1D KDE on ``A``
-         - ``ξ_i = Y_i * [π̄_hat(A_i) / π_hat(A_i|X_i)]``
+                  * if the density is stabilized:       ``π̄_hat(A_i) = 1``
+                  * if not stabilized:                  ``π̄_hat(A_i) = g_hat(A_i)`` via 1D KDE on ``A``
+            - ``ξ_i = Y_i * [π̄_hat(A_i) / π_hat_like(A_i|X_i)]``
       3) Regress the pseudo outcomes ``ξ_i`` on ``A_i`` with a 1D smoother to recover the ADRF.
     """
 
-    _tags = {
-        "capability:supports_multidimensional_treatment": False,
-        "t_inner_mtype": pl.DataFrame,
-        "store_X": True,
-        "one_hot_encode_enum_columns": False,
-    }
+    _tags = {"capability:multidimensional_treatment": False, "backend": "pandas"}
 
     def __init__(
         self,
-        treatment_regressor: BaseBalancingWeightRegressor,
+        treatment_regressor: BaseDensityEstimator,
         pseudo_outcome_regressor: BaseEstimator,
         bandwidth: Optional[float] = None,
         random_state: int = 0,
@@ -293,16 +297,12 @@ class PropensityPseudoOutcomeContinuous(BaseAverageCausalResponseEstimator):
         self.treatment_regressor_ = self.treatment_regressor.clone()
         self.treatment_regressor_.fit(self._X, t)
 
-        self.is_stabilized_ = (
-            self.treatment_regressor_.get_tag("balancing_weight_type") == "stabilized"
-        )
-
-        w_actual = self._as_1d(
-            self.treatment_regressor_.predict_sample_weight(self._X, t)
-        )
+        self.is_stabilized_ = is_stabilized_density(self.treatment_regressor_)
 
         eps = 1e-8
-        pi_actual = 1.0 / np.clip(w_actual, eps, None)
+        pi_actual = self._as_1d(
+            predict_density_array(self.treatment_regressor_, self._X, t)
+        )
 
         t_vec = self._as_1d(t.to_numpy())
 
@@ -336,12 +336,12 @@ class PropensityPseudoOutcomeContinuous(BaseAverageCausalResponseEstimator):
 
         return self
 
-    def _predict_adrf(self, X: np.ndarray, t: pl.DataFrame) -> np.ndarray:
+    def _predict(self, X: np.ndarray, t: pl.DataFrame) -> np.ndarray:
         t_vec = self._as_1d(t.to_numpy())
         return self.pseudo_outcome_regressor_.predict(t_vec.reshape(-1, 1))
 
     def _predict_average_treatment_effect(
         self, X: np.ndarray, t: pl.DataFrame
     ) -> float:
-        vals = self._predict_adrf(X, t)
+        vals = self._predict(X, t)
         return float(np.mean(vals))

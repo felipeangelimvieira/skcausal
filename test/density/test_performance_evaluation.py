@@ -29,7 +29,13 @@ def test_log_likelihood_metric_matches_expected_constant_density_value():
     metric = LogLikelihoodMetric()
     score = metric.evaluate(estimator, X, t)
 
-    assert score == np.log(2.0)
+    assert score == np.log(0.5)
+
+
+def test_density_metric_exposes_default_name():
+    metric = LogLikelihoodMetric()
+
+    assert metric.name == "LogLikelihoodMetric"
 
 
 def test_evaluate_returns_dataframe_with_expected_columns():

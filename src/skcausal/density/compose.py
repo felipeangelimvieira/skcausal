@@ -3,10 +3,10 @@ import copy
 import numpy as np
 import polars as pl
 
+from skcausal.datatypes import collect_column_types, convert
 from skcausal.density.base import BaseDensityEstimator
 from skcausal.density.sklearn import SklearnCategoricalDensity
 from skcausal.density.skpro import SkproDensityEstimator
-from skcausal.utils.polars import ALL_DTYPES, FLOAT_DTYPES
 
 
 __all__ = ["CompositeFactorizedDensityEstimator"]
@@ -40,7 +40,6 @@ class CompositeFactorizedDensityEstimator(BaseDensityEstimator):
     """
 
     _tags = {
-        "supported_t_dtypes": ALL_DTYPES,
         "capability:multidimensional_treatment": True,
         "density_kind": "conditional",
         "soft_dependencies": ["skpro"],
@@ -56,13 +55,14 @@ class CompositeFactorizedDensityEstimator(BaseDensityEstimator):
     def _fit(self, X: pl.DataFrame, t: pl.DataFrame):
         self.column_estimators_ = {}
         self.column_kinds_ = {}
+        self.column_types_ = self._t_metadata["t_column_types"]
         self.ordered_columns_ = self._order_columns(t)
 
         X_running = X
 
         for column in self.ordered_columns_:
-            dtype = t[column].dtype
-            if dtype in FLOAT_DTYPES:
+            column_type = self.column_types_[column]
+            if column_type == "continuous":
                 estimator = SkproDensityEstimator(
                     copy.deepcopy(self.continuous_estimator)
                 )
@@ -99,7 +99,7 @@ class CompositeFactorizedDensityEstimator(BaseDensityEstimator):
     def _append_predictions(self, X_running: pl.DataFrame, column: str) -> pl.DataFrame:
         """Append fitted estimator predictions as new columns."""
         estimator = self.column_estimators_[column]
-        X_pd = SklearnCategoricalDensity._to_pandas(X_running)
+        X_pd = convert(X_running, "pandas")
 
         if self.column_kinds_[column] == "continuous":
             preds = estimator.estimator_.predict(X_pd)
@@ -118,9 +118,16 @@ class CompositeFactorizedDensityEstimator(BaseDensityEstimator):
     @staticmethod
     def _order_columns(t: pl.DataFrame) -> list:
         """Return columns sorted by (task, name): continuous first, then discrete."""
-        continuous = sorted(c for c, d in zip(t.columns, t.dtypes) if d in FLOAT_DTYPES)
+        column_types = collect_column_types(t)
+        continuous = sorted(
+            column
+            for column, column_type in column_types.items()
+            if column_type == "continuous"
+        )
         discrete = sorted(
-            c for c, d in zip(t.columns, t.dtypes) if d not in FLOAT_DTYPES
+            column
+            for column, column_type in column_types.items()
+            if column_type != "continuous"
         )
         return continuous + discrete
 

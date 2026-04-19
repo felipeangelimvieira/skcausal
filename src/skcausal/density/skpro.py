@@ -22,7 +22,8 @@ class SkproDensityEstimator(BaseDensityEstimator):
     """
 
     _tags = {
-        "supported_t_dtypes": [pl.Float32, pl.Float64],
+        "backend": "pandas",
+        "capability:t_type": ["continuous"],
         "density_kind": "conditional",
         "soft_dependencies": ["skpro"],
     }
@@ -34,37 +35,13 @@ class SkproDensityEstimator(BaseDensityEstimator):
 
     def _fit(self, X: pl.DataFrame, t: pl.DataFrame):
         self.estimator_ = copy.deepcopy(self.estimator)
-        self.estimator_.fit(self._to_pandas(X), self._to_pandas(t))
+        self.estimator_.fit(X, t)
         return self
 
     def _predict_density(self, X: pl.DataFrame, t: pl.DataFrame) -> np.ndarray:
-        predictive_distribution = self.estimator_.predict_proba(self._to_pandas(X))
-        density = predictive_distribution.pdf(self._to_pandas(t))
-        return self._coerce_density_output(density)
-
-    @staticmethod
-    def _to_pandas(frame: pl.DataFrame) -> pd.DataFrame:
-        return pd.DataFrame(frame.to_dict(as_series=False))
-
-    @staticmethod
-    def _coerce_density_output(density) -> np.ndarray:
-        if isinstance(density, pd.DataFrame):
-            density_array = density.to_numpy()
-        elif isinstance(density, pd.Series):
-            density_array = density.to_numpy().reshape(-1, 1)
-        else:
-            density_array = np.asarray(density)
-
-        if density_array.ndim == 1:
-            density_array = density_array.reshape(-1, 1)
-
-        if density_array.ndim != 2:
-            raise ValueError(
-                "Expected density output to be 1D or 2D, but received array with "
-                f"shape {density_array.shape}."
-            )
-
-        return density_array.astype(float, copy=False)
+        predictive_distribution = self.estimator_.predict_proba(X)
+        density = predictive_distribution.pdf(t)
+        return density
 
     @classmethod
     def get_test_params(cls, parameter_set="default"):

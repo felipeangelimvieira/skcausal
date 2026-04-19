@@ -12,6 +12,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import KFold
 from skpro.regression.residual import ResidualDouble
 
+from skcausal.density.base import BaseDensityEstimator
 from skcausal.density.optuna import OptunaSearchDensityEstimator
 from skcausal.density.performance_evaluation.metrics.likelihood import (
     LogLikelihoodMetric,
@@ -77,7 +78,13 @@ def test_optuna_density_estimator_fits_and_refits_best_model():
     assert (density >= 0).all()
     assert len(tuner.cv_results_) == 2
     assert np.isfinite(tuner.best_score_)
-    assert tuner.best_score_ == pytest.approx(tuner.cv_results_["mean_score"].min())
+    lower_is_better = tuner.metric.get_tag("lower_is_better", True, raise_error=False)
+    expected_best_score = (
+        tuner.cv_results_["mean_score"].min()
+        if lower_is_better
+        else tuner.cv_results_["mean_score"].max()
+    )
+    assert tuner.best_score_ == pytest.approx(expected_best_score)
     assert tuner.best_estimator_ is not None
 
 
@@ -128,3 +135,35 @@ def test_optuna_density_estimator_respects_max_duration():
     tuner.fit(X, t)
 
     assert 1 <= len(tuner.cv_results_) < 10
+
+
+def test_optuna_density_estimator_raises_clear_error_when_all_trials_fail():
+    class _AlwaysFailDensityEstimator(BaseDensityEstimator):
+        _tags = {
+            "capability:t_type": ["continuous"],
+            "density_kind": "conditional",
+        }
+
+        def __init__(self, scale=1.0):
+            self.scale = scale
+            super().__init__()
+
+        def _fit(self, X, t):
+            return self
+
+        def _predict_density(self, X, t):
+            raise RuntimeError("intentional trial failure")
+
+    X, t = _make_synthetic_dataset()
+    tuner = OptunaSearchDensityEstimator(
+        estimator=_AlwaysFailDensityEstimator(),
+        metric=LogLikelihoodMetric(),
+        param_distributions={"scale": [0.5, 1.0]},
+        n_trials=2,
+        cv=KFold(n_splits=2, shuffle=True, random_state=0),
+        random_state=0,
+        refit=False,
+    )
+
+    with pytest.raises(RuntimeError, match="All Optuna trials failed"):
+        tuner.fit(X, t)

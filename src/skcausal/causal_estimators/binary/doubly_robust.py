@@ -5,8 +5,12 @@ import pandas as pd
 import polars as pl
 from sklearn.base import BaseEstimator
 
+from skcausal.causal_estimators._density_utils import (
+    binary_conditional_probabilities,
+    predict_density_array,
+)
 from skcausal.causal_estimators.base import BaseAverageCausalResponseEstimator
-from skcausal.weight_estimators.base import BaseBalancingWeightRegressor
+from skcausal.density.base import BaseDensityEstimator
 
 __all__ = [
     "BinaryDoublyRobust",
@@ -19,12 +23,12 @@ class BinaryDoublyRobust(BaseAverageCausalResponseEstimator):
 
     Parameters
     ----------
-    treatment_regressor : BaseSampleWeightRegressor
-        Regressor to estimate the propensity score.
+    treatment_regressor : BaseDensityEstimator
+        Density estimator used to estimate treatment propensities.
     """
 
     _tags = {
-        "capability:supports_multidimensional_treatment": False,
+        "capability:multidimensional_treatment": False,
         "t_inner_mtype": pl.DataFrame,
         "store_X": True,
         "one_hot_encode_enum_columns": False,
@@ -32,7 +36,7 @@ class BinaryDoublyRobust(BaseAverageCausalResponseEstimator):
 
     def __init__(
         self,
-        treatment_regressor: BaseBalancingWeightRegressor,
+        treatment_regressor: BaseDensityEstimator,
         outcome_regressor: BaseEstimator,
     ):
         self.treatment_regressor = treatment_regressor
@@ -80,7 +84,7 @@ class BinaryDoublyRobust(BaseAverageCausalResponseEstimator):
 
         return self
 
-    def _predict_adrf(self, X: np.ndarray, t: pl.DataFrame) -> list[float]:
+    def _predict(self, X: np.ndarray, t: pl.DataFrame) -> list[float]:
         """
         Predict the average response for each treatment value in t.
 
@@ -105,18 +109,23 @@ class BinaryDoublyRobust(BaseAverageCausalResponseEstimator):
         t1 = pl.DataFrame([True] * X.shape[0], schema=t.schema)
         t0 = pl.DataFrame([False] * X.shape[0], schema=t.schema)
 
-        w1 = np.asarray(self.treatment_regressor_.predict_sample_weight(X, t1)).ravel()
-        w0 = np.asarray(self.treatment_regressor_.predict_sample_weight(X, t0)).ravel()
+        d1 = predict_density_array(self.treatment_regressor_, X, t1).reshape(-1)
+        d0 = predict_density_array(self.treatment_regressor_, X, t0).reshape(-1)
 
         eps = 1e-8
 
-        # If predict_sample_weight ≈ 1/π(t|x), convert to probabilities:
-        p1_raw = np.clip(w1, eps, None) ** (-1)  # π(1|x)
-        p0_raw = np.clip(w0, eps, None) ** (-1)  # π(0|x)
-
-        denom = np.clip(p0_raw + p1_raw, eps, None)
-        e = p1_raw / denom  # e(x) = P(T=1|X)
-        one_minus_e = p0_raw / denom  # P(T=0|X)
+        prior1 = float(is_t1.mean())
+        prior0 = 1.0 - prior1
+        p0_raw, p1_raw = binary_conditional_probabilities(
+            self.treatment_regressor_,
+            d0,
+            d1,
+            marginal_false=prior0,
+            marginal_true=prior1,
+            eps=eps,
+        )
+        e = p1_raw  # e(x) = P(T=1|X)
+        one_minus_e = p0_raw  # P(T=0|X)
 
         # outcome models at X
         m1 = np.asarray(self.outcome_regressor1_.predict(X)).ravel()  # μ1(x)

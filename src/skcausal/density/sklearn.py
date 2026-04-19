@@ -2,7 +2,6 @@ import copy
 
 import numpy as np
 import pandas as pd
-import polars as pl
 
 from skcausal.density.base import BaseDensityEstimator
 from skcausal.utils.polars import INTEGER_DTYPES
@@ -23,15 +22,10 @@ class SklearnCategoricalDensity(BaseDensityEstimator):
     """
 
     _tags = {
-        "supported_t_dtypes": [
-            pl.Boolean,
-            pl.Enum,
-            pl.Utf8,
-            pl.String,
-            pl.Categorical,
-            *INTEGER_DTYPES,
-        ],
+        "backend": "pandas",
+        "capability:t_type": ["categorical"],
         "density_kind": "conditional",
+        "soft_dependencies": ["scikit-learn"],
     }
 
     def __init__(self, classifier):
@@ -39,16 +33,18 @@ class SklearnCategoricalDensity(BaseDensityEstimator):
 
         super().__init__()
 
-    def _fit(self, X: pl.DataFrame, t: pl.DataFrame):
+    def _fit(self, X: pd.DataFrame, t: pd.DataFrame):
+        """Fit the wrapped classifier on the single casted treatment column."""
         self.classifier_ = copy.deepcopy(self.classifier)
-        self.classifier_.fit(self._to_pandas(X), self._series_to_labels(t.to_series(0)))
+        self.classifier_.fit(X, self._series_to_labels(self._first_series(t)))
         return self
 
-    def _predict_density(self, X: pl.DataFrame, t: pl.DataFrame) -> np.ndarray:
-        labels = self._series_to_labels(t.to_series(0))
+    def _predict_density(self, X: pd.DataFrame, t: pd.DataFrame) -> np.ndarray:
+        """Return the fitted probability assigned to each observed treatment label."""
+        labels = self._series_to_labels(self._first_series(t))
 
         probabilities = self._coerce_probability_output(
-            self.classifier_.predict_proba(self._to_pandas(X)),
+            self.classifier_.predict_proba(X),
             classes=self.classifier_.classes_,
             n_rows=len(labels),
         )
@@ -57,8 +53,9 @@ class SklearnCategoricalDensity(BaseDensityEstimator):
         )
 
     @staticmethod
-    def _to_pandas(frame: pl.DataFrame) -> pd.DataFrame:
-        return pd.DataFrame(frame.to_dict(as_series=False))
+    def _first_series(frame: pd.DataFrame) -> pd.Series:
+        """Extract the single treatment column after base-class casting to pandas."""
+        return frame.iloc[:, 0]
 
     @classmethod
     def _coerce_probability_output(
@@ -68,6 +65,14 @@ class SklearnCategoricalDensity(BaseDensityEstimator):
         classes,
         n_rows: int,
     ) -> np.ndarray:
+        """Normalize classifier probability outputs to a dense 2D array.
+
+        sklearn-compatible classifiers are expected to return one probability
+        column per class, but some binary wrappers emit only the positive-class
+        probability or flatten the output. This helper reshapes those variants
+        into a consistent ``(n_rows, n_classes)`` array before the observed
+        treatment column is selected.
+        """
         probability_array = np.asarray(probabilities, dtype=float)
         n_classes = len(classes)
 
@@ -109,6 +114,7 @@ class SklearnCategoricalDensity(BaseDensityEstimator):
 
     @staticmethod
     def _expand_binary_probability_output(positive_class_probability) -> np.ndarray:
+        """Expand binary positive-class probabilities into two class columns."""
         positive_class_probability = np.asarray(
             positive_class_probability,
             dtype=float,
@@ -119,6 +125,13 @@ class SklearnCategoricalDensity(BaseDensityEstimator):
 
     @classmethod
     def _select_observed_class_probability(cls, classes, probabilities, labels):
+        """Pick the probability associated with each observed treatment label.
+
+        ``classifier.classes_`` and the labels extracted from ``t`` may contain
+        scalar wrapper types such as numpy scalars or pandas categorical values.
+        Both sides are normalized first so that semantically equivalent labels
+        match reliably during lookup.
+        """
         class_to_index = {
             cls._normalize_scalar(label): idx for idx, label in enumerate(classes)
         }
@@ -136,11 +149,19 @@ class SklearnCategoricalDensity(BaseDensityEstimator):
         return probabilities[row_index, np.asarray(indices)].reshape(-1, 1)
 
     @classmethod
-    def _series_to_labels(cls, series: pl.Series) -> list:
+    def _series_to_labels(cls, series: pd.Series) -> list:
+        """Convert a pandas Series into normalized scalar labels.
+
+        This keeps the labels passed to ``classifier.fit`` and the labels used
+        later for probability lookup in the same canonical Python form.
+        Without this normalization, comparisons against ``classifier.classes_``
+        can fail due to numpy, pandas, or categorical scalar wrappers.
+        """
         return [cls._normalize_scalar(value) for value in series.to_list()]
 
     @staticmethod
     def _normalize_scalar(value):
+        """Unwrap scalar wrapper types while leaving plain Python values alone."""
         if hasattr(value, "item"):
             try:
                 return value.item()

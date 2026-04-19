@@ -5,9 +5,8 @@ from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.model_selection import KFold
 from sklearn.tree import DecisionTreeRegressor
 
-from skcausal.causal_estimators.gps import GPS, GPSOut
-from skcausal.weight_estimators.base import BaseBalancingWeightRegressor
-from skcausal.weight_estimators.dummy import DummyWeightEstimator
+from skcausal.causal_estimators.gps import GPS, GPS
+from skcausal.density.base import BaseDensityEstimator
 
 
 class ContinuousScenario:
@@ -32,7 +31,34 @@ class ContinuousScenario:
         self.t_grid_polars = pl.DataFrame({"t": grid_values})
 
 
-class TrainSizeWeightEstimator(BaseBalancingWeightRegressor):
+class DummyDensityEstimator(BaseDensityEstimator):
+    _tags = {
+        "X_inner_mtype": np.ndarray,
+        "t_inner_mtype": pl.DataFrame,
+        "density_kind": "conditional",
+    }
+
+    def __init__(self, random_state: int = 0):
+        self.random_state = random_state
+        super().__init__()
+
+    def _fit(self, X, t):
+        return self
+
+    def _predict_density(self, X, t):
+        out = np.ones((len(X), 1), dtype=float)
+        rng = np.random.default_rng(self.random_state)
+        noise = rng.normal(loc=0.0, scale=0.001, size=out.shape)
+        return np.clip(out + noise, 1e-3, None)
+
+
+class TrainSizeDensityEstimator(BaseDensityEstimator):
+    _tags = {
+        "X_inner_mtype": np.ndarray,
+        "t_inner_mtype": pl.DataFrame,
+        "density_kind": "conditional",
+    }
+
     def __init__(self, scale: float = 0.01, random_state: int = 17):
         self.scale = scale
         self.random_state = random_state
@@ -42,7 +68,7 @@ class TrainSizeWeightEstimator(BaseBalancingWeightRegressor):
         self.train_size_ = len(X)
         return self
 
-    def _predict_sample_weight(self, X, t):
+    def _predict_density(self, X, t):
         base = np.full((len(X), 1), float(self.train_size_))
         return base + np.asarray(X[:, :1], dtype=float) * self.scale
 
@@ -71,9 +97,9 @@ GPS_ESTIMATOR_CONFIGS = [
         },
     ),
     (
-        GPSOut,
+        GPS,
         {
-            "density_regressor": DummyWeightEstimator(),
+            "density_regressor": DummyDensityEstimator(),
             "outcome_regressor": DecisionTreeRegressor(max_depth=3, random_state=0),
             "random_state": 0,
         },
@@ -89,7 +115,7 @@ def test_gps_estimators_support_configured_mtypes(estimator_cls, init_params):
 
     estimator.fit(scenario.X_polars, scenario.y_numpy, scenario.t_polars)
 
-    adrf = estimator.predict_adrf(scenario.X_polars, scenario.t_grid_polars)
+    adrf = estimator.predict(scenario.X_polars, scenario.t_grid_polars)
     adrf_array = np.atleast_1d(np.asarray(adrf, dtype=float))
     assert adrf_array.shape[0] == scenario.t_grid_polars.height
     assert np.all(np.isfinite(adrf_array))
@@ -101,16 +127,16 @@ def test_gps_out_uses_oof_gps_for_training_and_full_fit_for_prediction():
     y = np.linspace(0.0, 1.0, n_samples, dtype=np.float32)
     t = pl.DataFrame({"t": np.linspace(-1.0, 1.0, n_samples, dtype=np.float32)})
 
-    density_regressor = TrainSizeWeightEstimator(scale=0.01, random_state=7)
+    density_regressor = TrainSizeDensityEstimator(scale=0.01, random_state=7)
     outcome_regressor = RecordingRegressor(random_state=11)
-    estimator = GPSOut(
+    estimator = GPS(
         density_regressor=density_regressor,
         outcome_regressor=outcome_regressor,
         cv=3,
         random_state=0,
     )
 
-    estimator.fit(X, y, t)
+    estimator.fit(X, t, y)
 
     splitter = KFold(n_splits=3, shuffle=True, random_state=0)
     expected_oof_indices = []
@@ -119,10 +145,8 @@ def test_gps_out_uses_oof_gps_for_training_and_full_fit_for_prediction():
 
     for train_idx, test_idx in splitter.split(X):
         expected_oof_indices.extend(test_idx.tolist())
-        weights = train_idx.shape[0] + X[test_idx, :1] * density_regressor.scale
-        expected_fit_X.append(
-            np.concatenate(((weights + 1e-8) ** -1, t_numpy[test_idx]), axis=1)
-        )
+        densities = train_idx.shape[0] + X[test_idx, :1] * density_regressor.scale
+        expected_fit_X.append(np.concatenate((densities, t_numpy[test_idx]), axis=1))
 
     expected_oof_indices = np.asarray(expected_oof_indices, dtype=int)
     expected_fit_X = np.concatenate(expected_fit_X, axis=0)
@@ -138,9 +162,9 @@ def test_gps_out_uses_oof_gps_for_training_and_full_fit_for_prediction():
     assert estimator.treatment_regressor_ is estimator.density_regressor_
 
     t_grid = pl.DataFrame({"t": np.array([-0.5, 0.5], dtype=np.float32)})
-    estimator.predict_adrf(X, t_grid)
+    estimator.predict(X, t_grid)
 
-    expected_predict_gps = (n_samples + X[:, :1] * density_regressor.scale + 1e-8) ** -1
+    expected_predict_gps = n_samples + X[:, :1] * density_regressor.scale
     np.testing.assert_allclose(
         estimator.outcome_regressor_.last_predict_X_[:, :1], expected_predict_gps
     )

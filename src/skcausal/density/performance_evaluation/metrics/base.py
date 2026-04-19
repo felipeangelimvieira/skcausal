@@ -13,6 +13,11 @@ class BaseDensityMetric(BaseObject):
     def __init__(self):
         super().__init__()
 
+    @property
+    def name(self):
+        """Human-readable metric name used in evaluation outputs."""
+        return getattr(self, "_name", type(self).__name__)
+
     def evaluate(self, density_estimator, X, t):
         """Evaluate the density estimator on the supplied data."""
         return self._evaluate(density_estimator, X, t)

@@ -4,7 +4,7 @@ from .continuous import (
     DoublyRobustPseudoOutcome,
     PropensityPseudoOutcomeContinuous,
 )
-from .gps import GPS, GPSOut
+from .gps import GPS, GPS
 from .ignore_covariates import DirectNoCovariates
 
 __all__ = [
@@ -14,6 +14,6 @@ __all__ = [
     "PropensityPseudoOutcomeContinuous",
     "DoublyRobustPseudoOutcome",
     "GPS",
-    "GPSOut",
+    "GPS",
     "DirectNoCovariates",
 ]

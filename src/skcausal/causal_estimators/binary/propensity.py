@@ -8,9 +8,16 @@ from sklearn.base import BaseEstimator
 from sklearn.gaussian_process.kernels import RBF, Kernel
 from sklearn.kernel_ridge import KernelRidge
 
-from skcausal.causal_estimators.base import BaseAverageCausalResponseEstimator, to_dummies
+from skcausal.causal_estimators._density_utils import (
+    is_stabilized_density,
+    predict_density_array,
+)
+from skcausal.causal_estimators.base import (
+    BaseAverageCausalResponseEstimator,
+    to_dummies,
+)
 from skcausal.utils.polars import convert_categorical_to_dummies
-from skcausal.weight_estimators.base import BaseBalancingWeightRegressor
+from skcausal.density.base import BaseDensityEstimator
 from sklearn.neighbors import KernelDensity
 
 
@@ -25,12 +32,12 @@ class BinaryPropensityWeighting(BaseAverageCausalResponseEstimator):
 
     Parameters
     ----------
-    treatment_regressor : BaseSampleWeightRegressor
-        Regressor to estimate the propensity score.
+    treatment_regressor : BaseDensityEstimator
+        Density estimator used to estimate treatment propensities.
     """
 
     _tags = {
-        "capability:supports_multidimensional_treatment": False,
+        "capability:multidimensional_treatment": False,
         "t_inner_mtype": pl.DataFrame,
         "store_X": True,
         "one_hot_encode_enum_columns": False,
@@ -38,7 +45,7 @@ class BinaryPropensityWeighting(BaseAverageCausalResponseEstimator):
 
     def __init__(
         self,
-        treatment_regressor: BaseBalancingWeightRegressor,
+        treatment_regressor: BaseDensityEstimator,
     ):
         self.treatment_regressor = treatment_regressor
 
@@ -90,9 +97,9 @@ class BinaryPropensityWeighting(BaseAverageCausalResponseEstimator):
             The average treatment effect for the given treatment values t.
         """
 
-        return np.array(self._predict_adrf(X, t)).reshape((-1, 1)).mean()
+        return np.array(self._predict(X, t)).reshape((-1, 1)).mean()
 
-    def _predict_adrf(self, X: np.ndarray, t: pl.DataFrame) -> list[float]:
+    def _predict(self, X: np.ndarray, t: pl.DataFrame) -> list[float]:
         """
         Predict the average response for each treatment value in t.
 
@@ -114,17 +121,12 @@ class BinaryPropensityWeighting(BaseAverageCausalResponseEstimator):
         _t = self._t.to_numpy().astype(bool).flatten()
 
         t1 = pl.DataFrame([True] * X.shape[0], schema=t.schema)
-        w1 = self.treatment_regressor_.predict_sample_weight(X, t1)
+        p1 = predict_density_array(self.treatment_regressor_, X, t1).reshape(-1)
 
         t0 = pl.DataFrame([False] * X.shape[0], schema=t.schema)
-        w0 = self.treatment_regressor_.predict_sample_weight(X, t0)
+        p0 = predict_density_array(self.treatment_regressor_, X, t0).reshape(-1)
 
-        is_stabilized = (
-            self.treatment_regressor_.get_tag("balancing_weight_type") == "stabilized"
-        )
-
-        p1 = w1 ** (-1)
-        p0 = w0 ** (-1)
+        is_stabilized = is_stabilized_density(self.treatment_regressor_)
 
         prior1 = (_t == True).mean()
         prior0 = (_t == False).mean()
@@ -133,15 +135,15 @@ class BinaryPropensityWeighting(BaseAverageCausalResponseEstimator):
             prior1 = 1.0
             prior0 = 1.0
         else:
-            print(p1[:2], p0[:2])
             p1_raw = p1
             p0_raw = p0
-            denom = p0_raw + p1_raw
+            denom = np.clip(p0_raw + p1_raw, 1e-8, None)
             p1, p0 = p1_raw / denom, p0_raw / denom
-            print(p1[:2], p0[:2])
 
-        y1 = (self._y[_t == True] / p1[_t == True]).mean() * prior1
-        y0 = (self._y[_t == False] / p0[_t == False]).mean() * prior0
+        y1 = (self._y[_t == True] / np.clip(p1[_t == True], 1e-8, None)).mean() * prior1
+        y0 = (
+            self._y[_t == False] / np.clip(p0[_t == False], 1e-8, None)
+        ).mean() * prior0
         out = []
         for tval in t.to_numpy().flatten():
             if tval == True:

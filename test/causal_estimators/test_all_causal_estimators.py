@@ -5,7 +5,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.tree import DecisionTreeRegressor
 
 from skcausal.causal_estimators.base import BaseAverageCausalResponseEstimator
-from skcausal.causal_estimators.direct_method import WeightedDirectRegressor
+from skcausal.causal_estimators.direct_method import DirectRegressor
 from skcausal.causal_estimators.continuous.doubly_robust import (
     DoublyRobustPseudoOutcome,
 )
@@ -18,7 +18,28 @@ from skcausal.causal_estimators.continuous import (
 from skcausal.causal_estimators.binary import (
     BinaryPropensityWeighting,
 )
-from skcausal.weight_estimators.dummy import DummyWeightEstimator
+from skcausal.density.base import BaseDensityEstimator
+
+
+class DummyDensityEstimator(BaseDensityEstimator):
+    _tags = {
+        "X_inner_mtype": np.ndarray,
+        "t_inner_mtype": pl.DataFrame,
+        "density_kind": "stabilized",
+    }
+
+    def __init__(self, random_state: int = 0):
+        self.random_state = random_state
+        super().__init__()
+
+    def _fit(self, X, t):
+        return self
+
+    def _predict_density(self, X, t):
+        out = np.ones((len(X), 1), dtype=float)
+        rng = np.random.default_rng(self.random_state)
+        noise = rng.normal(loc=0.0, scale=0.001, size=out.shape)
+        return np.clip(out + noise, 1e-3, None)
 
 
 class ContinuousScenario:
@@ -77,27 +98,27 @@ SCENARIOS = {
 
 ESTIMATOR_CONFIGS = [
     (
-        WeightedDirectRegressor,
+        DirectRegressor,
         {
             "outcome_regressor": DecisionTreeRegressor(max_depth=3, random_state=0),
-            "sample_weight_regressor": DummyWeightEstimator(),
+            "sample_weight_regressor": DummyDensityEstimator(),
         },
         "continuous",
     ),
     (
         BinaryPropensityWeighting,
-        {"treatment_regressor": DummyWeightEstimator()},
+        {"treatment_regressor": DummyDensityEstimator()},
         "binary",
     ),
     (
         PropensityWeightingContinuous,
-        {"treatment_regressor": DummyWeightEstimator(), "random_state": 0},
+        {"treatment_regressor": DummyDensityEstimator(), "random_state": 0},
         "continuous",
     ),
     (
         BinaryDoublyRobust,
         {
-            "treatment_regressor": DummyWeightEstimator(),
+            "treatment_regressor": DummyDensityEstimator(),
             "outcome_regressor": LinearRegression(),
         },
         "binary",
@@ -105,7 +126,7 @@ ESTIMATOR_CONFIGS = [
     (
         DoublyRobustPseudoOutcome,
         {
-            "treatment_regressor": DummyWeightEstimator(),
+            "treatment_regressor": DummyDensityEstimator(),
             "outcome_regressor": LinearRegression(),
             "pseudo_outcome_regressor": LinearRegression(),
         },
@@ -124,7 +145,7 @@ def test_causal_estimators_support_configured_mtypes(
 
     estimator.fit(scenario.X_polars, scenario.y_numpy, scenario.t_polars)
 
-    adrf = estimator.predict_adrf(scenario.X_polars, scenario.t_grid_polars)
+    adrf = estimator.predict(scenario.X_polars, scenario.t_grid_polars)
     adrf_array = np.atleast_1d(np.asarray(adrf, dtype=float))
     assert adrf_array.shape[0] == scenario.t_grid_polars.height
     assert np.all(np.isfinite(adrf_array))

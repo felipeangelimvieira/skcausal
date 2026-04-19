@@ -8,3 +8,4 @@ class TestAllDatasets(QuickTester, BaseFixtureGenerator):
 
     def test_load_returns_three_dataframes(self, object_instance):
         out = object_instance.load()
+        assert len(out) == 3

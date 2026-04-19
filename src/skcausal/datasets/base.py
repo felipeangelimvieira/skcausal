@@ -197,7 +197,7 @@ class BaseSyntheticDataset(BaseDataset):
 
         return pl.DataFrame(treatments, schema=schema)
 
-    def predict_adrf(self, covariates: np.ndarray, treatment_list: pl.DataFrame):
+    def predict(self, covariates: np.ndarray, treatment_list: pl.DataFrame):
         """
         Computes the Average Direct Response Function (ADRF) for the given covariates and treatment list.
 

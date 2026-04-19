@@ -7,8 +7,12 @@ from sklearn.base import BaseEstimator
 from sklearn.gaussian_process.kernels import RBF, Kernel
 from sklearn.kernel_ridge import KernelRidge
 
+from skcausal.causal_estimators._density_utils import (
+    is_stabilized_density,
+    predict_density_array,
+)
 from skcausal.causal_estimators.base import BaseAverageCausalResponseEstimator
-from skcausal.weight_estimators.base import BaseBalancingWeightRegressor
+from skcausal.density.base import BaseDensityEstimator
 from typing import Optional
 from sklearn.neighbors import KernelDensity
 
@@ -21,16 +25,16 @@ class DoublyRobustPseudoOutcome(BaseAverageCausalResponseEstimator):
 
     Steps:
       1) Fit outcome model μ(x, a) on (X, A) -> Y.
-      2) Fit treatment model that outputs sample weights w(X, a).
-         We assume w ≈ 1 / π(a|X) (unstabilized) or w ≈ g(a)/π(a|X) (stabilized),
-         where g(a) is the marginal density of A.
+        2) Fit a treatment density model that outputs d(X, a).
+            We assume d ≈ π(a|X) (conditional) or d ≈ π(a|X)/g(a) (stabilized),
+            where g(a) is the marginal density of A.
       3) For each i, compute:
-         - π_hat(A_i|X_i) ∝ 1 / w_i(actual)
+            - π_hat_like(A_i|X_i) = d(X_i, A_i)
          - \$_hat(A_i):
-             * if weights are stabilized:          \$_hat(A_i) = 1
+                 * if the density is stabilized:       \$_hat(A_i) = 1
              * if not stabilized:                  \$_hat(A_i) = g_hat(A_i) via 1D KDE on A
          - μ̄_hat(A_i) = E_X[ μ_hat(X, A_i) ]      (estimated by averaging μ_hat(X, A_i) over X)
-         - ξ_i = (Y_i - μ_hat(X_i,A_i)) * [ \$_hat(A_i) / π_hat(A_i|X_i) ] + μ̄_hat(A_i)
+            - ξ_i = (Y_i - μ_hat(X_i,A_i)) * [ \$_hat(A_i) / π_hat_like(A_i|X_i) ] + μ̄_hat(A_i)
       4) Regress ξ_i on A_i with a 1D smoother to get m(a) = E[Y^a].
 
     The unknown proportional constant in π_hat cancels in the ratio.
@@ -38,7 +42,7 @@ class DoublyRobustPseudoOutcome(BaseAverageCausalResponseEstimator):
 
     _tags = {
         "capability:predicts_individual": False,
-        "capability:supports_multidimensional_treatment": False,
+        "capability:multidimensional_treatment": False,
         "t_inner_mtype": pl.DataFrame,
         "store_X": True,
         "one_hot_encode_enum_columns": False,
@@ -46,7 +50,7 @@ class DoublyRobustPseudoOutcome(BaseAverageCausalResponseEstimator):
 
     def __init__(
         self,
-        treatment_regressor: BaseBalancingWeightRegressor,
+        treatment_regressor: BaseDensityEstimator,
         outcome_regressor: BaseEstimator,
         pseudo_outcome_regressor: Optional[BaseEstimator] = None,
         mbar_sample_size: Optional[
@@ -114,9 +118,7 @@ class DoublyRobustPseudoOutcome(BaseAverageCausalResponseEstimator):
         self.treatment_regressor_ = self.treatment_regressor.clone()
         self.treatment_regressor_.fit(self._X, t)
 
-        self.is_stabilized_ = (
-            self.treatment_regressor_.get_tag("balancing_weight_type") == "stabilized"
-        )
+        self.is_stabilized_ = is_stabilized_density(self.treatment_regressor_)
 
         # 2) Fit outcome model μ(x, a)
         t_vec = self._as_1d(t.to_numpy())
@@ -126,12 +128,10 @@ class DoublyRobustPseudoOutcome(BaseAverageCausalResponseEstimator):
 
         eps = 1e-8
 
-        # 3) π_hat(A_i|X_i) from actual weights
-        w_actual = self.treatment_regressor_.predict_sample_weight(self._X, t)
-        w_actual = self._as_1d(w_actual)
-
-        # For both stabilized and unstabilized, π_hat is proportional to 1 / w_actual
-        pi_actual = 1.0 / np.clip(w_actual, eps, None)
+        # 3) π_hat(A_i|X_i) or π_hat(A_i|X_i) / g(A_i) from the fitted density model
+        pi_actual = self._as_1d(
+            predict_density_array(self.treatment_regressor_, self._X, t)
+        )
 
         # 4) If NOT stabilized: fit KDE on A to estimate g(a)
         if not self.is_stabilized_:
@@ -174,7 +174,7 @@ class DoublyRobustPseudoOutcome(BaseAverageCausalResponseEstimator):
 
         return self
 
-    def _predict_adrf(self, X: np.ndarray, t: pl.DataFrame) -> np.ndarray:
+    def _predict(self, X: np.ndarray, t: pl.DataFrame) -> np.ndarray:
         """Predict the average dose-response m(a)=E[Y^a] at the provided treatment grid."""
         t_vec = self._as_1d(t.to_numpy())
         return self.pseudo_outcome_regressor_.predict(t_vec.reshape(-1, 1))
@@ -183,5 +183,5 @@ class DoublyRobustPseudoOutcome(BaseAverageCausalResponseEstimator):
         self, X: np.ndarray, t: pl.DataFrame
     ) -> float:
         """Return the mean of the ADRF values over the provided grid t."""
-        vals = self._predict_adrf(X, t)
+        vals = self._predict(X, t)
         return float(np.mean(vals))

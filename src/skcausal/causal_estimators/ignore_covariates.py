@@ -1,5 +1,4 @@
 import numpy as np
-import polars as pl
 from sklearn.base import BaseEstimator, clone
 
 from skcausal.causal_estimators.base import BaseAverageCausalResponseEstimator
@@ -9,6 +8,9 @@ from skcausal.utils.polars import convert_categorical_to_dummies
 class DirectNoCovariates(BaseAverageCausalResponseEstimator):
     """
     Predicts E[Y|T] directly, ignoring covariates X.
+
+    This estimator should be used as baseline to compare against other
+    causal estimators.
 
 
     Parameters
@@ -20,10 +22,9 @@ class DirectNoCovariates(BaseAverageCausalResponseEstimator):
     """
 
     _tags = {
-        "capability:supports_multidimensional_treatment": True,
-        "t_inner_mtype": pl.DataFrame,
-        "store_X": True,
-        "one_hot_encode_enum_columns": False,
+        "capability:multidimensional_treatment": True,
+        "backend": "pandas",
+        "capability:t_type": ["continuous", "categorical"],
     }
 
     def __init__(
@@ -36,19 +37,17 @@ class DirectNoCovariates(BaseAverageCausalResponseEstimator):
 
         super().__init__()
 
-    def _fit(self, X: np.ndarray, y: np.ndarray, t: pl.DataFrame):
-        """Fits the GPS estimator.
-
-        First, fits the treatment regressor to estimate the propensity score.
-        Then, fits the outcome regressor to estimate the outcome.
+    def _fit(self, X: pd.DataFrame, y: pd.DataFrame, t: pd.DataFrame):
+        """Fits the DirectNoCovariates estimator.
 
         Parameters
         ----------
-        X : np.ndarray
+        X : pd.DataFrame
             Input features.
-        y : np.ndarray
+        y : pd.DataFrame
             Target variable.
-        t : np.ndarray
+        t : pd.DataFrame
+            Treatment values.
 
         Returns
         -------
@@ -56,17 +55,15 @@ class DirectNoCovariates(BaseAverageCausalResponseEstimator):
             The object itself
         """
 
-        t = self._prepare_t(t)
-
         self.outcome_regressor_ = clone(self.outcome_regressor)
         self.outcome_regressor_.fit(X=t, y=y)
 
-    def _prepare_t(self, t: pl.DataFrame) -> np.ndarray:
+    def _prepare_t(self, t: pd.DataFrame) -> np.ndarray:
         """Prepare treatment values for prediction.
 
         Parameters
         ----------
-        t : pl.DataFrame
+        t : pd.DataFrame
             Treatment values.
 
         Returns
@@ -81,7 +78,7 @@ class DirectNoCovariates(BaseAverageCausalResponseEstimator):
 
         return t
 
-    def _predict_adrf(self, X: np.ndarray, t: pl.DataFrame) -> list[float]:
+    def _predict(self, X: np.ndarray, t: pd.DataFrame) -> list[float]:
         """
         Predict the average response for each treatment value in t.
 
@@ -97,7 +94,7 @@ class DirectNoCovariates(BaseAverageCausalResponseEstimator):
         list[float]
             The average response for each treatment value in t.
         """
-        t = self._prepare_t(t)
+
         effect = self.outcome_regressor_.predict(t)
 
         return effect.flatten().tolist()

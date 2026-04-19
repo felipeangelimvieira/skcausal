@@ -151,7 +151,7 @@ def _evaluate_fold(x, meta):
         # score
         start_score = time.perf_counter()
         for metric in scoring:
-            result_key = f"test_{metric.name}"
+            result_key = _get_metric_result_key(metric)
             score = metric(estimator, X_test, t_test)
             temp_result[result_key] = [score]
         score_time = time.perf_counter() - start_score
@@ -170,7 +170,7 @@ def _evaluate_fold(x, meta):
                 stacklevel=2,
             )
             for metric in scoring:
-                result_key = f"test_{metric.name}"
+                result_key = _get_metric_result_key(metric)
                 temp_result[result_key] = [error_score]
 
     # format results data frame and return
@@ -195,7 +195,7 @@ def _get_column_order_and_datatype(scoring, return_data=False):
     """Get the ordered column name and input datatype of results."""
     metrics_metadata = {}
     for metric in scoring:
-        result_key = f"test_{metric.name}"
+        result_key = _get_metric_result_key(metric)
         metrics_metadata[result_key] = "float"
 
     fit_metadata = {
@@ -229,6 +229,11 @@ def _check_scores(scoring):
     if not isinstance(scoring, list):
         return [scoring]
     return list(scoring)
+
+
+def _get_metric_result_key(metric):
+    """Return the output column name for a metric."""
+    return f"test_{metric.name}"
 
 
 def _take_rows(X, indices):
