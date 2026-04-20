@@ -3,17 +3,7 @@
 import numpy as np
 import polars as pl
 from skbase.base import BaseEstimator as _BaseEstimator
-from skcausal.datatypes import (
-    convert,
-    collect_column_types,
-)
-from skcausal.utils.polars import (
-    FLOAT_DTYPES,
-    INTEGER_DTYPES,
-    assert_schema_equal,
-    to_dummies,
-)
-from skcausal.utils.mtype import convert_mtype
+from skcausal.datatypes import convert
 from skcausal.base.mixin import TreatmentCheckMixin
 
 
@@ -45,16 +35,17 @@ class BaseAverageCausalResponseEstimator(TreatmentCheckMixin, _BaseEstimator):
         """
         Fit the estimator to the data.
 
-        Abstract method that must be implemented by subclasses.
+        Public inputs are converted to the estimator backend before `_fit`
+        is called.
 
         Parameters
         ----------
-        X : np.ndarray
+        X : DataFrame-like
             Input features.
-        y : np.ndarray
-            Target variable.
-        t : np.ndarray
+        t : DataFrame-like
             Treatment variable.
+        y : DataFrame-like
+            Target variable.
 
         Returns
         -------
@@ -75,16 +66,16 @@ class BaseAverageCausalResponseEstimator(TreatmentCheckMixin, _BaseEstimator):
         """
         Fit the estimator to the data.
 
-        Abstract method that must be implemented by subclasses.
+        Subclasses receive inputs already converted to the estimator backend.
 
         Parameters
         ----------
-        X : np.ndarray
+        X : backend-native dataframe
             Input features.
-        y : np.ndarray
-            Target variable.
-        t : np.ndarray
+        t : backend-native dataframe
             Treatment variable.
+        y : backend-native dataframe
+            Target variable.
 
         Returns
         -------
@@ -100,7 +91,7 @@ class BaseAverageCausalResponseEstimator(TreatmentCheckMixin, _BaseEstimator):
 
     def predict(self, X, t):
         """
-        Predict the average treatment effect for each treatment value in t.
+        Predict the average response for each treatment value in t.
 
         """
 
@@ -110,85 +101,18 @@ class BaseAverageCausalResponseEstimator(TreatmentCheckMixin, _BaseEstimator):
 
     def _predict(self, X, t):
         """
-        Predict the average treatment effect for each treatment value in t.
+        Predict using backend-native inputs.
         """
 
         raise NotImplementedError("This method must be implemented by subclasses.")
 
-    def _preprocess_treatment_dataframe(self, t: pl.DataFrame) -> pl.DataFrame:
-        """Apply deterministic preprocessing steps to the treatment dataframe."""
-
-        if self._t_schema is not None:
-            expected_columns = list(self._t_schema.keys())
-            if list(t.columns) != expected_columns:
-                t = t.select(expected_columns)
-
-        if self.get_tag("one_hot_encode_enum_columns", False):
-            for col, dtype in zip(t.columns, t.dtypes):
-                if dtype == pl.Enum:
-                    t = to_dummies(t, col)
-
-        if self._t_preprocessed_schema is None:
-            self._t_preprocessed_schema = t.schema
-        else:
-            assert_schema_equal(t.schema, self._t_preprocessed_schema)
-
-        return t
-
-    def _prepare_treatment_inputs(self, t, *, check_schema: bool):
-        """Return raw, preprocessed, and inner representations of treatment input."""
-
-        raw_df = self._to_polars_dataframe(t, variable_name="t")
-
-        if check_schema:
-            self._assert_treatment_schema(raw_df)
-
-        processed_df = self._preprocess_treatment_dataframe(raw_df)
-        t_inner = self._convert_treatment_to_inner(processed_df)
-
-        return raw_df, processed_df, t_inner
-
-    def _convert_treatment_to_inner(self, t: pl.DataFrame):
-        """Convert treatment dataframe to the configured inner mtype."""
-
-        inner_mtype = self._resolve_inner_mtype("t_inner_mtype", np.ndarray)
-        if inner_mtype is np.ndarray:
-            converted = convert_mtype(t, np.ndarray, dtype=np.float32)
-        else:
-            converted = convert_mtype(t, inner_mtype)
-
-        if not isinstance(converted, inner_mtype):
-            raise TypeError(
-                f"Expected treatment to be converted to {inner_mtype}, got {type(converted)} instead."
-            )
-
-        return converted
-
-    def _check_and_transform_X(self, X, is_fit=False):
-        inner_mtype = self._resolve_inner_mtype("X_inner_mtype", np.ndarray)
-        if inner_mtype is np.ndarray:
-            if isinstance(X, np.ndarray):
-                result = X
-            try:
-                result = convert_mtype(X, np.ndarray)
-            except Exception:  # pragma: no cover - fallback for array-likes
-                result = np.asarray(X)
-        else:
-            if isinstance(X, inner_mtype):
-                result = X
-            else:
-                result = convert_mtype(X, inner_mtype)
-
-        if not isinstance(result, inner_mtype):
-            raise TypeError(
-                f"Expected X to be converted to {inner_mtype}, got {type(result)} instead."
-            )
-
-        return result
-
     def _check_and_transform_y(self, y, is_fit=False):
         y = convert(y, self.get_tag("backend"))
         return y
+
+    def _check_and_transform_X(self, X, is_fit=False):
+        X = convert(X, self.get_tag("backend"))
+        return X
 
     def _get_n_samples(self, value) -> int:
         if isinstance(value, np.ndarray):
@@ -217,7 +141,7 @@ class BaseAverageCausalResponseEstimator(TreatmentCheckMixin, _BaseEstimator):
                 + ", ".join(f"{name} has {n} samples" for name, n in n_samples)
             )
 
-    def _check_and_tranform(self, X, t, y=None, is_fit=False):
+    def _check_and_transform(self, X, t, y=None, is_fit=False):
         X = self._check_and_transform_X(X, is_fit=is_fit)
         t = self._check_and_transform_t(t, is_fit=is_fit)
         if y is not None:

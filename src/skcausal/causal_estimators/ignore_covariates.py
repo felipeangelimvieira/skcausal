@@ -1,8 +1,8 @@
 import numpy as np
+import pandas as pd
 from sklearn.base import BaseEstimator, clone
 
 from skcausal.causal_estimators.base import BaseAverageCausalResponseEstimator
-from skcausal.utils.polars import convert_categorical_to_dummies
 
 
 class DirectNoCovariates(BaseAverageCausalResponseEstimator):
@@ -37,7 +37,7 @@ class DirectNoCovariates(BaseAverageCausalResponseEstimator):
 
         super().__init__()
 
-    def _fit(self, X: pd.DataFrame, y: pd.DataFrame, t: pd.DataFrame):
+    def _fit(self, X: pd.DataFrame, t: pd.DataFrame, y: pd.DataFrame):
         """Fits the DirectNoCovariates estimator.
 
         Parameters
@@ -57,36 +57,22 @@ class DirectNoCovariates(BaseAverageCausalResponseEstimator):
 
         self.outcome_regressor_ = clone(self.outcome_regressor)
         self.outcome_regressor_.fit(X=t, y=y)
+        return self
 
-    def _prepare_t(self, t: pd.DataFrame) -> np.ndarray:
-        """Prepare treatment values for prediction.
+    def _get_n_samples(self, value) -> int:
+        if isinstance(value, (pd.DataFrame, pd.Series)):
+            return len(value)
+        return super()._get_n_samples(value)
 
-        Parameters
-        ----------
-        t : pd.DataFrame
-            Treatment values.
-
-        Returns
-        -------
-        np.ndarray
-            Prepared treatment values.
-        """
-
-        t = convert_categorical_to_dummies(t)
-
-        t = t.to_numpy().astype(np.float32)
-
-        return t
-
-    def _predict(self, X: np.ndarray, t: pd.DataFrame) -> list[float]:
+    def _predict(self, X: pd.DataFrame, t: pd.DataFrame) -> list[float]:
         """
         Predict the average response for each treatment value in t.
 
         Parameters
         ----------
-        X : np.ndarray
+        X : pd.DataFrame
             The input data
-        t : list[float]
+        t : pd.DataFrame
             The treatment values
 
         Returns

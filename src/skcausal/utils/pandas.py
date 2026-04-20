@@ -44,7 +44,9 @@ def is_dtype_supported(dtype, allowed_dtypes) -> bool:
                 return True
             continue
         if isinstance(allowed, np.dtype):
-            if not pdt.is_extension_array_dtype(dtype) and _dtype_equals(dtype, allowed):
+            if not pdt.is_extension_array_dtype(dtype) and _dtype_equals(
+                dtype, allowed
+            ):
                 return True
             continue
         if isinstance(allowed, type):

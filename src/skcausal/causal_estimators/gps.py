@@ -3,17 +3,15 @@ from copy import deepcopy
 
 import warnings
 import numpy as np
-import pandas as pd
 import polars as pl
 from sklearn.base import BaseEstimator
 
 from skcausal.causal_estimators.base import (
     BaseAverageCausalResponseEstimator,
-    to_dummies,
 )
 from skcausal.causal_estimators._density_utils import predict_density_array
 from skcausal.density.base import BaseDensityEstimator
-from skcausal.utils.polars import convert_categorical_to_dummies
+from skcausal.utils.polars import convert_categorical_to_dummies, to_dummies
 from sklearn.model_selection import KFold
 
 
@@ -47,8 +45,8 @@ class GPS(BaseAverageCausalResponseEstimator):
 
     _tags = {
         "capability:multidimensional_treatment": True,
-        "t_inner_mtype": pl.DataFrame,
-        "store_X": True,
+        "backend": "polars",
+        "capability:t_type": ["continuous", "categorical"],
         "one_hot_encode_enum_columns": False,
     }
 
@@ -71,7 +69,7 @@ class GPS(BaseAverageCausalResponseEstimator):
 
     def make_treatment_gps_array(
         self,
-        X: np.ndarray,
+        X: pl.DataFrame,
         t: pl.DataFrame,
         density_regressor: Optional[BaseDensityEstimator] = None,
     ) -> np.ndarray:
@@ -93,11 +91,11 @@ class GPS(BaseAverageCausalResponseEstimator):
                 warnings.warn(message)
                 raise ValueError(message)
         else:
-            gps = np.ones((X.shape[0], 1), dtype=float)
+            gps = np.ones((X.height, 1), dtype=float)
 
         if self.get_tag("one_hot_encode_enum_columns", False):
             for col, dtype in zip(t.columns, t.dtypes):
-                if not dtype.is_numeric():
+                if dtype == pl.Enum or dtype == pl.Categorical:
                     t = to_dummies(t, col)
 
         t = convert_categorical_to_dummies(t)
@@ -105,7 +103,7 @@ class GPS(BaseAverageCausalResponseEstimator):
 
         return np.concatenate((gps.reshape((-1, 1)), t), axis=1)
 
-    def _fit(self, X: np.ndarray, y: np.ndarray, t: pl.DataFrame):
+    def _fit(self, X: pl.DataFrame, t: pl.DataFrame, y: pl.DataFrame):
         """Fit the outcome model on out-of-fold GPS features."""
 
         self._X = X
@@ -172,16 +170,17 @@ class GPS(BaseAverageCausalResponseEstimator):
 
         return self
 
-    def _predict(self, X: np.ndarray, t: pl.DataFrame) -> list[float]:
+    def _predict(self, X: pl.DataFrame, t: pl.DataFrame) -> list[float]:
         """Predict the average response for each treatment value in t."""
 
         effects = []
-        repeated_treat_values = t[np.repeat(np.arange(t.shape[0]), X.shape[0])]
-        repeated_X = np.tile(X, (len(t), 1))
+        n_samples = X.height
+        repeated_treat_values = t[np.repeat(np.arange(t.shape[0]), n_samples)]
+        repeated_X = pl.concat([X] * len(t), how="vertical")
         treat_gps = self.make_treatment_gps_array(
             repeated_X,
             repeated_treat_values,
-        ).reshape((len(t), X.shape[0], -1))
+        ).reshape((len(t), n_samples, -1))
 
         for i in range(t.shape[0]):
             effect = self.outcome_regressor_.predict(treat_gps[i]).mean()

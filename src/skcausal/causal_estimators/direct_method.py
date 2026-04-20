@@ -9,7 +9,6 @@ import numpy as np
 import pandas as pd
 from sklearn.base import RegressorMixin
 from sklearn.pipeline import Pipeline
-import polars as pl
 from skcausal.causal_estimators.base import BaseAverageCausalResponseEstimator
 from skcausal.causal_estimators._density_utils import predict_inverse_density_weight
 from skcausal.density.base import BaseDensityEstimator
@@ -46,7 +45,7 @@ class DirectRegressor(BaseAverageCausalResponseEstimator):
         self.sample_weight_regressor = sample_weight_regressor
         super().__init__()
 
-    def _fit(self, X: np.ndarray, y: np.ndarray, t: np.ndarray):
+    def _fit(self, X: pd.DataFrame, t: pd.DataFrame, y: pd.DataFrame):
         """Fit the outcome model to the data.
 
         The treatment vector is concatenated to X before passing the inputs to
@@ -54,12 +53,12 @@ class DirectRegressor(BaseAverageCausalResponseEstimator):
 
         Parameters
         ----------
-        X : np.ndarray
+        X : pd.DataFrame
             Input features.
-        y : np.ndarray
-            Target variable.
-        t : np.ndarray
+        t : pd.DataFrame
             Treatment variable.
+        y : pd.DataFrame
+            Target variable.
 
         Returns
         -------
@@ -81,8 +80,12 @@ class DirectRegressor(BaseAverageCausalResponseEstimator):
         return self
 
     def _prepare_fit_kwargs(
-        self, X: np.ndarray, y: np.ndarray, t: np.ndarray, weights: np.ndarray
-    ) -> tuple:
+        self,
+        X: pd.DataFrame,
+        t: pd.DataFrame,
+        y: pd.DataFrame,
+        weights: np.ndarray,
+    ) -> dict:
 
         dataset = {"X": self._prepare_input_array(X, t), "y": y}
 
@@ -93,14 +96,19 @@ class DirectRegressor(BaseAverageCausalResponseEstimator):
             dataset[kwarg_name] = weights
         return dataset
 
-    def _prepare_input_array(self, X: np.ndarray, t: np.ndarray) -> np.ndarray:
+    def _get_n_samples(self, value) -> int:
+        if isinstance(value, (pd.DataFrame, pd.Series)):
+            return len(value)
+        return super()._get_n_samples(value)
+
+    def _prepare_input_array(self, X: pd.DataFrame, t: pd.DataFrame) -> np.ndarray:
         """Handles how to use X and t as input.
 
         Parameters
         ----------
-        X : np.ndarray
+        X : pd.DataFrame
             Input features.
-        t : np.ndarray
+        t : pd.DataFrame
             Treatment variable.
 
         Returns
@@ -111,19 +119,25 @@ class DirectRegressor(BaseAverageCausalResponseEstimator):
         return self._concat(X, t)
 
     def _concat(self, X, t):
-        if not isinstance(t, np.ndarray):
-            t = t.to_numpy()
-        return np.concatenate([X, t.reshape((X.shape[0], -1))], axis=1)
+        X_array = (
+            X.to_numpy() if isinstance(X, (pd.DataFrame, pd.Series)) else np.asarray(X)
+        )
+        t_array = (
+            t.to_numpy() if isinstance(t, (pd.DataFrame, pd.Series)) else np.asarray(t)
+        )
+        return np.concatenate(
+            [X_array, t_array.reshape((X_array.shape[0], -1))], axis=1
+        )
 
-    def _predict(self, X: pd.DataFrame, t: list[float]) -> list[float]:
+    def _predict(self, X: pd.DataFrame, t: pd.DataFrame) -> list[float]:
         """Predict the Average Dose-Response Curve for a list of treatment values.
 
         Parameters
         ----------
         X : pd.DataFrame
             Input data
-        t : list[float]
-            List of treatment values
+        t : pd.DataFrame
+            Treatment values at which to evaluate the response.
 
         Returns
         -------
@@ -132,11 +146,10 @@ class DirectRegressor(BaseAverageCausalResponseEstimator):
         """
         ys = []
 
-        t = t.to_numpy()
         for i in range(t.shape[0]):
-            _t = t[i]
+            repeated_t = pd.concat([t.iloc[[i]].copy()] * X.shape[0], ignore_index=True)
             ate = self.outcome_regressor.predict(
-                self._prepare_input_array(X, _t * np.ones((X.shape[0], 1)))
-            )[0]
+                self._prepare_input_array(X, repeated_t)
+            ).mean()
             ys.append(ate)
         return ys
