@@ -6,7 +6,7 @@ from sklearn.base import ClassifierMixin, TransformerMixin
 from sklearn.preprocessing import SplineTransformer
 
 from skcausal.density.base import BaseDensityEstimator
-from skcausal.utils.polars import ALL_DTYPES, convert_categorical_to_dummies
+from skcausal.utils.polars import convert_categorical_to_dummies
 from skcausal.utils.sklearn import _resolve_sample_weight_fit_args
 
 __all__ = ["PermutationWeighting"]

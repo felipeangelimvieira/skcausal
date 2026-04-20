@@ -187,3 +187,16 @@ class GPS(BaseAverageCausalResponseEstimator):
             effects.append(effect)
 
         return effects
+
+    @classmethod
+    def get_test_params(cls, parameter_set="default"):
+        from skcausal.density.naive import NaiveDensityEstimator
+        from sklearn.linear_model import LinearRegression
+
+        return [
+            {
+                "density_regressor": NaiveDensityEstimator(),
+                "outcome_regressor": LinearRegression(),
+                "cv": 2,
+            }
+        ]

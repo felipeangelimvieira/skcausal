@@ -65,7 +65,7 @@ estimator.fit(X, t=t, y=y)
 ```
 
 ```{python}
-y_pred = estimator.predict_adrf(X, t)
+y_pred = estimator.predict(X, t)
 ```
 
 We can now plot the predictions of this naive estimator (green) against the true ADRF (red).
@@ -123,7 +123,7 @@ dr.fit(X, t=t, y=y)
 ```
 
 ```{python}
-y_dr_pred = dr.predict_adrf(X, t)
+y_dr_pred = dr.predict(X, t)
 ```
 
 ## 3. Generalized Propensity Score (GPS)
@@ -152,7 +152,7 @@ gps = GPS(
 
 ```{python}
 gps.fit(X, t=t, y=y)
-y_gps_pred = gps.predict_adrf(X, t)
+y_gps_pred = gps.predict(X, t)
 ```
 
 ## 4. Propensity Weighting (Pseudo-Outcome)
@@ -176,7 +176,7 @@ pw = PropensityPseudoOutcomeContinuous(
 
 ```{python}
 pw.fit(X, t=t, y=y)
-y_pw_pred = pw.predict_adrf(X, t)
+y_pw_pred = pw.predict(X, t)
 ```
 
 ## Final Comparison

@@ -101,7 +101,11 @@ class DirectRegressor(BaseAverageCausalResponseEstimator):
             return len(value)
         return super()._get_n_samples(value)
 
-    def _prepare_input_array(self, X: pd.DataFrame, t: pd.DataFrame) -> np.ndarray:
+    def _prepare_input_array(
+        self,
+        X: pd.DataFrame,
+        t: pd.DataFrame,
+    ) -> pd.DataFrame:
         """Handles how to use X and t as input.
 
         Parameters
@@ -113,20 +117,15 @@ class DirectRegressor(BaseAverageCausalResponseEstimator):
 
         Returns
         -------
-        np.ndarray
-            Array to be passed to outcome regressor
+        pd.DataFrame
+            DataFrame to be passed to outcome regressor
         """
         return self._concat(X, t)
 
     def _concat(self, X, t):
-        X_array = (
-            X.to_numpy() if isinstance(X, (pd.DataFrame, pd.Series)) else np.asarray(X)
-        )
-        t_array = (
-            t.to_numpy() if isinstance(t, (pd.DataFrame, pd.Series)) else np.asarray(t)
-        )
-        return np.concatenate(
-            [X_array, t_array.reshape((X_array.shape[0], -1))], axis=1
+        return pd.concat(
+            [X.reset_index(drop=True), t.reset_index(drop=True)],
+            axis=1,
         )
 
     def _predict(self, X: pd.DataFrame, t: pd.DataFrame) -> list[float]:
@@ -153,3 +152,30 @@ class DirectRegressor(BaseAverageCausalResponseEstimator):
             ).mean()
             ys.append(ate)
         return ys
+
+    @classmethod
+    def get_test_params(cls, parameter_set="default"):
+        from sklearn.compose import ColumnTransformer, make_column_selector
+        from sklearn.linear_model import LinearRegression
+        from sklearn.pipeline import make_pipeline
+        from sklearn.preprocessing import OneHotEncoder
+
+        preprocessor = ColumnTransformer(
+            transformers=[
+                (
+                    "encode_categorical",
+                    OneHotEncoder(
+                        drop="first",
+                        handle_unknown="ignore",
+                        sparse_output=False,
+                    ),
+                    make_column_selector(
+                        dtype_include=["category", "object", "string"]
+                    ),
+                )
+            ],
+            remainder="passthrough",
+            verbose_feature_names_out=False,
+        )
+
+        return [{"outcome_regressor": make_pipeline(preprocessor, LinearRegression())}]

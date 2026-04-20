@@ -7,6 +7,7 @@ from skcausal.density.optuna import OptunaSearchDensityEstimator
 from skcausal.density.performance_evaluation.metrics.likelihood import (
     LogLikelihoodMetric,
 )
+from skcausal.density.pipeline import Pipeline
 from skcausal.datatypes import collect_column_types
 from sklearn.datasets import make_regression, make_classification
 from skcausal.testing._filter_scenarios import run_test_if, object_not_instance_of
@@ -293,6 +294,8 @@ class TestAllDensityEstimators(TestAllObjects):
         "capability:multidimensional_treatment",
         "density_kind",
         "soft_dependencies",
+        "named_object_parameters",
+        "fitted_named_object_parameters",
     ]
 
     object_type_filter = BaseDensityEstimator
@@ -367,7 +370,9 @@ class TestAllDensityEstimators(TestAllObjects):
         assert (density >= 0).all(), "Density values must be non-negative"
 
     @run_test_if(
-        object_not_instance_of(OptunaSearchDensityEstimator, NaiveDensityEstimator)
+        object_not_instance_of(
+            OptunaSearchDensityEstimator, NaiveDensityEstimator, Pipeline
+        )
     )
     def test_estimators_outperform_naive_density(self, object_instance, scenario):
         n_train = int(0.7 * len(scenario.X))

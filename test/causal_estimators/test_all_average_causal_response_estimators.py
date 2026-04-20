@@ -2,18 +2,21 @@ import inspect
 import numpy as np
 import pandas as pd
 import polars as pl
+import pytest
 from skbase.testing.test_all_objects import BaseFixtureGenerator, QuickTester
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.neighbors import KernelDensity
 
 from skcausal.causal_estimators.base import BaseAverageCausalResponseEstimator
 from skcausal.causal_estimators.categorical import (
+    CategoricalDirectMethod,
     CategoricalDoublyRobust,
-    BinaryPropensityWeighting,
+    CategoricalInversePropensityWeighting,
 )
 from skcausal.causal_estimators.direct_method import DirectRegressor
 from skcausal.causal_estimators.gps import GPS
 from skcausal.causal_estimators.ignore_covariates import DirectNoCovariates
+from skcausal.causal_estimators.pipeline import Pipeline
 from skcausal.causal_estimators.pseudo_outcome import DoublyRobustPseudoOutcome
 from skcausal.datatypes import collect_column_types
 from skcausal.density.naive import NaiveDensityEstimator
@@ -197,17 +200,24 @@ def _has_current_base_tags(estimator_class) -> bool:
 
 
 def _build_test_instance(estimator_class):
-    if estimator_class is BinaryPropensityWeighting:
-        return BinaryPropensityWeighting(treatment_regressor=NaiveDensityEstimator())
+    if estimator_class is CategoricalInversePropensityWeighting:
+        return CategoricalInversePropensityWeighting(
+            density_estimator=NaiveDensityEstimator()
+        )
     if estimator_class is CategoricalDoublyRobust:
         return CategoricalDoublyRobust(
-            treatment_regressor=NaiveDensityEstimator(),
+            density_estimator=NaiveDensityEstimator(),
             outcome_regressor=MeanRegressor(),
         )
+    if estimator_class is CategoricalDirectMethod:
+        return CategoricalDirectMethod(outcome_regressor=MeanRegressor())
     if estimator_class is DirectRegressor:
         return DirectRegressor(outcome_regressor=MeanRegressor())
     if estimator_class is DirectNoCovariates:
         return DirectNoCovariates(outcome_regressor=MeanRegressor(), random_state=0)
+    if estimator_class is Pipeline:
+        params = Pipeline.get_test_params()[0]
+        return Pipeline(**params)
     if estimator_class is GPS:
         return GPS(
             density_regressor=NaiveDensityEstimator(),
@@ -252,22 +262,6 @@ class TestAllAverageCausalResponseEstimators(QuickTester, BaseFixtureGenerator):
 
         return object_classes_to_test, object_names
 
-    def _generate_object_instance(self, test_name, **kwargs):
-        object_class = kwargs.get("object_class")
-
-        if object_class is None:
-            object_classes, _ = self._generate_object_class(test_name=test_name)
-        else:
-            object_classes = [object_class]
-
-        object_instances = []
-        object_names = []
-        for estimator_class in object_classes:
-            object_instances.append(_build_test_instance(estimator_class))
-            object_names.append(estimator_class.__name__)
-
-        return object_instances, object_names
-
     def _generate_scenario(self, test_name, **kwargs):
         object_instance = kwargs.get("object_instance")
         scenarios, scenario_names = _get_all_treatment_scenarios()
@@ -299,12 +293,14 @@ def test_current_estimators_are_included_in_object_matrix():
     tester = TestAllAverageCausalResponseEstimators()
     _, object_names = tester._generate_object_class("test_fit_predict_average_response")
 
-    assert "BinaryDoublyRobust" in object_names
-    assert "BinaryPropensityWeighting" in object_names
+    assert "CategoricalDirectMethod" in object_names
+    assert "CategoricalDoublyRobust" in object_names
+    assert "CategoricalInversePropensityWeighting" in object_names
     assert "DirectRegressor" in object_names
     assert "DirectNoCovariates" in object_names
     assert "DoublyRobustPseudoOutcome" in object_names
     assert "GPS" in object_names
+    assert "Pipeline" in object_names
 
 
 def test_categorical_estimators_receive_boolean_and_enum_scenarios():
@@ -316,7 +312,11 @@ def test_categorical_estimators_receive_boolean_and_enum_scenarios():
     )
     _, weighting_scenarios = tester._generate_scenario(
         "test_fit_predict_average_response",
-        object_instance=_build_test_instance(BinaryPropensityWeighting),
+        object_instance=_build_test_instance(CategoricalInversePropensityWeighting),
+    )
+    _, direct_method_scenarios = tester._generate_scenario(
+        "test_fit_predict_average_response",
+        object_instance=_build_test_instance(CategoricalDirectMethod),
     )
 
     assert doubly_robust_scenarios == [
@@ -325,6 +325,11 @@ def test_categorical_estimators_receive_boolean_and_enum_scenarios():
         "two_binary_treatments",
     ]
     assert weighting_scenarios == [
+        "boolean_treatment",
+        "enum_treatment",
+        "two_binary_treatments",
+    ]
+    assert direct_method_scenarios == [
         "boolean_treatment",
         "enum_treatment",
         "two_binary_treatments",

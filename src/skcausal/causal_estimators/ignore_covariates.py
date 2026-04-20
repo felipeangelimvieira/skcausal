@@ -84,3 +84,30 @@ class DirectNoCovariates(BaseAverageCausalResponseEstimator):
         effect = self.outcome_regressor_.predict(t)
 
         return effect.flatten().tolist()
+
+    @classmethod
+    def get_test_params(cls, parameter_set="default"):
+        from sklearn.compose import ColumnTransformer, make_column_selector
+        from sklearn.linear_model import LinearRegression
+        from sklearn.pipeline import make_pipeline
+        from sklearn.preprocessing import OneHotEncoder
+
+        preprocessor = ColumnTransformer(
+            transformers=[
+                (
+                    "encode_categorical",
+                    OneHotEncoder(
+                        drop="first",
+                        handle_unknown="ignore",
+                        sparse_output=False,
+                    ),
+                    make_column_selector(
+                        dtype_include=["category", "object", "string"]
+                    ),
+                )
+            ],
+            remainder="passthrough",
+            verbose_feature_names_out=False,
+        )
+
+        return [{"outcome_regressor": make_pipeline(preprocessor, LinearRegression())}]

@@ -4,8 +4,6 @@ import numpy as np
 import pandas as pd
 
 from skcausal.density.base import BaseDensityEstimator
-from skcausal.utils.polars import INTEGER_DTYPES
-
 
 __all__ = ["SklearnCategoricalDensity"]
 

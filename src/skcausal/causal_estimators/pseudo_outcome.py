@@ -241,3 +241,40 @@ class DoublyRobustPseudoOutcome(BaseAverageCausalResponseEstimator):
             return predictions.to_numpy().reshape(-1, 1)
         else:
             return np.asarray(predictions, dtype=float).reshape(-1, 1)
+
+    @classmethod
+    def get_test_params(cls, parameter_set="default"):
+        from sklearn.compose import ColumnTransformer, make_column_selector
+        from sklearn.linear_model import LinearRegression
+        from sklearn.pipeline import make_pipeline
+        from sklearn.preprocessing import OneHotEncoder
+        from skcausal.density.naive import NaiveDensityEstimator
+
+        def make_regressor_pipeline():
+            preprocessor = ColumnTransformer(
+                transformers=[
+                    (
+                        "encode_categorical",
+                        OneHotEncoder(
+                            drop="first",
+                            handle_unknown="ignore",
+                            sparse_output=False,
+                        ),
+                        make_column_selector(
+                            dtype_include=["category", "object", "string"]
+                        ),
+                    )
+                ],
+                remainder="passthrough",
+                verbose_feature_names_out=False,
+            )
+            return make_pipeline(preprocessor, LinearRegression())
+
+        return [
+            {
+                "density_estimator": NaiveDensityEstimator("stabilized"),
+                "outcome_regressor": make_regressor_pipeline(),
+                "pseudo_outcome_regressor": make_regressor_pipeline(),
+                "n_pseudo_samples": 10,
+            }
+        ]

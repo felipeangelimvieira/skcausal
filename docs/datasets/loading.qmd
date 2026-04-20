@@ -8,7 +8,7 @@ x_to_y_degree=2, covariate_effect_scale=20, joint_effect_scale=.1, treatment_eff
 
 X, t, y = dataset.load()
 
-adrf = dataset.predict_adrf(X, t)
+adrf = dataset.predict(X, t)
 
 ```
 
@@ -34,7 +34,7 @@ estimator.fit(X, y=y, t=t)
 ```
 
 ```{python}
-adrf_pred = estimator.predict_adrf(X, t)
+adrf_pred = estimator.predict(X, t)
 
 plt.figure()
 plt.scatter(t, y, alpha=0.5)
