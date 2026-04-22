@@ -1,0 +1,53 @@
+# Getting Started
+
+`skcausal` is easiest to understand if you keep one mental model in mind: every estimator is built around observed covariates `X`, treatment assignments `t`, and outcomes `y`.
+
+## Install The Package
+
+```bash
+pip install skcausal
+```
+
+If you also want the plotting helpers introduced in the docs examples, install the plotting extra:
+
+```bash
+pip install "skcausal[plotting]"
+```
+
+## The Core Data Contract
+
+The package expects three aligned tables with the same number of rows.
+
+```{mermaid}
+graph LR
+  X["X: covariates"] --> F["fit(X, t, y)"]
+  T["t: treatment"] --> F
+  Y["y: outcome"] --> F
+  F --> P["predict(X, requested treatments)"]
+```
+
+In the documentation examples, those tables are typically `polars.DataFrame` objects. The important part is not the library choice, but the semantics:
+
+1. `X` contains pre-treatment covariates.
+2. `t` contains the intervention variable you want to reason about.
+3. `y` contains the observed outcome.
+
+## Minimal Dataset Example
+
+```python
+from skcausal.datasets import SimpleLinearDataset
+
+dataset = SimpleLinearDataset(
+    n=250,
+    t_types=("continuous",),
+    n_features=4,
+    random_state=0,
+)
+X, t, y = dataset.retrieve()
+```
+
+The built-in synthetic datasets are useful because they also expose `predict(...)`, which gives you the known target quantity for benchmarking.
+
+## Where To Go Next
+
+If you want to understand what estimators are expected to return, continue to [Estimator Contract](estimator-contract.qmd).

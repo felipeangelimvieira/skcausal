@@ -1,0 +1,233 @@
+---
+title: "Continuous Treatments"
+execute:
+  warning: false
+---
+
+Use this guide when the treatment is numeric — such as a dose, exposure, score, or intensity.
+
+::: {.callout-note appearance="simple"}
+## When To Use This Guide
+
+Start here if you need one copy-pastable example for a continuous treatment and want to see how the estimated response curve compares to a known truth.
+:::
+
+## What we’re estimating
+
+A continuous treatment changes the question from “treated vs. control?” to “what happens at *every possible dose level*?” The result is the **Average Dose-Response Function** (ADRF):
+
+$$\mu(t) = E[Y(t)], \quad t \in \mathcal{T} \subset \mathbb{R}$$
+
+This is a curve, not a single number.
+
+::: {.callout-tip}
+**Analogy**: think of a pharmacological dose-response curve. Different doses of a drug produce different average patient responses. We want to estimate that curve from observational data where the dose was not randomized — people received different doses for reasons that also affect the outcome.
+:::
+
+```{mermaid}
+graph LR
+  X["Covariates X"] --> T["Treatment T (numeric)"]
+  X --> Y["Outcome Y"]
+  T --> Y
+  G["Treatment grid"] --> P["Predicted curve"]
+  X --> P
+```
+
+skcausal provides two estimators for continuous treatments in this example:
+
+| Estimator | Approach |
+|---|---|
+| `DirectRegressor` | Fits $E[Y \mid X, T]$ and averages over `X` at each grid point |
+| `GPS` | Fits an outcome model on treatment and an estimated treatment score from `predict_density(X, T)` |
+
+::: {.callout-note}
+All causal interpretations in this guide assume consistency, no unmeasured confounding after conditioning on `X`, and sufficient overlap across the treatment range you want to evaluate.
+:::
+
+## Step 1: Import dependencies
+
+```{python}
+import numpy as np
+import polars as pl
+import matplotlib.pyplot as plt
+
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestClassifier
+
+from skcausal.causal_estimators import DirectRegressor, GPS
+from skcausal.datasets import SimpleLinearDataset
+from skcausal.density.permutation_weighting import PermutationWeighting
+from skcausal.plotting import use_theme
+
+use_theme()
+```
+
+## Step 2: Load the data
+
+```{python}
+dataset = SimpleLinearDataset(
+    n=250,
+    t_types=("continuous",),
+    n_features=4,
+    random_state=0,
+)
+X, t, y = dataset.retrieve()
+
+X = X.rename({col: f"x{i}" for i, col in enumerate(X.columns)})
+y = y.rename({y.columns[0]: "y"})
+
+pl.concat([X.head(5), t.head(5), y.head(5)], how="horizontal")
+```
+
+`t` contains one numeric column. The estimators will learn how the average outcome changes as that column is varied.
+
+## Step 3: Build the evaluation grid
+
+Instead of a small table of discrete levels, we build a fine grid spanning the observed treatment range:
+
+```{python}
+grid = pl.DataFrame(
+    {
+        "t0": np.linspace(
+            float(t["t0"].min()),
+            float(t["t0"].max()),
+            X.height,
+        )
+    }
+)
+
+truth = np.asarray(dataset.predict(X, grid), dtype=float).reshape(-1)
+```
+
+::: {.callout-note}
+The grid has `X.height` rows to satisfy the predict API contract: `X` and the treatment table must have the same number of rows. The `truth` array holds the true average potential outcome at each grid point — available only because this is a synthetic dataset.
+:::
+
+## Step 3b: Plot the naive observational curve
+
+Before fitting any estimator, compare the raw observed averages to the true ADRF. This is the continuous-treatment version of the confounding problem: the observed association between `T` and `Y` is not automatically the causal curve.
+
+```{python}
+t_values = t["t0"].to_numpy()
+y_values = y["y"].to_numpy()
+bin_edges = np.linspace(float(t["t0"].min()), float(t["t0"].max()), 15)
+bin_ids = np.digitize(t_values, bin_edges[1:-1])
+bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+observed_curve = np.array([y_values[bin_ids == i].mean() if np.any(bin_ids == i) else np.nan for i in range(len(bin_centers))])
+```
+
+```{python}
+fig, ax = plt.subplots(figsize=(8, 4.5))
+ax.plot(bin_centers, observed_curve, marker="o", linewidth=1.5, label="Observed mean within bins")
+ax.plot(grid["t0"].to_numpy(), truth, linewidth=2.5, label="Truth")
+ax.set_xlabel("Treatment")
+ax.set_ylabel("Average outcome")
+ax.set_title("Naive observational curve vs true ADRF")
+ax.legend()
+plt.show()
+```
+
+The distance between these two curves is the bias caused by confounding. The goal of the estimators below is to recover the `Truth` line rather than the raw observational trend.
+
+## Step 4: Fit the estimators
+
+### Direct regressor
+
+`DirectRegressor` fits an outcome model $\hat{m}(x, t) = \hat{E}[Y \mid X=x, T=t]$ and estimates the ADRF by averaging over the covariate distribution:
+
+$$\hat{\mu}_{DM}(t) = \frac{1}{n} \sum_{i=1}^{n} \hat{m}(X_i,\, t)$$
+
+```{python}
+direct = DirectRegressor(outcome_regressor=LinearRegression())
+_ = direct.fit(X, t, y)
+direct_curve = np.asarray(direct.predict(X, grid), dtype=float).reshape(-1)
+```
+
+This is equivalent to outcome regression with covariates. On this exactly-linear dataset it will closely track the truth.
+
+### Generalized propensity score (GPS)
+
+`GPS` in `skcausal` follows a score-adjustment pattern rather than fitting a weighted pseudo-population estimator directly. It first computes a treatment score
+
+$$\hat{g}_i = \widehat{\mathrm{predict\_density}}(X_i, T_i)$$
+
+and then fits an outcome model on the pair $(\hat{g}_i, T_i)$ using out-of-fold scores during training. At prediction time, it recomputes the score at each requested treatment value and averages the fitted outcome model over the observed covariate sample:
+
+$$\hat{\mu}_{GPS}(t) = \frac{1}{n} \sum_{i=1}^{n} \hat{m}(\hat{g}(X_i, t),\, t)$$
+
+In this example, `PermutationWeighting` supplies the treatment score. Because that density estimator returns a stabilized ratio, the GPS features here are built from a density-ratio estimate rather than a normalized conditional density:
+
+```{python}
+permutation_weighting = PermutationWeighting(
+    classifier=RandomForestClassifier(
+        n_estimators=200,
+        min_samples_leaf=5,
+        random_state=0,
+    ),
+    treatment_transformation="spline",
+    max_trials=3,
+    random_state=0,
+)
+```
+
+::: {.callout-tip}
+**PermutationWeighting intuition**: instead of estimating $p(T \mid X)$ directly, it trains a classifier to distinguish *observed* $(X, T)$ pairs from pairs where $T$ has been randomly shuffled. The classifier's score is proportional to the likelihood ratio $p(T \mid X) / p(T)$. This avoids explicit density estimation and tends to be more stable in higher dimensions.
+:::
+
+::: {.callout-important}
+Despite the weighting intuition often used to motivate generalized propensity scores, the current `GPS` implementation in `skcausal` does **not** estimate the ADRF by reweighting observations. It trains an outcome regressor on the score-and-treatment features produced by `predict_density`.
+:::
+
+```{python}
+from sklearn.ensemble import RandomForestRegressor
+
+gps = GPS(
+    density_regressor=permutation_weighting,
+    outcome_regressor=RandomForestRegressor(),
+    cv=3,
+    random_state=0,
+)
+_ = gps.fit(X, t, y)
+gps_curve = np.asarray(gps.predict(X, grid), dtype=float).reshape(-1)
+```
+
+## Step 5: Plot the response curves
+
+```{python}
+grid_values = grid["t0"].to_numpy()
+
+fig, ax = plt.subplots(figsize=(8, 5))
+ax.scatter(t["t0"].to_numpy(), y["y"].to_numpy(), s=12, alpha=0.2, label="Observed data")
+ax.plot(grid_values, truth, linewidth=2.5, label="Truth")
+ax.plot(grid_values, direct_curve, linewidth=2, label="DirectRegressor")
+ax.plot(grid_values, gps_curve, linewidth=2, label="GPS")
+ax.set_xlabel("Treatment")
+ax.set_ylabel("Average outcome")
+ax.set_title("Continuous-treatment response curve")
+ax.legend()
+plt.show()
+```
+
+## Step 6: Compare numerically
+
+```{python}
+pl.DataFrame(
+    {
+        "estimator": ["DirectRegressor", "GPS"],
+        "mean_absolute_error": [
+            float(np.mean(np.abs(direct_curve - truth))),
+            float(np.mean(np.abs(gps_curve - truth))),
+        ],
+    }
+).sort("mean_absolute_error")
+```
+
+::: {.callout-note}
+This toy dataset is exactly linear, which gives `DirectRegressor` a strong advantage. The GPS example demonstrates the API for a density-aware estimator with `PermutationWeighting`, but it should not be read as "direct regression is always better" — on nonlinear or heavily confounded data the GPS can close the gap.
+:::
+
+## What to try next
+
+For a more realistic nonlinear benchmark, continue to the [SyntheticDataset2 walkthrough](dose_response_curve.qmd).
+
+If your treatment is boolean or multi-level instead of numeric, go back to the [examples hub](index.qmd).

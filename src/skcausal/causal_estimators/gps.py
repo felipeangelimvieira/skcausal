@@ -115,11 +115,15 @@ class GPS(BaseAverageCausalResponseEstimator):
             raise ValueError("GPSOut requires at least one sample to fit.")
 
         if isinstance(self.cv, bool) or not isinstance(self.cv, (int, np.integer)):
-            raise TypeError("cv must be an integer greater than or equal to 2.")
+            raise TypeError(
+                "cv must be an integer equal to 0 or greater than or equal to 2."
+            )
 
         n_splits = int(self.cv)
-        if n_splits < 2:
-            raise ValueError("cv must be an integer greater than or equal to 2.")
+        if n_splits != 0 and n_splits < 2:
+            raise ValueError(
+                "cv must be an integer equal to 0 or greater than or equal to 2."
+            )
 
         self.outcome_regressor_ = deepcopy(self.outcome_regressor)
 
@@ -128,6 +132,18 @@ class GPS(BaseAverageCausalResponseEstimator):
         self.oof_test_indices_ = []
         self.cv_splitter_ = None
         oof_treatment_gps = []
+
+        if n_splits == 0:
+            self.density_regressor_ = self.density_regressor.clone()
+            self.density_regressor_.fit(X, t)
+            self.treatment_regressor_ = self.density_regressor_
+
+            insample_gps = self.make_treatment_gps_array(X, t)
+            self.oof_test_indices_ = np.arange(n_samples, dtype=int)
+            self.oof_treatment_gps_ = insample_gps
+
+            self.outcome_regressor_.fit(insample_gps, y)
+            return self
 
         if n_splits > n_samples:
             raise ValueError(

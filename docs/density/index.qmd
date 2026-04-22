@@ -1,42 +1,73 @@
 ---
 title: "Density Estimators"
+subtitle: "Model the treatment assignment mechanism explicitly and keep the returned quantity clear."
+page-layout: full
+toc: false
 ---
 
-Density estimators model the treatment assignment mechanism rather than the outcome model. In skcausal, the public interface is intentionally small:
+::: {.surface-section}
+Density estimators model the treatment assignment mechanism rather than the outcome model. In `skcausal`, the public interface stays intentionally small:
 
 ```python
 estimator.fit(X, t)
 scores = estimator.predict_density(X, t)
 ```
 
-The documented density estimators take `polars.DataFrame` inputs for both covariates `X` and treatment `t`. The continuous estimators covered here work with a single treatment column and return a NumPy array with one row per observation.
+The documented density estimators take `polars.DataFrame` inputs for both covariates `X` and treatment `t`.
+:::
 
-## What `predict_density` means
+[`Returned quantity`]{.section-kicker}
+## What `predict_density` Means
 
-skcausal currently exposes two kinds of density-like outputs.
+`skcausal` currently exposes two density-like output kinds.
 
 | `density_kind` | Quantity | Interpretation |
 | --- | --- | --- |
 | `"conditional"` | $p(t \mid x)$ | A conditional treatment density. |
 | `"stabilized"` | $p(t \mid x) / p(t)$ | A stabilized density ratio on the treatment scale. |
 
-You can inspect this with `estimator.get_tag("density_kind")` before comparing estimators or choosing an evaluation metric.
+Inspect `estimator.get_tag("density_kind")` before comparing estimators or choosing an evaluation metric.
 
-## Continuous estimators
+[`Estimator map`]{.section-kicker}
+## Documented Density Components
 
-This section currently documents the two estimators used for single-column continuous treatments.
+::: {.docs-card-grid}
+::: {.docs-card}
+### SkproDensityEstimator
+
+Use this when you need a proper conditional treatment density from a probabilistic regressor.
+:::
+
+::: {.docs-card}
+### PermutationWeighting
+
+Use this when you need a classifier-based stabilized density ratio for single-column continuous treatments.
+:::
+
+::: {.docs-card}
+### CompositeFactorizedDensityEstimator
+
+Use this when treatment has multiple columns and you want a factorized or autoregressive density decomposition.
+:::
+
+::: {.docs-card}
+### `evaluate(...)`
+
+Use this when you want cross-validated density scoring with `LogLikelihoodMetric()` or another explicit metric.
+:::
+:::
+
+[`Interpretation`]{.section-kicker}
+## Continuous Estimators In This Guide
 
 | Estimator | Returns | Core idea |
 | --- | --- | --- |
 | `SkproDensityEstimator` | Conditional density | Wrap a skpro probabilistic regressor and evaluate its `pdf` at the supplied treatment values. |
 | `PermutationWeighting` | Stabilized density ratio | Train a classifier to separate observed `(X, t)` pairs from pairs with permuted treatments. |
 
-[Continue to the continuous density guide](continuous.qmd).
-
-## Related APIs
-
-`CompositeFactorizedDensityEstimator` handles multi-column treatments by fitting one estimator per treatment dimension and combining the resulting densities under a factorized or autoregressive decomposition.
-
-`evaluate` in `skcausal.density.performance_evaluation.evaluate` runs cross-validation for a density estimator and uses `LogLikelihoodMetric()` by default.
-
 Because `LogLikelihoodMetric()` applies `log` to the output of `predict_density`, it is directly interpretable as a log-likelihood when `density_kind` is `"conditional"`. For `"stabilized"` estimators, it becomes a log-score on the returned ratio scale instead.
+
+::: {.button-row}
+[Continue to the continuous density guide](continuous.qmd){.hero-button .hero-button-primary}
+[Open example workflows](../examples/index.qmd){.hero-button .hero-button-secondary}
+:::

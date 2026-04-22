@@ -1,23 +1,68 @@
 ---
-title: "skcausal documentation"
+title: "One Workflow. Any Treatment."
+subtitle: "Causal inference across binary, categorical, and continuous treatments — one consistent API."
+page-layout: full
+toc: false
 ---
 
-Use the guides below to learn the package in the order you need it.
+```{=html}
 
-::: {.callout-note appearance="simple"}
-## Density estimators
 
-Start here if you need the treatment density API, the difference between conditional densities and stabilized ratios, or the continuous density estimators currently documented in the package.
+<div class="home-hero-grid">
+  <div class="surface-section home-intro-panel">
+    <span class="section-kicker">For observational ML workflows</span>
+    <p class="home-lead"><code>skcausal</code> estimates causal effects from observational data. One <code>fit(X, t, y)</code> contract covers binary, categorical, and continuous treatments.</p>
+    <div style="margin-top: 1.2rem;">
+      <code class="home-install-cmd">pip install skcausal</code>
+    </div>
+  </div>
 
-[**Open the density guide**](density/index.qmd)
+  <div class="home-code-panel">
+    <div class="home-code-window">
+      <div class="home-window-bar">
+        <div class="home-window-dots" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <span class="home-window-title">minimal continuous-treatment example</span>
+      </div>
+<pre class="home-code-block"><code>from sklearn.linear_model import LinearRegression
+from skcausal.causal_estimators import DirectRegressor
+
+estimator = DirectRegressor(
+    outcome_regressor=LinearRegression()
+)
+estimator.fit(X, t, y)
+curve = estimator.predict(X, t)</code></pre>
+    </div>
+  </div>
+</div>
+```
+
+
+[Choose your path]{.section-kicker}
+
+::: {.home-intent-grid}
+::: {.docs-card}
+### Binary treatments
+
+Treatment is a treated-vs-control flag and the target is average potential outcomes under each level.
+
+[Open binary guide](examples/binary_treatments.html){.card-link}
 :::
 
-::: {.callout-note appearance="simple"}
-## Estimate causal effects for continuous treatments
+::: {.docs-card}
+### Continuous treatments
 
-See an end-to-end dose-response example using the causal estimators for continuous treatments.
+Treatment is a dose, exposure, or intensity and the target is a dose-response curve. Includes density and GPS tooling.
 
----
-  
-[**Click here!**](/examples/dose_response_curve.qmd)
+[Open continuous guide](examples/continuous_treatments.html){.card-link}
+:::
+
+::: {.docs-card}
+### Categorical treatments
+
+Treatment has more than two named levels such as `control`, `placebo`, and `treated`.
+
+[Open categorical guide](examples/categorical_treatments.html){.card-link}
+:::
 :::

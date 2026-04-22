@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>About – skcausal</title>
+<title>About skcausal – skcausal</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -40,7 +40,7 @@ ul.task-list li input[type="checkbox"] {
 <link href="site_libs/quarto-html/quarto-syntax-highlighting-7b89279ff1a6dce999919e0e67d4d9ec.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-5b4ad623e5705c0698d39aec6f10cf02.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-b3b235ae6ba71d6e5c2a90c00144237d.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -67,14 +67,16 @@ ul.task-list li input[type="checkbox"] {
     "search-label": "Search"
   }
 }</script>
+<style>html{ scroll-behavior: smooth; }</style>
 
 
+<link rel="stylesheet" href="styles.css">
 </head>
 
 <body class="nav-fixed quarto-light">
 
 <div id="quarto-search-results"></div>
-  <header id="quarto-header" class="headroom fixed-top">
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
     <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
@@ -90,6 +92,41 @@ ul.task-list li input[type="checkbox"] {
 </button>
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./book/index.html"> 
+<span class="menu-text">Book</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-examples" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Examples</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-examples">    
+        <li>
+    <a class="dropdown-item" href="./examples/index.html">
+ <span class="dropdown-text">Overview</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./examples/binary_treatments.html">
+ <span class="dropdown-text">Binary Treatments</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./examples/continuous_treatments.html">
+ <span class="dropdown-text">Continuous Treatments</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./examples/categorical_treatments.html">
+ <span class="dropdown-text">Categorical Treatments</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./examples/dose_response_curve.html">
+ <span class="dropdown-text">SyntheticDataset2 Walkthrough</span></a>
+  </li>  
+    </ul>
+  </li>
   <li class="nav-item dropdown ">
     <a class="nav-link dropdown-toggle" href="#" id="nav-menu-density" role="link" data-bs-toggle="dropdown" aria-expanded="false">
  <span class="menu-text">Density</span>
@@ -105,9 +142,27 @@ ul.task-list li input[type="checkbox"] {
   </li>  
     </ul>
   </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-datasets" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Datasets</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-datasets">    
+        <li>
+    <a class="dropdown-item" href="./datasets/loading.html">
+ <span class="dropdown-text">Loading</span></a>
+  </li>  
+    </ul>
+  </li>
   <li class="nav-item">
-    <a class="nav-link" href="./examples/dose_response_curve.html"> 
-<span class="menu-text">Example</span></a>
+    <a class="nav-link active" href="./about.html" aria-current="page"> 
+<span class="menu-text">About</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/felipeangelimvieira/skcausal"> <i class="bi bi-github" role="img" aria-label="GitHub repository">
+</i> 
+<span class="menu-text"></span></a>
   </li>  
 </ul>
           </div> <!-- /navcollapse -->
@@ -117,35 +172,63 @@ ul.task-list li input[type="checkbox"] {
     </nav>
 </header>
 <!-- content -->
-<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-page">
+      <h1 class="title">About skcausal</h1>
+            <p class="subtitle lead">A modern causal inference toolkit organized around one clear estimator contract.</p>
+                      </div>
+  </div>
+    
+  
+  <div class="quarto-title-meta column-page">
+
+      
+    
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-full page-navbar">
 <!-- sidebar -->
 <!-- margin-sidebar -->
-    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
-        
-    </div>
+    
 <!-- main -->
-<main class="content" id="quarto-document-content">
+<main class="content quarto-banner-title-block column-page" id="quarto-document-content">
 
-<header id="title-block-header" class="quarto-title-block default">
-<div class="quarto-title">
-<h1 class="title">About</h1>
+
+
+
+
+<div class="surface-section">
+<p><code>skcausal</code> is a Python library for causal inference workflows that tries to keep three things explicit: the treatment type, the estimator contract, and the quantity returned by the model. The documentation follows the same structure so users can move from binary effects to density-based continuous treatments without relearning the whole interface.</p>
 </div>
-
-
-
-<div class="quarto-title-meta">
-
-    
-  
-    
-  </div>
-  
-
-
-</header>
-
-
-<p>About this site</p>
+<p><span class="section-kicker"><code>Design principles</code></span> ## Why The Docs Are Structured This Way</p>
+<div class="feature-grid">
+<section id="treatment-type-comes-first" class="level3 feature-card">
+<h3 class="anchored" data-anchor-id="treatment-type-comes-first">Treatment type comes first</h3>
+<p>Binary, categorical, and continuous treatments correspond to different estimator families and different prediction semantics.</p>
+</section>
+<section id="returned-quantities-stay-explicit" class="level3 feature-card">
+<h3 class="anchored" data-anchor-id="returned-quantities-stay-explicit">Returned quantities stay explicit</h3>
+<p>The docs call out whether a model returns an average potential outcome, a response curve, a conditional density, or a stabilized ratio.</p>
+</section>
+<section id="estimators-are-composable" class="level3 feature-card">
+<h3 class="anchored" data-anchor-id="estimators-are-composable">Estimators are composable</h3>
+<p>Outcome models, treatment models, and density estimators are documented as separate pieces so users can see how the full workflow is assembled.</p>
+</section>
+<section id="examples-stay-practical" class="level3 feature-card">
+<h3 class="anchored" data-anchor-id="examples-stay-practical">Examples stay practical</h3>
+<p>The guides use example-ready <code>polars.DataFrame</code> inputs and familiar <code>scikit-learn</code> components so the examples are easy to adapt.</p>
+</section>
+</div>
+<p><span class="section-kicker"><code>Explore the project</code></span> ## Useful Starting Points</p>
+<div class="button-row">
+<p><a href="https://github.com/felipeangelimvieira/skcausal" class="hero-button hero-button-primary">View the repository</a> <a href="./examples/index.html" class="hero-button hero-button-secondary">Browse the examples hub</a> <a href="./density/index.html" class="hero-button hero-button-secondary">Read the density overview</a></p>
+</div>
+<div class="surface-section">
+<p>The goal is not just to expose more estimators. It is to make the causal question, the treatment representation, and the model output easy to understand before you trust the result.</p>
+</div>
 
 
 
@@ -551,8 +634,22 @@ ul.task-list li input[type="checkbox"] {
   });
   </script>
 </div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>skcausal</p>
+</div>   
+    <div class="nav-footer-center">
+<p>State-of-the-art unified API for causal inference</p>
+</div>
+    <div class="nav-footer-right">
+<p><a href="https://github.com/felipeangelimvieira/skcausal">GitHub</a></p>
+</div>
+  </div>
+</footer>
 
 
 
 
+<script src="site_libs/quarto-html/zenscroll-min.js"></script>
 </body></html>

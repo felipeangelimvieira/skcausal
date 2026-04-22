@@ -16,6 +16,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+plotting = ["matplotlib>=3.7.2"]
 torch = ["torch>=2.4.1", "lightning>=2.5.0.post0"]
 optuna = ["optuna>=4.0.0"]
 dev = [

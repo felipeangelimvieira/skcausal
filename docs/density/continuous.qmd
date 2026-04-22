@@ -6,12 +6,25 @@ Use this guide when the treatment is numeric and you need either a conditional d
 
 ## Choose an estimator
 
+```{mermaid}
+flowchart TD
+  Q1{"Does the downstream method\nrequire a normalized density\nor log-likelihood score?"}
+  Q1 -->|Yes| A["SkproDensityEstimator\nReturns p(t|x)"]
+  Q1 -->|No| Q2{"Is explicit density\nestimation difficult or\nunstable here?"}
+  Q2 -->|Yes| B["PermutationWeighting\nReturns p(t|x)/p(t)"]
+  Q2 -->|No| A
+```
+
 | Estimator | Use it when you need | Output scale | Main dependency |
 | --- | --- | --- | --- |
 | `SkproDensityEstimator` | A proper conditional treatment density from a probabilistic regressor | `"conditional"` | `skpro` |
 | `PermutationWeighting` | A classifier-based stabilized ratio | `"stabilized"` | A binary classifier with `predict_proba` |
 
+::: {.callout-important}
 These estimators do not return the same quantity. If a downstream method expects a conditional density or a log-likelihood, use `SkproDensityEstimator`. If it expects a stabilized density ratio, use `PermutationWeighting`.
+
+Check `estimator.get_tag("density_kind")` to confirm what a fitted estimator returns before plugging it into a weighting or evaluation step.
+:::
 
 ## Example data
 
@@ -62,7 +75,7 @@ In the test suite, the adapter matches the density obtained by calling the wrapp
 
 ## `PermutationWeighting`
 
-`PermutationWeighting` solves a different problem. It creates a binary classification dataset in which observed `(X, t)` pairs are labeled `1` and pairs built from observed `X` with permuted treatment values are labeled `0`. The estimator then returns posterior odds from that classifier, which correspond to a stabilized density ratio.
+`PermutationWeighting` solves a different problem. It creates a binary classification dataset in which observed `(X, t)` pairs are labeled `1` and pairs built from observed `X` with permuted treatment values are labeled `0`. The estimator then returns posterior-odds scores from that classifier, which are used as a stabilized density-ratio estimate.
 
 ```python
 from sklearn.linear_model import LogisticRegression
@@ -82,13 +95,18 @@ stabilized_ratio = ratio_estimator.predict_density(X, t)
 stabilized_ratio[:5]
 ```
 
-Common knobs:
+The key parameters control how the internal classifier trains and aggregates:
 
-- `treatment_transformation="spline"` expands the treatment with `SplineTransformer(n_knots=10, degree=2)` before classification.
-- `fit_mode="ensemble"` fits up to `max_trials` classifiers and aggregates their predicted probabilities. The default aggregation is the arithmetic mean, and `mean_type="geometric"` switches to a geometric mean.
-- `fit_mode="convergence"` keeps trying new classifiers until the observed-class probabilities show nontrivial variation, then stores the first converged model.
+| Parameter | Default | What it does |
+|---|---|---|
+| `treatment_transformation` | `None` | `"spline"` expands `t` with `SplineTransformer(n_knots=10, degree=2)` before classification — recommended for nonlinear treatment distributions |
+| `fit_mode` | `"ensemble"` | `"ensemble"` fits up to `max_trials` classifiers and averages predicted probabilities; `"convergence"` keeps the first model whose observed-class probabilities show nontrivial variation |
+| `max_trials` | `5` | Controls how many trial classifiers are fit in `"ensemble"` or `"convergence"` mode |
+| `mean_type` | `"arithmetic"` | Switch to `"geometric"` for ensemble aggregation when ratio values span several orders of magnitude |
 
-The returned values are nonnegative, but they are not a normalized density over `t`. Treat them as stabilized ratios, not as interchangeable replacements for $p(t \mid x)$.
+::: {.callout-warning}
+`PermutationWeighting` returns nonnegative stabilized ratios, not a normalized density over `t`. Do not treat these values as interchangeable with $p(t \mid x)$ — the ratio scale is correct for GPS-style reweighting, but it does not integrate to 1 over the treatment support.
+:::
 
 ## Evaluation
 

@@ -1,46 +1,118 @@
+---
+title: "Datasets"
+subtitle: "Synthetic benchmark datasets with known ground truth for testing and tutorial workflows."
+execute:
+  warning: false
+---
 
-```{python}
-from skcausal.datasets import PolynomialDataset
+Use this guide when you want to load one of the built-in synthetic datasets, inspect its structure, or access the known true dose-response curve for benchmarking.
+
+::: {.callout-note appearance="simple"}
+## What makes these datasets useful
+
+Each dataset is a small data-generating process: it creates confounded observational data **and** exposes `predict()` to return the true average potential outcome at any treatment value. This means you can fit an estimator and immediately check how close it is to the ground truth — without running an experiment.
+:::
+
+## Available datasets
+
+| Dataset | Treatment type | Ground truth available | Notes |
+|---|---|---|---|
+| `SyntheticDataset2` | Continuous (1 column) | `predict()` + `get_grid()` | Nonlinear, confounded |
+| `SyntheticDataset2Discrete` | Binary (`bool`) | `predict()` | Discrete version of SyntheticDataset2 |
+| `SimpleLinearDataset` | Continuous or binary | `predict()` | Linear by construction |
+| `PolynomialDataset` | Continuous, binary, or mixed | `predict()` | Polynomial X→T and (X,T)→Y |
+
+## Step 1: Import and instantiate
+
+All datasets share the same constructor pattern. Pass `n` for sample size and a random seed for reproducibility:
+
+```python
+from skcausal.datasets import SyntheticDataset2
+from skcausal.plotting import use_theme
+
+use_theme()
+
+dataset = SyntheticDataset2(n=300, n_features=6, random_state=0)
+```
+
+## Step 2: Retrieve the data
+
+`retrieve()` returns three separate `polars.DataFrame` objects — covariates `X`, treatment assignments `t`, and observed outcomes `y`:
+
+```python
+X, t, y = dataset.retrieve()
+```
+
+::: {.callout-note}
+`X`, `t`, and `y` have the same number of rows (`n`). Column names are set by the dataset's schema — rename them as needed to match your pipeline.
+:::
+
+```python
+import polars as pl
+
+# Optional: give covariates readable names
+X = X.rename({col: f"x{i}" for i, col in enumerate(X.columns)})
+y = y.rename({y.columns[0]: "y"})
+
+pl.concat([X.head(5), t.head(5), y.head(5)], how="horizontal")
+```
+
+## Step 3: Build a treatment grid
+
+For continuous treatment datasets, `get_grid(n)` returns a treatment `DataFrame` spanning the observed range at `n` evenly spaced points. This matches the predict API contract — `X` and the treatment table must have the same number of rows:
+
+```python
+grid = dataset.get_grid(X.height)
+```
+
+`grid` has the same schema as `t` and `X.height` rows, so it is ready to pass directly to `estimator.predict(X, grid)`.
+
+## Step 4: Get the true dose-response curve
+
+`dataset.predict(X, grid)` computes the **average potential outcome** at each treatment grid point by averaging `predict_y` over all rows of `X`. This is the true dose-response curve for the data-generating process:
+
+```python
+import numpy as np
+
+true_curve = np.asarray(dataset.predict(X, grid), dtype=float).reshape(-1)
+grid_values = grid["t_0"].to_numpy()
+```
+
+::: {.callout-tip}
+**What `predict()` returns**: for each treatment value in `grid`, it evaluates the noiseless outcome function at every row of `X` and returns the mean. The result is the **average dose-response function (ADRF)** — the quantity your causal estimator is trying to recover.
+:::
+
+## Step 5: Plot observed data vs. ground truth
+
+```python
 import matplotlib.pyplot as plt
 
-dataset = PolynomialDataset(n=10000, treatment_dim_types=["continuous"],
-x_to_y_degree=2, covariate_effect_scale=20, joint_effect_scale=.1, treatment_effect_scale=1)
-
-X, t, y = dataset.load()
-
-adrf = dataset.predict(X, t)
-
-```
-
-```{python}
-
-plt.figure()
-plt.scatter(t, y, alpha=0.5)
-# argsort t (pl.DataFrame)
-sorted_indices = t.to_numpy().argsort(axis=0).flatten()
-plt.plot(t.to_numpy()[sorted_indices], adrf[sorted_indices], color="red")
+fig, ax = plt.subplots(figsize=(8, 5))
+ax.scatter(t["t_0"].to_numpy(), y["y"].to_numpy(), s=12, alpha=0.25, label="Observed data")
+ax.plot(grid_values, true_curve, linewidth=2.5, label="True ADRF")
+ax.set_xlabel("Treatment")
+ax.set_ylabel("Average outcome")
+ax.set_title("SyntheticDataset2: observed data vs. ground truth")
+ax.legend()
 plt.show()
 ```
 
-```{python}
-from skcausal.causal_estimators.ignore_covariates import DirectNoCovariates
-from sklearn.neural_network import MLPRegressor
-estimator = DirectNoCovariates(
-    outcome_regressor=MLPRegressor(hidden_layer_sizes=(100, 100), max_iter=500)
-)
-estimator.fit(X, y=y, t=t)
+A visible gap between the cloud of observed points and the true curve is expected — it reflects confounding: the treatment was not randomly assigned.
 
+## SimpleLinearDataset
 
+`SimpleLinearDataset` is the quickest dataset for sanity-checking a new estimator. The outcome is exactly linear in both `X` and `t`, so a correctly specified linear outcome model should recover the truth with low error:
+
+```python
+from skcausal.datasets import SimpleLinearDataset
+
+dataset = SimpleLinearDataset(n=250, t_types=("continuous",), n_features=4, random_state=0)
+X, t, y = dataset.retrieve()
 ```
 
-```{python}
-adrf_pred = estimator.predict(X, t)
+`t_types` controls which treatment columns are continuous and which are binary. Passing `("continuous", "binary")` generates a two-column treatment table.
 
-plt.figure()
-plt.scatter(t, y, alpha=0.5)
-# argsort t (pl.DataFrame)
-sorted_indices = t.to_numpy().argsort(axis=0).flatten()
-plt.plot(t.to_numpy()[sorted_indices], adrf[sorted_indices], color="black")
-plt.plot(t.to_numpy()[sorted_indices], adrf_pred[sorted_indices], color="red")
-plt.show()
-```
+## What to try next
+
+- Use `SyntheticDataset2` or `SimpleLinearDataset` in the [continuous treatments example](../examples/continuous_treatments.qmd) to see the fit vs. truth comparison.
+- The full benchmark walkthrough [SyntheticDataset2 walkthrough](../examples/dose_response_curve.qmd) uses `SyntheticDataset2` with four estimators side by side.
