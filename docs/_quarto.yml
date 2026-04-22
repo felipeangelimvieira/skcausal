@@ -40,10 +40,6 @@ website:
             text: "Overview"
           - href: density/continuous.qmd
             text: "Continuous Treatments"
-      - text: "Datasets"
-        menu:
-          - href: datasets/loading.qmd
-            text: "Loading"
       - href: about.qmd
         text: "About"
     right:

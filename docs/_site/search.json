@@ -485,7 +485,7 @@
   {
     "objectID": "index.html",
     "href": "index.html",
-    "title": "One Workflow. Any Treatment.",
+    "title": "A Unified Workflow for Causal Inference.",
     "section": "",
     "text": "For observational ML workflows\n    skcausal estimates causal effects from observational data. One fit(X, t, y) contract covers binary, categorical, and continuous treatments.\n    \n      pip install skcausal\n    \n  \n\n  \n    \n      \n        \n          \n        \n        minimal continuous-treatment example\n      \nfrom sklearn.linear_model import LinearRegression\nfrom skcausal.causal_estimators import DirectRegressor\n\nestimator = DirectRegressor(\n    outcome_regressor=LinearRegression()\n)\nestimator.fit(X, t, y)\ncurve = estimator.predict(X, t)\n    \n  \n\nChoose your path\n\n\nBinary treatments\nTreatment is a treated-vs-control flag and the target is average potential outcomes under each level.\nOpen binary guide\n\n\nContinuous treatments\nTreatment is a dose, exposure, or intensity and the target is a dose-response curve. Includes density and GPS tooling.\nOpen continuous guide\n\n\nCategorical treatments\nTreatment has more than two named levels such as control, placebo, and treated.\nOpen categorical guide"
   },

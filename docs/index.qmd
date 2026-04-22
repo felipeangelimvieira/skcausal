@@ -1,6 +1,6 @@
 ---
-title: "One Workflow. Any Treatment."
-subtitle: "Causal inference across binary, categorical, and continuous treatments — one consistent API."
+title: "A Unified Workflow for Causal Inference."
+subtitle: "Causal inference across binary, categorical, and continuous treatments — one consistent API. scikit-learn and skpro compatible."
 page-layout: full
 toc: false
 ---
