@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>doc_plan – skcausal</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-6dce83697ef593b6f21f66f8d1a1696b.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "textbox",
+  "limit": 5,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<style>html{ scroll-behavior: smooth; }</style>
+
+
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">skcausal</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-examples" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Examples</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-examples">    
+        <li>
+    <a class="dropdown-item" href="./examples/index.html">
+ <span class="dropdown-text">Overview</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./examples/binary_treatments.html">
+ <span class="dropdown-text">Binary Treatments</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./examples/continuous_treatments.html">
+ <span class="dropdown-text">Continuous Treatments</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./examples/categorical_treatments.html">
+ <span class="dropdown-text">Categorical Treatments</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./examples/dose_response_curve.html">
+ <span class="dropdown-text">SyntheticDataset2 Walkthrough</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-density" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Density</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-density">    
+        <li>
+    <a class="dropdown-item" href="./density/index.html">
+ <span class="dropdown-text">Overview</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./density/continuous.html">
+ <span class="dropdown-text">Continuous Treatments</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="./about.html"> 
+<span class="menu-text">About</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/felipeangelimvieira/skcausal"> <i class="bi bi-github" role="img" aria-label="GitHub repository">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<header id="title-block-header" class="quarto-title-block"></header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active" data-toc-expanded="99">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#documentation-rewrite-plan" id="toc-documentation-rewrite-plan" class="nav-link active" data-scroll-target="#documentation-rewrite-plan">Documentation Rewrite Plan</a>
+  <ul class="collapse">
+  <li><a href="#user-goals" id="toc-user-goals" class="nav-link" data-scroll-target="#user-goals">1. User Goals</a></li>
+  <li><a href="#success-criteria" id="toc-success-criteria" class="nav-link" data-scroll-target="#success-criteria">2. Success Criteria</a></li>
+  <li><a href="#proposed-information-architecture" id="toc-proposed-information-architecture" class="nav-link" data-scroll-target="#proposed-information-architecture">3. Proposed Information Architecture</a></li>
+  <li><a href="#recommended-user-flow" id="toc-recommended-user-flow" class="nav-link" data-scroll-target="#recommended-user-flow">4. Recommended User Flow</a></li>
+  <li><a href="#page-by-page-plan" id="toc-page-by-page-plan" class="nav-link" data-scroll-target="#page-by-page-plan">5. Page-by-Page Plan</a>
+  <ul class="collapse">
+  <li><a href="#a.-binary-treatments-guide" id="toc-a.-binary-treatments-guide" class="nav-link" data-scroll-target="#a.-binary-treatments-guide">A. Binary Treatments Guide</a></li>
+  <li><a href="#b.-continuous-treatments-guide" id="toc-b.-continuous-treatments-guide" class="nav-link" data-scroll-target="#b.-continuous-treatments-guide">B. Continuous Treatments Guide</a></li>
+  <li><a href="#c.-categorical-treatments-guide" id="toc-c.-categorical-treatments-guide" class="nav-link" data-scroll-target="#c.-categorical-treatments-guide">C. Categorical Treatments Guide</a></li>
+  <li><a href="#d.-full-syntheticdataset2-walkthrough" id="toc-d.-full-syntheticdataset2-walkthrough" class="nav-link" data-scroll-target="#d.-full-syntheticdataset2-walkthrough">D. Full <code>SyntheticDataset2</code> Walkthrough</a></li>
+  </ul></li>
+  <li><a href="#migration-rules-for-the-rewrite" id="toc-migration-rules-for-the-rewrite" class="nav-link" data-scroll-target="#migration-rules-for-the-rewrite">6. Migration Rules for the Rewrite</a></li>
+  <li><a href="#writing-conventions-across-all-guides" id="toc-writing-conventions-across-all-guides" class="nav-link" data-scroll-target="#writing-conventions-across-all-guides">7. Writing Conventions Across All Guides</a></li>
+  <li><a href="#implementation-order" id="toc-implementation-order" class="nav-link" data-scroll-target="#implementation-order">8. Implementation Order</a></li>
+  <li><a href="#out-of-scope-for-the-first-pass" id="toc-out-of-scope-for-the-first-pass" class="nav-link" data-scroll-target="#out-of-scope-for-the-first-pass">9. Out-of-Scope for the First Pass</a></li>
+  <li><a href="#final-deliverable-shape" id="toc-final-deliverable-shape" class="nav-link" data-scroll-target="#final-deliverable-shape">10. Final Deliverable Shape</a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content quarto-banner-title-block" id="quarto-document-content">
+
+
+
+
+<section id="documentation-rewrite-plan" class="level1">
+<h1>Documentation Rewrite Plan</h1>
+<section id="user-goals" class="level2">
+<h2 class="anchored" data-anchor-id="user-goals">1. User Goals</h2>
+<p>The rewritten docs should let a new user answer these questions quickly:</p>
+<ol type="1">
+<li>I have a binary treatment. Which estimator should I use, and what should <code>t</code> look like?</li>
+<li>I have a continuous treatment. How do I estimate a dose-response curve?</li>
+<li>I have a categorical treatment with more than two levels. How do I estimate average outcomes per level?</li>
+<li>I want one full end-to-end example with known ground truth so I can understand the library before using it on real data.</li>
+</ol>
+<p>From the user perspective, the current gaps are:</p>
+<ul>
+<li>The docs only expose one example path.</li>
+<li>The main walkthrough uses stale imports and stale method names.</li>
+<li>There is no obvious decision path by treatment type.</li>
+<li>It is not clear that boolean treatments should be treated as categorical in <code>skcausal</code>.</li>
+<li>The examples do not consistently teach the expected shapes and schemas for <code>X</code>, <code>t</code>, and <code>y</code>.</li>
+</ul>
+</section>
+<section id="success-criteria" class="level2">
+<h2 class="anchored" data-anchor-id="success-criteria">2. Success Criteria</h2>
+<p>The rewrite is complete when:</p>
+<ul>
+<li>A new user can choose the right guide from the homepage in one or two clicks.</li>
+<li>Each guide contains a minimal working example that runs against the current API.</li>
+<li>Binary, continuous, and categorical treatments each have a dedicated example page.</li>
+<li>The full <code>SyntheticDataset2</code> walkthrough remains available at the current <code>dose_response_curve.qmd</code> path.</li>
+<li>All example code uses current imports, current dataset methods, and current plotting logic.</li>
+</ul>
+</section>
+<section id="proposed-information-architecture" class="level2">
+<h2 class="anchored" data-anchor-id="proposed-information-architecture">3. Proposed Information Architecture</h2>
+<p>The docs should be organized around the user’s treatment type, not around internal modules.</p>
+<p>Planned page structure:</p>
+<ul>
+<li><code>docs/index.qmd</code></li>
+<li><code>docs/examples/index.qmd</code></li>
+<li><code>docs/examples/binary_treatments.qmd</code></li>
+<li><code>docs/examples/continuous_treatments.qmd</code></li>
+<li><code>docs/examples/categorical_treatments.qmd</code></li>
+<li><code>docs/examples/dose_response_curve.qmd</code></li>
+</ul>
+<p>Navigation changes:</p>
+<ul>
+<li>Update <code>docs/index.qmd</code> to present four user-facing entry points:
+<ul>
+<li>Binary treatments</li>
+<li>Continuous treatments</li>
+<li>Categorical treatments</li>
+<li>Full <code>SyntheticDataset2</code> walkthrough</li>
+</ul></li>
+<li>Keep the density guide as a separate entry point.</li>
+<li>Update <code>docs/examples/index.qmd</code> into an examples hub with a short “Choose the right guide” section.</li>
+<li>Update <code>docs/_quarto.yml</code> so the navbar has an <code>Examples</code> menu instead of a single <code>Example</code> link.</li>
+<li>Keep <code>docs/examples/dose_response_curve.qmd</code> in place so existing links do not break.</li>
+</ul>
+</section>
+<section id="recommended-user-flow" class="level2">
+<h2 class="anchored" data-anchor-id="recommended-user-flow">4. Recommended User Flow</h2>
+<p>The homepage and examples hub should guide users like this:</p>
+<ol type="1">
+<li>If your treatment is <code>True</code>/<code>False</code>, go to the binary treatments guide.</li>
+<li>If your treatment is a dosage, score, or other numeric exposure, go to the continuous treatments guide.</li>
+<li>If your treatment is a label such as <code>control</code>, <code>treated</code>, or <code>placebo</code>, go to the categorical treatments guide.</li>
+<li>If you want the detailed benchmark-style walkthrough with ground truth, go to the full <code>SyntheticDataset2</code> guide.</li>
+</ol>
+</section>
+<section id="page-by-page-plan" class="level2">
+<h2 class="anchored" data-anchor-id="page-by-page-plan">5. Page-by-Page Plan</h2>
+<section id="a.-binary-treatments-guide" class="level3">
+<h3 class="anchored" data-anchor-id="a.-binary-treatments-guide">A. Binary Treatments Guide</h3>
+<p>Primary user question:</p>
+<p>“I have treated vs control data. What is the shortest correct example I can copy?”</p>
+<p>Recommended dataset:</p>
+<ul>
+<li><code>SyntheticDataset2Discrete</code></li>
+</ul>
+<p>Key teaching points:</p>
+<ul>
+<li>In <code>skcausal</code>, boolean treatments are handled through the categorical-treatment estimators.</li>
+<li>The treatment query passed to <code>predict</code> should be an explicit treatment DataFrame.</li>
+<li>Users should understand the difference between direct, weighting, and doubly robust estimators without reading theory first.</li>
+</ul>
+<p>Planned outline:</p>
+<ol type="1">
+<li>State that binary is a special case of categorical treatment.</li>
+<li>Generate data with <code>SyntheticDataset2Discrete</code>.</li>
+<li>Show <code>X</code>, <code>t</code>, and <code>y</code> and explain their expected structure.</li>
+<li>Fit <code>CategoricalDirectMethod</code> as the simplest baseline.</li>
+<li>Fit <code>CategoricalInversePropensityWeighting</code>.</li>
+<li>Fit <code>CategoricalDoublyRobust</code>.</li>
+<li>Query average potential outcomes for <code>False</code> and <code>True</code>.</li>
+<li>End with a short interpretation section: average potential outcome, uplift, and when to prefer DR over simpler methods.</li>
+</ol>
+<p>Implementation note:</p>
+<ul>
+<li>Prefer <code>PermutationWeighting</code> in examples whenever a stabilized density ratio is appropriate.</li>
+</ul>
+</section>
+<section id="b.-continuous-treatments-guide" class="level3">
+<h3 class="anchored" data-anchor-id="b.-continuous-treatments-guide">B. Continuous Treatments Guide</h3>
+<p>Primary user question:</p>
+<p>“I have a numeric treatment. How do I estimate an average dose-response curve with the current API?”</p>
+<p>Recommended dataset:</p>
+<ul>
+<li><code>SimpleLinearDataset(t_types=("continuous",))</code> for the quickstart example</li>
+</ul>
+<p>Reasoning:</p>
+<ul>
+<li>This keeps the quickstart short and easy to read.</li>
+<li>The more realistic <code>SyntheticDataset2</code> example can stay focused in the full walkthrough.</li>
+</ul>
+<p>Key teaching points:</p>
+<ul>
+<li>Continuous treatment examples should be shown on a treatment grid, not only on observed treatment values.</li>
+<li>Users need one minimal example first, then one density-aware example.</li>
+</ul>
+<p>Planned outline:</p>
+<ol type="1">
+<li>Generate a simple continuous-treatment dataset.</li>
+<li>Show <code>X</code>, <code>t</code>, and <code>y</code>.</li>
+<li>Create a treatment grid.</li>
+<li>Fit <code>DirectRegressor</code> as the simplest covariate-aware baseline.</li>
+<li>Fit <code>GPS</code> as the first density-based method.</li>
+<li>Plot both estimated curves.</li>
+<li>Link to the full <code>SyntheticDataset2</code> walkthrough for a richer benchmark and ground-truth comparison.</li>
+</ol>
+</section>
+<section id="c.-categorical-treatments-guide" class="level3">
+<h3 class="anchored" data-anchor-id="c.-categorical-treatments-guide">C. Categorical Treatments Guide</h3>
+<p>Primary user question:</p>
+<p>“I have more than two treatment levels. How do I estimate average outcomes for each level?”</p>
+<p>Recommended example setup:</p>
+<ul>
+<li>A small in-page synthetic multiclass example using a <code>polars</code> Enum treatment such as <code>control</code>, <code>treated</code>, and <code>placebo</code></li>
+</ul>
+<p>Reasoning:</p>
+<ul>
+<li>There is no built-in multiclass synthetic dataset today.</li>
+<li>For the first rewrite pass, creating the example inline is lower scope than adding a new dataset class.</li>
+</ul>
+<p>Key teaching points:</p>
+<ul>
+<li>Each observed treatment level is treated as a valid query level.</li>
+<li>Predictions are average potential outcomes for requested levels.</li>
+<li>Only observed treatment levels should be requested.</li>
+</ul>
+<p>Planned outline:</p>
+<ol type="1">
+<li>Build a small multiclass synthetic dataset directly in the page.</li>
+<li>Make the treatment column explicitly categorical or enum-valued.</li>
+<li>Fit <code>CategoricalDirectMethod</code>.</li>
+<li>Fit <code>CategoricalInversePropensityWeighting</code>.</li>
+<li>Fit <code>CategoricalDoublyRobust</code>.</li>
+<li>Query predictions for each observed level.</li>
+<li>Compare estimated average outcomes across levels.</li>
+<li>End with a note that binary treatment is the same API family with only two levels.</li>
+</ol>
+</section>
+<section id="d.-full-syntheticdataset2-walkthrough" class="level3">
+<h3 class="anchored" data-anchor-id="d.-full-syntheticdataset2-walkthrough">D. Full <code>SyntheticDataset2</code> Walkthrough</h3>
+<p>Primary user question:</p>
+<p>“Show me one end-to-end example that explains the library in practice and compares estimators against known truth.”</p>
+<p>File to rewrite:</p>
+<ul>
+<li><code>docs/examples/dose_response_curve.qmd</code></li>
+</ul>
+<p>Keep this path stable because it is already linked from the homepage and navbar.</p>
+<p>Planned outline:</p>
+<ol type="1">
+<li>Introduce <code>SyntheticDataset2</code> and why it is useful for benchmarking.</li>
+<li>Generate data with the current dataset API.</li>
+<li>Inspect <code>X</code>, <code>t</code>, and <code>y</code>.</li>
+<li>Build a smooth treatment grid with <code>dataset.get_grid(...)</code>.</li>
+<li>Compute the true ADRF with <code>dataset.predict(X, treatment_grid)</code>.</li>
+<li>Visualize the observed data and the true curve.</li>
+<li>Fit <code>DirectNoCovariates</code> as the naive baseline.</li>
+<li>Fit <code>DirectRegressor</code> as the first covariate-aware baseline.</li>
+<li>Fit <code>GPS</code>.</li>
+<li>Fit <code>DoublyRobustPseudoOutcome</code>.</li>
+<li>Plot all estimated curves against the true ADRF.</li>
+<li>End with a short estimator-selection guide for users.</li>
+</ol>
+<p>Implementation note:</p>
+<ul>
+<li><code>DoublyRobustPseudoOutcome</code> requires a stabilized density estimator. Prefer <code>PermutationWeighting</code> for the walkthrough unless a page specifically needs a wrapped conditional density estimator.</li>
+</ul>
+</section>
+</section>
+<section id="migration-rules-for-the-rewrite" class="level2">
+<h2 class="anchored" data-anchor-id="migration-rules-for-the-rewrite">6. Migration Rules for the Rewrite</h2>
+<p>The old <code>dose_response_curve.qmd</code> page is outdated. The rewrite should explicitly fix these issues:</p>
+<ul>
+<li>Replace stale internal imports with imports from current public modules that exist in the repo.</li>
+<li>Replace <code>prepare(n=..., split_seed=..., preparation_seed=...)</code> with the current dataset API.</li>
+<li>Replace the nonexistent <code>get_adrf(...)</code> call with <code>dataset.predict(X, treatment_grid)</code>.</li>
+<li>Replace plots built from sorted observed treatments with plots over an explicit treatment grid when the goal is to show a smooth response curve.</li>
+<li>Remove references to modules that no longer exist, such as the old continuous estimator import paths.</li>
+</ul>
+</section>
+<section id="writing-conventions-across-all-guides" class="level2">
+<h2 class="anchored" data-anchor-id="writing-conventions-across-all-guides">7. Writing Conventions Across All Guides</h2>
+<p>Every page should follow the same user-first pattern:</p>
+<ol type="1">
+<li>Start with “When to use this guide”.</li>
+<li>Show a minimal working example early.</li>
+<li>Explain the expected structure of <code>X</code>, <code>t</code>, and <code>y</code>.</li>
+<li>Use current, copy-pastable imports only.</li>
+<li>Use <code>polars</code> data structures consistently, since that is what the datasets currently expose.</li>
+<li>Add one plot or compact table that lets the user see the result immediately.</li>
+<li>End with “What to try next” and link to the next most relevant page.</li>
+</ol>
+<p>Additional content rules:</p>
+<ul>
+<li>Prefer current public APIs over deep internal imports.</li>
+<li>Avoid long theory blocks before the first working example.</li>
+<li>Explain estimator tradeoffs in plain language after the code works.</li>
+<li>Keep the first version of each page minimal; optional variants can be added later.</li>
+</ul>
+</section>
+<section id="implementation-order" class="level2">
+<h2 class="anchored" data-anchor-id="implementation-order">8. Implementation Order</h2>
+<p>Recommended execution order:</p>
+<ol type="1">
+<li>Rewrite <code>docs/examples/dose_response_curve.qmd</code> around the current <code>SyntheticDataset2</code> API while preserving its path.</li>
+<li>Add <code>docs/examples/binary_treatments.qmd</code>.</li>
+<li>Add <code>docs/examples/continuous_treatments.qmd</code>.</li>
+<li>Add <code>docs/examples/categorical_treatments.qmd</code>.</li>
+<li>Rewrite <code>docs/examples/index.qmd</code> into a real examples hub.</li>
+<li>Update <code>docs/index.qmd</code> so the landing page routes users by treatment type.</li>
+<li>Update <code>docs/_quarto.yml</code> navigation.</li>
+<li>Build the docs and fix any broken imports, execution failures, or stale links.</li>
+</ol>
+</section>
+<section id="out-of-scope-for-the-first-pass" class="level2">
+<h2 class="anchored" data-anchor-id="out-of-scope-for-the-first-pass">9. Out-of-Scope for the First Pass</h2>
+<p>To keep the rewrite focused, these items should stay out of scope unless needed later:</p>
+<ul>
+<li>Adding a brand-new multiclass dataset class just for documentation.</li>
+<li>Writing API reference pages for every estimator before the example guides are fixed.</li>
+<li>Expanding the density documentation unless a causal example needs a missing explanation.</li>
+</ul>
+</section>
+<section id="final-deliverable-shape" class="level2">
+<h2 class="anchored" data-anchor-id="final-deliverable-shape">10. Final Deliverable Shape</h2>
+<p>After the rewrite, the docs should feel like this from the user’s perspective:</p>
+<ul>
+<li>I can identify my treatment type immediately.</li>
+<li>I can copy one small example that runs.</li>
+<li>I can find one deeper walkthrough that explains how the pieces fit together.</li>
+<li>I do not need to reverse-engineer stale imports or guess which estimator family applies to my data.</li>
+</ul>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>skcausal</p>
+</div>   
+    <div class="nav-footer-center">
+<p>State-of-the-art unified API for causal inference</p>
+</div>
+    <div class="nav-footer-right">
+<p><a href="https://github.com/felipeangelimvieira/skcausal">GitHub</a></p>
+</div>
+  </div>
+</footer>
+
+
+
+
+<script src="site_libs/quarto-html/zenscroll-min.js"></script>
+</body></html>
