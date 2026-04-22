@@ -1,0 +1,28 @@
+# Welcome
+
+This book lives inside the main documentation site, but it is rendered by its own Quarto project. That separation is intentional: the website stays a website project, while the book gets book-specific navigation, chapter structure, and cross-reference support.
+
+::: {.callout-note appearance="simple"}
+## Why A Separate Book Project?
+
+Quarto only allows one project type per `_quarto.yml`. This book is therefore sourced from `docs/book/` and rendered into `/book/` inside the published documentation website.
+:::
+
+## Reading Path
+
+```{mermaid}
+flowchart LR
+  A["Getting started"] --> B["Estimator contract"]
+  B --> C["Continuous workflows"]
+  C --> D["Back to examples and API docs"]
+```
+
+Use this book when you want a more linear reading experience than the website provides.
+
+1. Start with [Getting Started](getting-started.qmd) for installation and the core `X`, `t`, `y` contract.
+2. Continue to [Estimator Contract](estimator-contract.qmd) for the package's fit and predict semantics.
+3. Finish with [Continuous Workflows](continuous-workflows.qmd) for the treatment-grid and ADRF workflow.
+
+::: {.callout-tip}
+Return to the main site from any chapter with [the main docs homepage](../index.html){.book-page-link}.
+:::

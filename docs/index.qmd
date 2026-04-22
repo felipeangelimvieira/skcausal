@@ -1,13 +1,68 @@
 ---
-title: "Skcausal documention"
+title: "A Unified Workflow for Causal Inference."
+subtitle: "Causal inference across binary, categorical, and continuous treatments — one consistent API. scikit-learn and skpro compatible."
+page-layout: full
+toc: false
 ---
 
-::: {.callout-note appearance="simple"}
-## Estimate causal effects for continuous treatments
+```{=html}
 
-Checkout how to fit and predict dose-response curves using different causal estimators for continuous treatments in skcausal.
 
----
-  
-[**Click here!**](/examples/dose_response_curve.qmd)
+<div class="home-hero-grid">
+  <div class="surface-section home-intro-panel">
+    <span class="section-kicker">For observational ML workflows</span>
+    <p class="home-lead"><code>skcausal</code> estimates causal effects from observational data. One <code>fit(X, t, y)</code> contract covers binary, categorical, and continuous treatments.</p>
+    <div style="margin-top: 1.2rem;">
+      <code class="home-install-cmd">pip install skcausal</code>
+    </div>
+  </div>
+
+  <div class="home-code-panel">
+    <div class="home-code-window">
+      <div class="home-window-bar">
+        <div class="home-window-dots" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <span class="home-window-title">minimal continuous-treatment example</span>
+      </div>
+<pre class="home-code-block"><code>from sklearn.linear_model import LinearRegression
+from skcausal.causal_estimators import DirectRegressor
+
+estimator = DirectRegressor(
+    outcome_regressor=LinearRegression()
+)
+estimator.fit(X, t, y)
+curve = estimator.predict(X, t)</code></pre>
+    </div>
+  </div>
+</div>
+```
+
+
+[Choose your path]{.section-kicker}
+
+::: {.home-intent-grid}
+::: {.docs-card}
+### Binary treatments
+
+Treatment is a treated-vs-control flag and the target is average potential outcomes under each level.
+
+[Open binary guide](examples/binary_treatments.html){.card-link}
+:::
+
+::: {.docs-card}
+### Continuous treatments
+
+Treatment is a dose, exposure, or intensity and the target is a dose-response curve. Includes density and GPS tooling.
+
+[Open continuous guide](examples/continuous_treatments.html){.card-link}
+:::
+
+::: {.docs-card}
+### Categorical treatments
+
+Treatment has more than two named levels such as `control`, `placebo`, and `treated`.
+
+[Open categorical guide](examples/categorical_treatments.html){.card-link}
+:::
 :::

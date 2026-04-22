@@ -1,5 +1,52 @@
 ---
-title: "About"
+title: "About skcausal"
+subtitle: "A modern causal inference toolkit organized around one clear estimator contract."
+page-layout: full
+toc: false
 ---
 
-About this site
+::: {.surface-section}
+`skcausal` is a Python library for causal inference workflows that tries to keep three things explicit: the treatment type, the estimator contract, and the quantity returned by the model. The documentation follows the same structure so users can move from binary effects to density-based continuous treatments without relearning the whole interface.
+:::
+
+[`Design principles`]{.section-kicker}
+## Why The Docs Are Structured This Way
+
+::: {.feature-grid}
+::: {.feature-card}
+### Treatment type comes first
+
+Binary, categorical, and continuous treatments correspond to different estimator families and different prediction semantics.
+:::
+
+::: {.feature-card}
+### Returned quantities stay explicit
+
+The docs call out whether a model returns an average potential outcome, a response curve, a conditional density, or a stabilized ratio.
+:::
+
+::: {.feature-card}
+### Estimators are composable
+
+Outcome models, treatment models, and density estimators are documented as separate pieces so users can see how the full workflow is assembled.
+:::
+
+::: {.feature-card}
+### Examples stay practical
+
+The guides use example-ready `polars.DataFrame` inputs and familiar `scikit-learn` components so the examples are easy to adapt.
+:::
+:::
+
+[`Explore the project`]{.section-kicker}
+## Useful Starting Points
+
+::: {.button-row}
+[View the repository](https://github.com/felipeangelimvieira/skcausal){.hero-button .hero-button-primary}
+[Browse the examples hub](examples/index.qmd){.hero-button .hero-button-secondary}
+[Read the density overview](density/index.qmd){.hero-button .hero-button-secondary}
+:::
+
+::: {.surface-section}
+The goal is not just to expose more estimators. It is to make the causal question, the treatment representation, and the model output easy to understand before you trust the result.
+:::

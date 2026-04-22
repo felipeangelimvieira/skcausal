@@ -1,0 +1,136 @@
+---
+title: "Continuous Treatment Densities"
+---
+
+Use this guide when the treatment is numeric and you need either a conditional density $p(t \mid x)$ or a stabilized density ratio $p(t \mid x) / p(t)$.
+
+## Choose an estimator
+
+```{mermaid}
+flowchart TD
+  Q1{"Does the downstream method\nrequire a normalized density\nor log-likelihood score?"}
+  Q1 -->|Yes| A["SkproDensityEstimator\nReturns p(t|x)"]
+  Q1 -->|No| Q2{"Is explicit density\nestimation difficult or\nunstable here?"}
+  Q2 -->|Yes| B["PermutationWeighting\nReturns p(t|x)/p(t)"]
+  Q2 -->|No| A
+```
+
+| Estimator | Use it when you need | Output scale | Main dependency |
+| --- | --- | --- | --- |
+| `SkproDensityEstimator` | A proper conditional treatment density from a probabilistic regressor | `"conditional"` | `skpro` |
+| `PermutationWeighting` | A classifier-based stabilized ratio | `"stabilized"` | A binary classifier with `predict_proba` |
+
+::: {.callout-important}
+These estimators do not return the same quantity. If a downstream method expects a conditional density or a log-likelihood, use `SkproDensityEstimator`. If it expects a stabilized density ratio, use `PermutationWeighting`.
+
+Check `estimator.get_tag("density_kind")` to confirm what a fitted estimator returns before plugging it into a weighting or evaluation step.
+:::
+
+## Example data
+
+The examples below use a single continuous treatment column stored in a `polars.DataFrame`.
+
+```python
+import numpy as np
+import polars as pl
+
+rng = np.random.default_rng(0)
+n = 400
+
+x0 = rng.normal(size=n)
+x1 = rng.normal(size=n)
+noise_scale = 0.2 + 0.5 * np.abs(x1)
+t_values = 1.5 * x0 - 0.8 * x1 + rng.normal(scale=noise_scale, size=n)
+
+X = pl.DataFrame({"x0": x0, "x1": x1})
+t = pl.DataFrame({"t": t_values})
+```
+
+## `SkproDensityEstimator`
+
+`SkproDensityEstimator` is an adapter around a skpro probabilistic regressor. It fits the wrapped regressor on `X` and `t`, calls `predict_proba(X)`, and evaluates the resulting predictive distribution at the supplied treatment values.
+
+The current implementation supports floating-point treatment columns (`pl.Float32` and `pl.Float64`).
+
+```python
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
+from skpro.regression.residual import ResidualDouble
+
+from skcausal.density.skpro import SkproDensityEstimator
+
+regressor = ResidualDouble(
+    estimator=LinearRegression(),
+    estimator_resid=RandomForestRegressor(n_estimators=25, random_state=0),
+)
+
+density_estimator = SkproDensityEstimator(estimator=regressor)
+density_estimator.fit(X, t)
+
+conditional_density = density_estimator.predict_density(X, t)
+conditional_density[:5]
+```
+
+In the test suite, the adapter matches the density obtained by calling the wrapped skpro regressor directly and then evaluating its `pdf` on the same rows.
+
+## `PermutationWeighting`
+
+`PermutationWeighting` solves a different problem. It creates a binary classification dataset in which observed `(X, t)` pairs are labeled `1` and pairs built from observed `X` with permuted treatment values are labeled `0`. The estimator then returns posterior-odds scores from that classifier, which are used as a stabilized density-ratio estimate.
+
+```python
+from sklearn.linear_model import LogisticRegression
+
+from skcausal.density.permutation_weighting import PermutationWeighting
+
+ratio_estimator = PermutationWeighting(
+    classifier=LogisticRegression(max_iter=1000),
+    treatment_transformation="spline",
+    max_trials=3,
+    random_state=0,
+)
+
+ratio_estimator.fit(X, t)
+
+stabilized_ratio = ratio_estimator.predict_density(X, t)
+stabilized_ratio[:5]
+```
+
+The key parameters control how the internal classifier trains and aggregates:
+
+| Parameter | Default | What it does |
+|---|---|---|
+| `treatment_transformation` | `None` | `"spline"` expands `t` with `SplineTransformer(n_knots=10, degree=2)` before classification — recommended for nonlinear treatment distributions |
+| `fit_mode` | `"ensemble"` | `"ensemble"` fits up to `max_trials` classifiers and averages predicted probabilities; `"convergence"` keeps the first model whose observed-class probabilities show nontrivial variation |
+| `max_trials` | `5` | Controls how many trial classifiers are fit in `"ensemble"` or `"convergence"` mode |
+| `mean_type` | `"arithmetic"` | Switch to `"geometric"` for ensemble aggregation when ratio values span several orders of magnitude |
+
+::: {.callout-warning}
+`PermutationWeighting` returns nonnegative stabilized ratios, not a normalized density over `t`. Do not treat these values as interchangeable with $p(t \mid x)$ — the ratio scale is correct for GPS-style reweighting, but it does not integrate to 1 over the treatment support.
+:::
+
+## Evaluation
+
+For conditional density estimators, `skcausal.density.performance_evaluation.evaluate.evaluate` runs cross-validation and uses `LogLikelihoodMetric()` by default.
+
+```python
+from sklearn.model_selection import KFold
+
+from skcausal.density.performance_evaluation.evaluate import evaluate
+from skcausal.density.performance_evaluation.metrics import LogLikelihoodMetric
+
+results = evaluate(
+    estimator=density_estimator,
+    cv=KFold(n_splits=3),
+    X=X,
+    t=t,
+    scoring=LogLikelihoodMetric(),
+)
+
+results[["test_LogLikelihoodMetric", "fit_time", "score_time"]]
+```
+
+`LogLikelihoodMetric()` computes the mean of `log(predict_density(X, t))` after clipping values below `epsilon`. That interpretation is natural for `SkproDensityEstimator`. If you evaluate `PermutationWeighting`, the metric is still well defined numerically, but it is scoring a stabilized ratio rather than a normalized treatment density.
+
+## Multi-column treatments
+
+The continuous estimators in this guide work with a single treatment column. If `t` contains multiple treatment columns, use `CompositeFactorizedDensityEstimator` to combine per-column models instead.

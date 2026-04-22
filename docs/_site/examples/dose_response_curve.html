@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>dose_response_curve – skcausal</title>
+<title>SyntheticDataset2 Walkthrough – skcausal</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -75,7 +75,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../site_libs/quarto-html/quarto-syntax-highlighting-7b89279ff1a6dce999919e0e67d4d9ec.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-5b4ad623e5705c0698d39aec6f10cf02.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-b3b235ae6ba71d6e5c2a90c00144237d.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -102,17 +102,52 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     "search-label": "Search"
   }
 }</script>
+<style>html{ scroll-behavior: smooth; }</style>
+<meta name="mermaid-theme" content="neutral">
+<script src="../site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="../site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/requirejs@2.3.6/require.min.js" integrity="sha384-c9c+LnTbwQ3aujuU7ULEPVvgLs+Fn6fJUvIGTsuu1ZcCf11fiEubah0ttpca4ntM sha384-6V1/AdqZRWk1KAlWbKBlGhN7VG4iE/yAZcO6NZPMF8od0vukrvr0tg4qY6NSrItx" crossorigin="anonymous"></script>
 
 <script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
 
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
 
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="../styles.css">
 </head>
 
 <body class="nav-fixed quarto-light">
 
 <div id="quarto-search-results"></div>
-  <header id="quarto-header" class="headroom fixed-top">
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
     <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
@@ -129,8 +164,76 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
   <li class="nav-item">
-    <a class="nav-link active" href="../examples/dose_response_curve.html" aria-current="page"> 
-<span class="menu-text">Example</span></a>
+    <a class="nav-link" href="../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../book/index.html"> 
+<span class="menu-text">Book</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-examples" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Examples</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-examples">    
+        <li>
+    <a class="dropdown-item" href="../examples/index.html">
+ <span class="dropdown-text">Overview</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/binary_treatments.html">
+ <span class="dropdown-text">Binary Treatments</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/continuous_treatments.html">
+ <span class="dropdown-text">Continuous Treatments</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/categorical_treatments.html">
+ <span class="dropdown-text">Categorical Treatments</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/dose_response_curve.html">
+ <span class="dropdown-text">SyntheticDataset2 Walkthrough</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-density" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Density</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-density">    
+        <li>
+    <a class="dropdown-item" href="../density/index.html">
+ <span class="dropdown-text">Overview</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../density/continuous.html">
+ <span class="dropdown-text">Continuous Treatments</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-datasets" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Datasets</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-datasets">    
+        <li>
+    <a class="dropdown-item" href="../datasets/loading.html">
+ <span class="dropdown-text">Loading</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html"> 
+<span class="menu-text">About</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/felipeangelimvieira/skcausal"> <i class="bi bi-github" role="img" aria-label="GitHub repository">
+</i> 
+<span class="menu-text"></span></a>
   </li>  
 </ul>
           </div> <!-- /navcollapse -->
@@ -140,45 +243,227 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </nav>
 </header>
 <!-- content -->
-<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">SyntheticDataset2 Walkthrough</h1>
+                      </div>
+  </div>
+    
+  
+  <div class="quarto-title-meta">
+
+      
+    
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
 <!-- sidebar -->
 <!-- margin-sidebar -->
-    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
-        
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active" data-toc-expanded="99">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#overview" id="toc-overview" class="nav-link active" data-scroll-target="#overview">Overview</a></li>
+  <li><a href="#step-1-import-dependencies" id="toc-step-1-import-dependencies" class="nav-link" data-scroll-target="#step-1-import-dependencies">Step 1: Import dependencies</a></li>
+  <li><a href="#step-2-define-spline-regression-helpers" id="toc-step-2-define-spline-regression-helpers" class="nav-link" data-scroll-target="#step-2-define-spline-regression-helpers">Step 2: Define spline regression helpers</a></li>
+  <li><a href="#step-3-load-the-data-and-build-the-evaluation-grid" id="toc-step-3-load-the-data-and-build-the-evaluation-grid" class="nav-link" data-scroll-target="#step-3-load-the-data-and-build-the-evaluation-grid">Step 3: Load the data and build the evaluation grid</a></li>
+  <li><a href="#step-4-inspect-the-raw-data" id="toc-step-4-inspect-the-raw-data" class="nav-link" data-scroll-target="#step-4-inspect-the-raw-data">Step 4: Inspect the raw data</a></li>
+  <li><a href="#estimators" id="toc-estimators" class="nav-link" data-scroll-target="#estimators">Estimators</a>
+  <ul class="collapse">
+  <li><a href="#baseline-ignore-covariates" id="toc-baseline-ignore-covariates" class="nav-link" data-scroll-target="#baseline-ignore-covariates">1. Baseline: ignore covariates</a></li>
+  <li><a href="#outcome-regression-with-covariates" id="toc-outcome-regression-with-covariates" class="nav-link" data-scroll-target="#outcome-regression-with-covariates">2. Outcome regression with covariates</a></li>
+  <li><a href="#generalized-propensity-score-gps" id="toc-generalized-propensity-score-gps" class="nav-link" data-scroll-target="#generalized-propensity-score-gps">3. Generalized propensity score (GPS)</a></li>
+  <li><a href="#doubly-robust-pseudo-outcome" id="toc-doubly-robust-pseudo-outcome" class="nav-link" data-scroll-target="#doubly-robust-pseudo-outcome">4. Doubly robust pseudo-outcome</a></li>
+  </ul></li>
+  <li><a href="#final-comparison-chart" id="toc-final-comparison-chart" class="nav-link" data-scroll-target="#final-comparison-chart">Final comparison chart</a></li>
+  <li><a href="#error-profile-by-treatment-value" id="toc-error-profile-by-treatment-value" class="nav-link" data-scroll-target="#error-profile-by-treatment-value">Error profile by treatment value</a></li>
+  <li><a href="#error-table" id="toc-error-table" class="nav-link" data-scroll-target="#error-table">Error table</a></li>
+  <li><a href="#what-to-try-next" id="toc-what-to-try-next" class="nav-link" data-scroll-target="#what-to-try-next">What to try next</a></li>
+  </ul>
+</nav>
     </div>
 <!-- main -->
-<main class="content" id="quarto-document-content">
+<main class="content quarto-banner-title-block" id="quarto-document-content">
 
-<header id="title-block-header" class="quarto-title-block default">
-<div class="quarto-title">
-<h1 class="title">Dose Response Curve Example</h1>
+
+
+
+
+<p>Use this page when you want one full benchmark-style example with a known dose-response curve.</p>
+<div class="callout callout-style-simple callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
 </div>
-
-
-
-<div class="quarto-title-meta">
-
-    
-  
-    
-  </div>
-  
-
-
-</header>
-
-
-<div id="54201829" class="cell" data-execution_count="1">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skcausal.datasets.synthetic2 <span class="im">import</span> SyntheticDataset2</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>dataset <span class="op">=</span> SyntheticDataset2(n_features<span class="op">=</span><span class="dv">6</span>)</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>dataset.prepare(n<span class="op">=</span><span class="dv">1000</span>, split_seed<span class="op">=</span><span class="dv">42</span>, preparation_seed<span class="op">=</span><span class="dv">42</span>)</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>X, t, y <span class="op">=</span> dataset.retrieve()</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>X</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>When To Use This Guide
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>SyntheticDataset2</code> is useful when you want to understand the <code>skcausal</code> workflow end to end before moving to real data. The treatment is continuous, the observed data are confounded, and the true response curve is available from the data-generating process.</p>
+</div>
+</div>
+<section id="overview" class="level2">
+<h2 class="anchored" data-anchor-id="overview">Overview</h2>
+<p>This walkthrough fits four estimators on the same confounded dataset and compares their dose-response curves to the known truth.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+  D["SyntheticDataset2\nconfounded, nonlinear"] --&gt; E1["1. DirectNoCovariates\nbaseline: ignores X"]
+  D --&gt; E2["2. DirectRegressor\noutcome model with X"]
+    D --&gt; E3["3. GPS\nscore-adjusted outcome model"]
+  D --&gt; E4["4. DoublyRobustPseudoOutcome\ncombines both"]
+  E1 &amp; E2 &amp; E3 &amp; E4 --&gt; C["Compare to true curve"]
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>The baseline (<code>DirectNoCovariates</code>) intentionally ignores confounding — it shows how much bias is introduced when <code>X</code> is omitted. Each subsequent estimator adds more structure to correct for it.</p>
+</section>
+<section id="step-1-import-dependencies" class="level2">
+<h2 class="anchored" data-anchor-id="step-1-import-dependencies">Step 1: Import dependencies</h2>
+<div id="8ce2ba13" class="cell" data-execution_count="1">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> polars <span class="im">as</span> pl</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.compose <span class="im">import</span> ColumnTransformer</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.ensemble <span class="im">import</span> HistGradientBoostingRegressor, RandomForestClassifier</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.linear_model <span class="im">import</span> LinearRegression</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.pipeline <span class="im">import</span> make_pipeline</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.preprocessing <span class="im">import</span> SplineTransformer</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skcausal.causal_estimators <span class="im">import</span> (</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    DirectNoCovariates,</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    DirectRegressor,</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>    DoublyRobustPseudoOutcome,</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    GPS,</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skcausal.datasets <span class="im">import</span> SyntheticDataset2</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skcausal.density.permutation_weighting <span class="im">import</span> PermutationWeighting</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skcausal.plotting <span class="im">import</span> use_theme</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>use_theme()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-display" data-execution_count="1">
+<pre><code>{'figure.facecolor': '#F4F7FB',
+ 'figure.figsize': (8.0, 4.8),
+ 'savefig.facecolor': '#F4F7FB',
+ 'axes.facecolor': '#FBFCFE',
+ 'axes.edgecolor': '#D7E0EA',
+ 'axes.linewidth': 0.9,
+ 'axes.grid': True,
+ 'axes.axisbelow': True,
+ 'axes.spines.top': False,
+ 'axes.spines.right': False,
+ 'axes.titlecolor': '#0F172A',
+ 'axes.titlesize': 15,
+ 'axes.titleweight': 'bold',
+ 'axes.titlepad': 12.0,
+ 'axes.labelcolor': '#1F2937',
+ 'axes.labelsize': 11.5,
+ 'axes.prop_cycle': cycler('color', ['#0F766E', '#F97316', '#2563EB', '#D9465F', '#CA8A04', '#16A34A']),
+ 'grid.color': '#CBD5E1',
+ 'grid.alpha': 0.55,
+ 'grid.linewidth': 0.8,
+ 'grid.linestyle': '--',
+ 'legend.frameon': True,
+ 'legend.framealpha': 0.95,
+ 'legend.facecolor': '#FFFFFF',
+ 'legend.edgecolor': '#D7E0EA',
+ 'legend.fancybox': True,
+ 'legend.borderpad': 0.6,
+ 'font.size': 11.0,
+ 'font.family': 'sans-serif',
+ 'font.sans-serif': ['Avenir Next',
+  'Avenir',
+  'Helvetica Neue',
+  'Arial',
+  'DejaVu Sans'],
+ 'text.color': '#1F2937',
+ 'xtick.color': '#334155',
+ 'ytick.color': '#334155',
+ 'xtick.labelsize': 10,
+ 'ytick.labelsize': 10,
+ 'xtick.major.size': 0,
+ 'ytick.major.size': 0,
+ 'lines.linewidth': 2.4,
+ 'lines.markersize': 6.5,
+ 'patch.linewidth': 0.75,
+ 'patch.edgecolor': '#FFFFFF',
+ 'errorbar.capsize': 3.0,
+ 'axes.formatter.use_mathtext': True}</code></pre>
+</div>
+</div>
+</section>
+<section id="step-2-define-spline-regression-helpers" class="level2">
+<h2 class="anchored" data-anchor-id="step-2-define-spline-regression-helpers">Step 2: Define spline regression helpers</h2>
+<p>The doubly robust estimator needs flexible regressors to capture <code>SyntheticDataset2</code>’s nonlinear response. These helpers build sklearn pipelines that expand the treatment column into spline basis functions:</p>
+<div id="c3a7df76" class="cell" data-execution_count="2">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> make_joint_spline_regressor(treatment_column: <span class="bu">str</span>):</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Spline-expand T; pass X through unchanged</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    preprocessor <span class="op">=</span> ColumnTransformer(</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>        transformers<span class="op">=</span>[</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>            (<span class="st">"t_spline"</span>, SplineTransformer(n_knots<span class="op">=</span><span class="dv">8</span>, degree<span class="op">=</span><span class="dv">3</span>, include_bias<span class="op">=</span><span class="va">False</span>), [treatment_column])</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>        ],</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>        remainder<span class="op">=</span><span class="st">"passthrough"</span>,</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>        verbose_feature_names_out<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> make_pipeline(preprocessor, LinearRegression())</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="dfd5cb30" class="cell" data-execution_count="3">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> make_treatment_spline_regressor(treatment_column: <span class="bu">str</span>):</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Spline-expand T only; drop X entirely</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    preprocessor <span class="op">=</span> ColumnTransformer(</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>        transformers<span class="op">=</span>[</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>            (<span class="st">"t_spline"</span>, SplineTransformer(n_knots<span class="op">=</span><span class="dv">8</span>, degree<span class="op">=</span><span class="dv">3</span>, include_bias<span class="op">=</span><span class="va">False</span>), [treatment_column])</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>        ],</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>        remainder<span class="op">=</span><span class="st">"drop"</span>,</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>        verbose_feature_names_out<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> make_pipeline(preprocessor, LinearRegression())</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Why splines?</strong> A linear model assumes the dose-response is a straight line. Spline expansion gives the regressor a flexible basis to capture curves and plateaus without a fully nonparametric model.</p>
+<ul>
+<li><code>make_joint_spline_regressor</code>: expands <span class="math inline">\(T\)</span> into splines and keeps <span class="math inline">\(X\)</span> — used wherever both covariates and treatment matter.</li>
+<li><code>make_treatment_spline_regressor</code>: expands only <span class="math inline">\(T\)</span> and drops <span class="math inline">\(X\)</span> — used for the final pseudo-outcome smoother in doubly robust, which conditions only on <span class="math inline">\(T\)</span>.</li>
+</ul>
+</div>
+</div>
+</section>
+<section id="step-3-load-the-data-and-build-the-evaluation-grid" class="level2">
+<h2 class="anchored" data-anchor-id="step-3-load-the-data-and-build-the-evaluation-grid">Step 3: Load the data and build the evaluation grid</h2>
+<div id="f6ad8499" class="cell" data-execution_count="4">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>dataset <span class="op">=</span> SyntheticDataset2(n<span class="op">=</span><span class="dv">2000</span>, n_features<span class="op">=</span><span class="dv">6</span>, random_state<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>X, t, y <span class="op">=</span> dataset.retrieve()</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>X <span class="op">=</span> X.rename({col: <span class="ss">f"x</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> i, col <span class="kw">in</span> <span class="bu">enumerate</span>(X.columns)})</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>y <span class="op">=</span> y.rename({y.columns[<span class="dv">0</span>]: <span class="st">"y"</span>})</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>grid <span class="op">=</span> dataset.get_grid(X.height)</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>true_curve <span class="op">=</span> np.asarray(dataset.predict(X, grid), dtype<span class="op">=</span><span class="bu">float</span>).reshape(<span class="op">-</span><span class="dv">1</span>)</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>grid_values <span class="op">=</span> grid[<span class="st">"t_0"</span>].to_numpy()</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>pl.concat([X.head(<span class="dv">5</span>), t.head(<span class="dv">5</span>), y.head(<span class="dv">5</span>)], how<span class="op">=</span><span class="st">"horizontal"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="4">
 <div><style>
 .dataframe > thead > tr,
 .dataframe > tbody > tr {
@@ -186,18 +471,22 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   white-space: pre-wrap;
 }
 </style>
-<small>shape: (1_000, 6)</small>
+<small>shape: (5, 8)</small>
 <table class="dataframe caption-top table table-sm table-striped small" data-border="1">
 <thead>
 <tr class="header">
-<th data-quarto-table-cell-role="th">column_0</th>
-<th data-quarto-table-cell-role="th">column_1</th>
-<th data-quarto-table-cell-role="th">column_2</th>
-<th data-quarto-table-cell-role="th">column_3</th>
-<th data-quarto-table-cell-role="th">column_4</th>
-<th data-quarto-table-cell-role="th">column_5</th>
+<th data-quarto-table-cell-role="th">x0</th>
+<th data-quarto-table-cell-role="th">x1</th>
+<th data-quarto-table-cell-role="th">x2</th>
+<th data-quarto-table-cell-role="th">x3</th>
+<th data-quarto-table-cell-role="th">x4</th>
+<th data-quarto-table-cell-role="th">x5</th>
+<th data-quarto-table-cell-role="th">t_0</th>
+<th data-quarto-table-cell-role="th">y</th>
 </tr>
 <tr class="even">
+<td>f64</td>
+<td>f64</td>
 <td>f64</td>
 <td>f64</td>
 <td>f64</td>
@@ -208,334 +497,310 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </thead>
 <tbody>
 <tr class="odd">
-<td>0.460742</td>
-<td>2.017809</td>
-<td>0.17723</td>
-<td>2.447803</td>
-<td>0.177521</td>
-<td>0.02248</td>
+<td>1.304</td>
+<td>0.947081</td>
+<td>-0.703735</td>
+<td>-1.265421</td>
+<td>-0.623274</td>
+<td>0.041326</td>
+<td>0.463393</td>
+<td>-3.312002</td>
 </tr>
 <tr class="even">
-<td>0.288838</td>
-<td>-0.333125</td>
-<td>1.689823</td>
-<td>1.342182</td>
-<td>0.632839</td>
-<td>0.378467</td>
+<td>-2.325031</td>
+<td>-0.218792</td>
+<td>-1.245911</td>
+<td>-0.732267</td>
+<td>-0.544259</td>
+<td>-0.3163</td>
+<td>0.29262</td>
+<td>-1.958108</td>
 </tr>
 <tr class="odd">
-<td>0.661478</td>
-<td>-0.875629</td>
-<td>-0.647278</td>
-<td>0.494931</td>
-<td>-0.624121</td>
-<td>-2.117243</td>
+<td>0.411631</td>
+<td>1.042513</td>
+<td>-0.128535</td>
+<td>1.366463</td>
+<td>-0.665195</td>
+<td>0.35151</td>
+<td>0.663803</td>
+<td>-1.829244</td>
 </tr>
 <tr class="even">
-<td>-0.600697</td>
-<td>0.589961</td>
-<td>0.723263</td>
-<td>-0.768546</td>
-<td>-0.493024</td>
-<td>-2.225363</td>
+<td>0.90347</td>
+<td>0.094012</td>
+<td>-0.743499</td>
+<td>-0.921725</td>
+<td>-0.457726</td>
+<td>0.220195</td>
+<td>0.530812</td>
+<td>-2.43135</td>
 </tr>
 <tr class="odd">
-<td>0.740014</td>
-<td>0.636906</td>
-<td>0.340791</td>
-<td>-1.783611</td>
-<td>0.083621</td>
-<td>-0.556192</td>
-</tr>
-<tr class="even">
-<td>…</td>
-<td>…</td>
-<td>…</td>
-<td>…</td>
-<td>…</td>
-<td>…</td>
-</tr>
-<tr class="odd">
-<td>-0.406134</td>
-<td>-1.028504</td>
-<td>-0.217144</td>
-<td>0.277344</td>
-<td>-0.494748</td>
-<td>0.553954</td>
-</tr>
-<tr class="even">
-<td>0.623291</td>
-<td>0.347934</td>
-<td>-0.232851</td>
-<td>1.915435</td>
-<td>-0.906937</td>
-<td>0.004308</td>
-</tr>
-<tr class="odd">
-<td>-0.487116</td>
-<td>1.651992</td>
-<td>-0.104985</td>
-<td>0.149484</td>
-<td>1.203782</td>
-<td>0.585139</td>
-</tr>
-<tr class="even">
-<td>-0.034656</td>
-<td>-1.426693</td>
-<td>-0.582354</td>
-<td>-0.279591</td>
-<td>-0.011291</td>
-<td>0.479733</td>
-</tr>
-<tr class="odd">
-<td>-0.262104</td>
-<td>-0.725858</td>
-<td>-1.215503</td>
-<td>-1.413517</td>
-<td>-2.339748</td>
-<td>-1.056346</td>
+<td>-1.009618</td>
+<td>-0.209176</td>
+<td>-0.159225</td>
+<td>0.540846</td>
+<td>0.214659</td>
+<td>0.355373</td>
+<td>0.00191</td>
+<td>-2.635592</td>
 </tr>
 </tbody>
 </table>
 </div>
 </div>
 </div>
-<div id="370aa740" class="cell" data-execution_count="2">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> polars <span class="im">as</span> pl</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>treatment_grid <span class="op">=</span> pl.DataFrame(np.linspace(<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">100</span>), schema<span class="op">=</span>t.schema)</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>true_adrf <span class="op">=</span> dataset.get_adrf(X, t)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</div>
-<div id="9ac517c1" class="cell" data-execution_count="3">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots()</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>plt.scatter(t, y, alpha<span class="op">=</span><span class="fl">0.3</span>)</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Argsort true_adrf for plotting</span></span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>sorted_indices <span class="op">=</span> np.argsort(t.to_numpy().flatten())</span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>plt.plot(</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    t[sorted_indices],</span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    true_adrf[sorted_indices],</span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    color<span class="op">=</span><span class="st">"red"</span>,</span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    linewidth<span class="op">=</span><span class="dv">2</span>,</span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>fig.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stderr">
-<pre><code>/var/folders/_2/9y4tsvdd2n3gqjgd2zmlr1km0000gn/T/ipykernel_77708/3362939848.py:13: UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
-  fig.show()</code></pre>
-</div>
+<p><code>dataset.get_grid</code> returns a treatment table spanning the observed range at <code>X.height</code> evenly spaced points — matching the predict API’s row-count requirement.</p>
+</section>
+<section id="step-4-inspect-the-raw-data" class="level2">
+<h2 class="anchored" data-anchor-id="step-4-inspect-the-raw-data">Step 4: Inspect the raw data</h2>
+<p>Before fitting, plot the observed data against the true curve to see how much confounding is present:</p>
+<div id="50ffae46" class="cell" data-execution_count="5">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">8</span>, <span class="dv">5</span>))</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>ax.scatter(t[<span class="st">"t_0"</span>].to_numpy(), y[<span class="st">"y"</span>].to_numpy(), s<span class="op">=</span><span class="dv">12</span>, alpha<span class="op">=</span><span class="fl">0.2</span>, label<span class="op">=</span><span class="st">"Observed data"</span>)</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>ax.plot(grid_values, true_curve, linewidth<span class="op">=</span><span class="fl">2.5</span>, label<span class="op">=</span><span class="st">"Truth"</span>)</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"Treatment"</span>)</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"Average outcome"</span>)</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"SyntheticDataset2: observed data vs ground truth"</span>)</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>ax.legend()</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="dose_response_curve_files/figure-html/cell-4-output-2.png" width="569" height="411" class="figure-img"></p>
+<p><img src="dose_response_curve_files/figure-html/cell-6-output-1.png" width="657" height="459" class="figure-img"></p>
 </figure>
 </div>
 </div>
 </div>
-<div id="2c591b2c" class="cell" data-execution_count="4">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skcausal.causal_estimators.ignore_covariates <span class="im">import</span> DirectNoCovariates</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.ensemble <span class="im">import</span> RandomForestRegressor</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>estimator <span class="op">=</span> DirectNoCovariates(outcome_regressor<span class="op">=</span>RandomForestRegressor(min_samples_leaf<span class="op">=</span><span class="dv">30</span>))</span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>estimator.fit(X, t<span class="op">=</span>t, y<span class="op">=</span>y)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stderr">
-<pre><code>/Users/felipeangelim/Workspace/skcausal/.venv/lib/python3.11/site-packages/sklearn/base.py:1365: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples,), for example using ravel().
-  return fit_method(estimator, *args, **kwargs)</code></pre>
+<p>If the raw data cloud already tracks the truth, confounding is mild. A visible gap indicates that estimators ignoring <code>X</code> will be systematically biased.</p>
+</section>
+<section id="estimators" class="level2">
+<h2 class="anchored" data-anchor-id="estimators">Estimators</h2>
+<section id="baseline-ignore-covariates" class="level3">
+<h3 class="anchored" data-anchor-id="baseline-ignore-covariates">1. Baseline: ignore covariates</h3>
+<p><code>DirectNoCovariates</code> fits <span class="math inline">\(E[Y \mid T]\)</span> without including <code>X</code>. This is the naive estimator — useful only as a baseline to measure the cost of ignoring confounding:</p>
+<div id="2f53dee9" class="cell" data-execution_count="6">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>naive <span class="op">=</span> DirectNoCovariates(</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    outcome_regressor<span class="op">=</span>HistGradientBoostingRegressor(</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>        random_state<span class="op">=</span><span class="dv">0</span>, max_depth<span class="op">=</span><span class="dv">3</span>, max_iter<span class="op">=</span><span class="dv">120</span>,</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>_ <span class="op">=</span> naive.fit(X, t, y)</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>naive_curve <span class="op">=</span> np.asarray(naive.predict(X, grid), dtype<span class="op">=</span><span class="bu">float</span>).reshape(<span class="op">-</span><span class="dv">1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<div class="cell-output cell-output-display" data-execution_count="4">
-<style>#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 {color: black;background-color: white;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 pre{padding: 0;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 div.sk-toggleable {background-color: white;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 label.sk-toggleable__label {cursor: pointer;display: block;width: 100%;margin-bottom: 0;padding: 0.3em;box-sizing: border-box;text-align: center;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 label.sk-toggleable__label-arrow:before {content: "▸";float: left;margin-right: 0.25em;color: #696969;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 label.sk-toggleable__label-arrow:hover:before {color: black;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 div.sk-estimator:hover label.sk-toggleable__label-arrow:before {color: black;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 div.sk-toggleable__content {max-height: 0;max-width: 0;overflow: hidden;text-align: left;background-color: #f0f8ff;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 div.sk-toggleable__content pre {margin: 0.2em;color: black;border-radius: 0.25em;background-color: #f0f8ff;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 input.sk-toggleable__control:checked~div.sk-toggleable__content {max-height: 200px;max-width: 100%;overflow: auto;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 input.sk-toggleable__control:checked~label.sk-toggleable__label-arrow:before {content: "▾";}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 div.sk-estimator input.sk-toggleable__control:checked~label.sk-toggleable__label {background-color: #d4ebff;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 div.sk-label input.sk-toggleable__control:checked~label.sk-toggleable__label {background-color: #d4ebff;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 input.sk-hidden--visually {border: 0;clip: rect(1px 1px 1px 1px);clip: rect(1px, 1px, 1px, 1px);height: 1px;margin: -1px;overflow: hidden;padding: 0;position: absolute;width: 1px;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 div.sk-estimator {font-family: monospace;background-color: #f0f8ff;border: 1px dotted black;border-radius: 0.25em;box-sizing: border-box;margin-bottom: 0.5em;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 div.sk-estimator:hover {background-color: #d4ebff;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 div.sk-parallel-item::after {content: "";width: 100%;border-bottom: 1px solid gray;flex-grow: 1;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 div.sk-label:hover label.sk-toggleable__label {background-color: #d4ebff;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 div.sk-serial::before {content: "";position: absolute;border-left: 1px solid gray;box-sizing: border-box;top: 2em;bottom: 0;left: 50%;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 div.sk-serial {display: flex;flex-direction: column;align-items: center;background-color: white;padding-right: 0.2em;padding-left: 0.2em;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 div.sk-item {z-index: 1;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 div.sk-parallel {display: flex;align-items: stretch;justify-content: center;background-color: white;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 div.sk-parallel::before {content: "";position: absolute;border-left: 1px solid gray;box-sizing: border-box;top: 2em;bottom: 0;left: 50%;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 div.sk-parallel-item {display: flex;flex-direction: column;position: relative;background-color: white;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 div.sk-parallel-item:first-child::after {align-self: flex-end;width: 50%;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 div.sk-parallel-item:last-child::after {align-self: flex-start;width: 50%;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 div.sk-parallel-item:only-child::after {width: 0;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 div.sk-dashed-wrapped {border: 1px dashed gray;margin: 0 0.4em 0.5em 0.4em;box-sizing: border-box;padding-bottom: 0.4em;background-color: white;position: relative;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 div.sk-label label {font-family: monospace;font-weight: bold;background-color: white;display: inline-block;line-height: 1.2em;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 div.sk-label-container {position: relative;z-index: 2;text-align: center;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 div.sk-container {/* jupyter's `normalize.less` sets `[hidden] { display: none; }` but bootstrap.min.css set `[hidden] { display: none !important; }` so we also need the `!important` here to be able to override the default hidden behavior on the sphinx rendered scikit-learn.org. See: https://github.com/scikit-learn/scikit-learn/issues/21755 */display: inline-block !important;position: relative;}#sk-e0b7a747-f82e-489b-8df4-0df5a5851635 div.sk-text-repr-fallback {display: none;}</style><div id="sk-e0b7a747-f82e-489b-8df4-0df5a5851635" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>DirectNoCovariates(outcome_regressor=RandomForestRegressor(min_samples_leaf=30))</pre><b>Please rerun this cell to show the HTML repr or trust the notebook.</b></div><div class="sk-container" hidden=""><div class="sk-item sk-dashed-wrapped"><div class="sk-label-container"><div class="sk-label sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="UUID('9e876e60-9906-4a4f-bc30-6cb08dab60cd')" type="checkbox"><label for="UUID('9e876e60-9906-4a4f-bc30-6cb08dab60cd')" class="sk-toggleable__label sk-toggleable__label-arrow">DirectNoCovariates</label><div class="sk-toggleable__content"><pre>DirectNoCovariates(outcome_regressor=RandomForestRegressor(min_samples_leaf=30))</pre></div></div></div><div class="sk-parallel"><div class="sk-parallel-item"><div class="sk-item"><div class="sk-serial"><div class="sk-item"><div class="sk-estimator sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="UUID('3bbd8c54-d730-4908-b684-22e1511e7a2d')" type="checkbox"><label for="UUID('3bbd8c54-d730-4908-b684-22e1511e7a2d')" class="sk-toggleable__label sk-toggleable__label-arrow">RandomForestRegressor</label><div class="sk-toggleable__content"><pre>RandomForestRegressor(min_samples_leaf=30)</pre></div></div></div></div></div></div></div></div></div></div>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Warning
 </div>
 </div>
-<div id="e87e9359" class="cell" data-execution_count="5">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>y_pred <span class="op">=</span> estimator.predict_adrf(X, t)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="callout-body-container callout-body">
+<p>This estimator is intentionally biased. Do not use it for causal inference on real data — it is here only to quantify the cost of ignoring confounding.</p>
 </div>
-<div id="1e3027f9" class="cell" data-execution_count="6">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots()</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>plt.scatter(t, y, alpha<span class="op">=</span><span class="fl">0.3</span>)</span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Argsort true_adrf for plotting</span></span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>sorted_indices <span class="op">=</span> np.argsort(t.to_numpy().flatten())</span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>plt.plot(</span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>    t[sorted_indices],</span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>    true_adrf[sorted_indices],</span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>    color<span class="op">=</span><span class="st">"red"</span>,</span>
-<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>    linewidth<span class="op">=</span><span class="dv">2</span>,</span>
-<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>plt.plot(</span>
-<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>    t[sorted_indices],</span>
-<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>    y_pred[sorted_indices],</span>
-<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>    color<span class="op">=</span><span class="st">"green"</span>,</span>
-<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>    linewidth<span class="op">=</span><span class="dv">2</span>,</span>
-<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>fig.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stderr">
-<pre><code>/var/folders/_2/9y4tsvdd2n3gqjgd2zmlr1km0000gn/T/ipykernel_77708/1174730313.py:17: UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
-  fig.show()</code></pre>
 </div>
+</section>
+<section id="outcome-regression-with-covariates" class="level3">
+<h3 class="anchored" data-anchor-id="outcome-regression-with-covariates">2. Outcome regression with covariates</h3>
+<p><code>DirectRegressor</code> models the outcome as a function of both <code>X</code> and <code>T</code>. Including <code>X</code> removes the portion of outcome variation explained by covariates:</p>
+<div id="bd8f1131" class="cell" data-execution_count="7">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>direct <span class="op">=</span> DirectRegressor(</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    outcome_regressor<span class="op">=</span>HistGradientBoostingRegressor(</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>        random_state<span class="op">=</span><span class="dv">0</span>, max_depth<span class="op">=</span><span class="dv">4</span>, max_iter<span class="op">=</span><span class="dv">160</span>,</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>_ <span class="op">=</span> direct.fit(X, t, y)</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>direct_curve <span class="op">=</span> np.asarray(direct.predict(X, grid), dtype<span class="op">=</span><span class="bu">float</span>).reshape(<span class="op">-</span><span class="dv">1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>This is a strong baseline when the outcome model is correctly specified. In this walkthrough it ends up as the best-performing estimator.</p>
+</section>
+<section id="generalized-propensity-score-gps" class="level3">
+<h3 class="anchored" data-anchor-id="generalized-propensity-score-gps">3. Generalized propensity score (GPS)</h3>
+<p><code>GPS</code> takes an alternative route: it first estimates a treatment score from <code>predict_density(X, T)</code> and then fits an outcome model on that score together with the treatment value. In this walkthrough, <code>PermutationWeighting</code> supplies the score, so the outcome model is adjusted using a stabilized density-ratio estimate rather than a normalized conditional density.</p>
+<div id="bbae55af" class="cell" data-execution_count="8">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>gps_density <span class="op">=</span> PermutationWeighting(</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    classifier<span class="op">=</span>RandomForestClassifier(</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>        n_estimators<span class="op">=</span><span class="dv">200</span>, min_samples_leaf<span class="op">=</span><span class="dv">5</span>, random_state<span class="op">=</span><span class="dv">0</span>,</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>    treatment_transformation<span class="op">=</span><span class="st">"spline"</span>,</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    max_trials<span class="op">=</span><span class="dv">3</span>,</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    random_state<span class="op">=</span><span class="dv">0</span>,</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>gps <span class="op">=</span> GPS(</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>    density_regressor<span class="op">=</span>gps_density,</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>    outcome_regressor<span class="op">=</span>HistGradientBoostingRegressor(</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>        random_state<span class="op">=</span><span class="dv">0</span>, max_depth<span class="op">=</span><span class="dv">3</span>, max_iter<span class="op">=</span><span class="dv">120</span>,</span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>    cv<span class="op">=</span><span class="dv">3</span>,</span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>    random_state<span class="op">=</span><span class="dv">0</span>,</span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>_ <span class="op">=</span> gps.fit(X, t, y)</span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>gps_curve <span class="op">=</span> np.asarray(gps.predict(X, grid), dtype<span class="op">=</span><span class="bu">float</span>).reshape(<span class="op">-</span><span class="dv">1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="doubly-robust-pseudo-outcome" class="level3">
+<h3 class="anchored" data-anchor-id="doubly-robust-pseudo-outcome">4. Doubly robust pseudo-outcome</h3>
+<p><code>DoublyRobustPseudoOutcome</code> combines an outcome model and a treatment-density model. Under the method’s identification and nuisance-model assumptions, the pseudo-outcome construction can remain consistent if either nuisance component is correctly specified. Spline regressors keep the fitted curve smooth:</p>
+<div id="e8cc7787" class="cell" data-execution_count="9">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>dr_density <span class="op">=</span> PermutationWeighting(</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    classifier<span class="op">=</span>RandomForestClassifier(</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>        n_estimators<span class="op">=</span><span class="dv">200</span>,</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>        min_samples_leaf<span class="op">=</span><span class="dv">5</span>,</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>        random_state<span class="op">=</span><span class="dv">0</span>,</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>    treatment_transformation<span class="op">=</span><span class="st">"spline"</span>,</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>    max_trials<span class="op">=</span><span class="dv">3</span>,</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>    random_state<span class="op">=</span><span class="dv">0</span>,</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>dr_outcome_regressor <span class="op">=</span> make_joint_spline_regressor(t.columns[<span class="dv">0</span>])</span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>dr_pseudo_outcome_regressor <span class="op">=</span> make_treatment_spline_regressor(t.columns[<span class="dv">0</span>])</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>dr <span class="op">=</span> DoublyRobustPseudoOutcome(</span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>    density_estimator<span class="op">=</span>dr_density,</span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>    outcome_regressor<span class="op">=</span>dr_outcome_regressor,</span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>    pseudo_outcome_regressor<span class="op">=</span>dr_pseudo_outcome_regressor,</span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>    random_state<span class="op">=</span><span class="dv">0</span>,</span>
+<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a>_ <span class="op">=</span> dr.fit(X, t, y)</span>
+<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a>dr_curve <span class="op">=</span> np.asarray(dr.predict(X, grid), dtype<span class="op">=</span><span class="bu">float</span>).reshape(<span class="op">-</span><span class="dv">1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+</section>
+<section id="final-comparison-chart" class="level2">
+<h2 class="anchored" data-anchor-id="final-comparison-chart">Final comparison chart</h2>
+<div id="3667dfcc" class="cell" data-execution_count="10">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">8</span>, <span class="dv">5</span>))</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>ax.scatter(t[<span class="st">"t_0"</span>].to_numpy(), y[<span class="st">"y"</span>].to_numpy(), s<span class="op">=</span><span class="dv">12</span>, alpha<span class="op">=</span><span class="fl">0.15</span>, label<span class="op">=</span><span class="st">"Observed data"</span>)</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>ax.plot(grid_values, true_curve, linewidth<span class="op">=</span><span class="fl">2.5</span>, label<span class="op">=</span><span class="st">"Truth"</span>)</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>ax.plot(grid_values, naive_curve, linewidth<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="st">"DirectNoCovariates"</span>)</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>ax.plot(grid_values, direct_curve, linewidth<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="st">"DirectRegressor"</span>)</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>ax.plot(grid_values, gps_curve, linewidth<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="st">"GPS"</span>)</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>ax.plot(grid_values, dr_curve, linewidth<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="st">"DoublyRobustPseudoOutcome"</span>)</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"Treatment"</span>)</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"Average outcome"</span>)</span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Dose-response curve estimates on SyntheticDataset2"</span>)</span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>ax.legend()</span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="dose_response_curve_files/figure-html/cell-7-output-2.png" width="569" height="411" class="figure-img"></p>
+<p><img src="dose_response_curve_files/figure-html/cell-11-output-1.png" width="657" height="459" class="figure-img"></p>
 </figure>
 </div>
 </div>
 </div>
-<div id="7ea09246" class="cell" data-execution_count="7">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skcausal.causal_estimators.continuous.doubly_robust <span class="im">import</span> (</span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    DoublyRobustPseudoOutcome,</span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skcausal.weight_estimators.multiplicative_boosting <span class="im">import</span> (</span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>    DiscriminativeWeightBoosting,</span>
-<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.ensemble <span class="im">import</span> RandomForestClassifier</span>
-<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>dr <span class="op">=</span> DoublyRobustPseudoOutcome(</span>
-<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>    treatment_regressor<span class="op">=</span>DiscriminativeWeightBoosting(</span>
-<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>        classifier<span class="op">=</span>RandomForestClassifier(min_samples_leaf<span class="op">=</span><span class="dv">30</span>),</span>
-<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>        n_boosting_iter<span class="op">=</span><span class="dv">5</span>,</span>
-<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>        method<span class="op">=</span><span class="st">"balanced"</span>,</span>
-<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>        complexity_factor<span class="op">=</span><span class="dv">5</span>,</span>
-<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>    outcome_regressor<span class="op">=</span>RandomForestRegressor(min_samples_leaf<span class="op">=</span><span class="dv">30</span>),</span>
-<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>    pseudo_outcome_regressor<span class="op">=</span>RandomForestRegressor(min_samples_leaf<span class="op">=</span><span class="dv">30</span>),</span>
-<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>dr.fit(X, t<span class="op">=</span>t, y<span class="op">=</span>y)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-display" data-execution_count="7">
-<style>#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da {color: black;background-color: white;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da pre{padding: 0;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da div.sk-toggleable {background-color: white;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da label.sk-toggleable__label {cursor: pointer;display: block;width: 100%;margin-bottom: 0;padding: 0.3em;box-sizing: border-box;text-align: center;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da label.sk-toggleable__label-arrow:before {content: "▸";float: left;margin-right: 0.25em;color: #696969;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da label.sk-toggleable__label-arrow:hover:before {color: black;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da div.sk-estimator:hover label.sk-toggleable__label-arrow:before {color: black;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da div.sk-toggleable__content {max-height: 0;max-width: 0;overflow: hidden;text-align: left;background-color: #f0f8ff;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da div.sk-toggleable__content pre {margin: 0.2em;color: black;border-radius: 0.25em;background-color: #f0f8ff;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da input.sk-toggleable__control:checked~div.sk-toggleable__content {max-height: 200px;max-width: 100%;overflow: auto;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da input.sk-toggleable__control:checked~label.sk-toggleable__label-arrow:before {content: "▾";}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da div.sk-estimator input.sk-toggleable__control:checked~label.sk-toggleable__label {background-color: #d4ebff;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da div.sk-label input.sk-toggleable__control:checked~label.sk-toggleable__label {background-color: #d4ebff;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da input.sk-hidden--visually {border: 0;clip: rect(1px 1px 1px 1px);clip: rect(1px, 1px, 1px, 1px);height: 1px;margin: -1px;overflow: hidden;padding: 0;position: absolute;width: 1px;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da div.sk-estimator {font-family: monospace;background-color: #f0f8ff;border: 1px dotted black;border-radius: 0.25em;box-sizing: border-box;margin-bottom: 0.5em;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da div.sk-estimator:hover {background-color: #d4ebff;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da div.sk-parallel-item::after {content: "";width: 100%;border-bottom: 1px solid gray;flex-grow: 1;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da div.sk-label:hover label.sk-toggleable__label {background-color: #d4ebff;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da div.sk-serial::before {content: "";position: absolute;border-left: 1px solid gray;box-sizing: border-box;top: 2em;bottom: 0;left: 50%;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da div.sk-serial {display: flex;flex-direction: column;align-items: center;background-color: white;padding-right: 0.2em;padding-left: 0.2em;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da div.sk-item {z-index: 1;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da div.sk-parallel {display: flex;align-items: stretch;justify-content: center;background-color: white;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da div.sk-parallel::before {content: "";position: absolute;border-left: 1px solid gray;box-sizing: border-box;top: 2em;bottom: 0;left: 50%;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da div.sk-parallel-item {display: flex;flex-direction: column;position: relative;background-color: white;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da div.sk-parallel-item:first-child::after {align-self: flex-end;width: 50%;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da div.sk-parallel-item:last-child::after {align-self: flex-start;width: 50%;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da div.sk-parallel-item:only-child::after {width: 0;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da div.sk-dashed-wrapped {border: 1px dashed gray;margin: 0 0.4em 0.5em 0.4em;box-sizing: border-box;padding-bottom: 0.4em;background-color: white;position: relative;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da div.sk-label label {font-family: monospace;font-weight: bold;background-color: white;display: inline-block;line-height: 1.2em;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da div.sk-label-container {position: relative;z-index: 2;text-align: center;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da div.sk-container {/* jupyter's `normalize.less` sets `[hidden] { display: none; }` but bootstrap.min.css set `[hidden] { display: none !important; }` so we also need the `!important` here to be able to override the default hidden behavior on the sphinx rendered scikit-learn.org. See: https://github.com/scikit-learn/scikit-learn/issues/21755 */display: inline-block !important;position: relative;}#sk-b597b44a-cf8c-4c90-acd5-0506b379b7da div.sk-text-repr-fallback {display: none;}</style><div id="sk-b597b44a-cf8c-4c90-acd5-0506b379b7da" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>DoublyRobustPseudoOutcome(outcome_regressor=RandomForestRegressor(min_samples_leaf=30),
-                          pseudo_outcome_regressor=RandomForestRegressor(min_samples_leaf=30),
-                          treatment_regressor=DiscriminativeWeightBoosting(classifier=RandomForestClassifier(min_samples_leaf=30),
-                                                                           complexity_factor=5,
-                                                                           method='balanced',
-                                                                           n_boosting_iter=5))</pre><b>Please rerun this cell to show the HTML repr or trust the notebook.</b></div><div class="sk-container" hidden=""><div class="sk-item sk-dashed-wrapped"><div class="sk-label-container"><div class="sk-label sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="UUID('17724d70-667f-4837-ae5f-2dc0f18dc669')" type="checkbox"><label for="UUID('17724d70-667f-4837-ae5f-2dc0f18dc669')" class="sk-toggleable__label sk-toggleable__label-arrow">DoublyRobustPseudoOutcome</label><div class="sk-toggleable__content"><pre>DoublyRobustPseudoOutcome(outcome_regressor=RandomForestRegressor(min_samples_leaf=30),
-                          pseudo_outcome_regressor=RandomForestRegressor(min_samples_leaf=30),
-                          treatment_regressor=DiscriminativeWeightBoosting(classifier=RandomForestClassifier(min_samples_leaf=30),
-                                                                           complexity_factor=5,
-                                                                           method='balanced',
-                                                                           n_boosting_iter=5))</pre></div></div></div><div class="sk-parallel"><div class="sk-parallel-item"><div class="sk-item"><div class="sk-serial"><div class="sk-item"><div class="sk-estimator sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="UUID('5b7b136f-8957-43e8-9b94-d040777d642d')" type="checkbox"><label for="UUID('5b7b136f-8957-43e8-9b94-d040777d642d')" class="sk-toggleable__label sk-toggleable__label-arrow">RandomForestRegressor</label><div class="sk-toggleable__content"><pre>RandomForestRegressor(min_samples_leaf=30)</pre></div></div></div></div></div></div><div class="sk-parallel-item"><div class="sk-item"><div class="sk-serial"><div class="sk-item"><div class="sk-estimator sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="UUID('2a6d3f60-dcb3-4981-bbf4-44e6c19e4a6b')" type="checkbox"><label for="UUID('2a6d3f60-dcb3-4981-bbf4-44e6c19e4a6b')" class="sk-toggleable__label sk-toggleable__label-arrow">RandomForestRegressor</label><div class="sk-toggleable__content"><pre>RandomForestRegressor(min_samples_leaf=30)</pre></div></div></div></div></div></div><div class="sk-parallel-item"><div class="sk-item"><div class="sk-serial"><div class="sk-item sk-dashed-wrapped"><div class="sk-parallel"><div class="sk-parallel-item"><div class="sk-item"><div class="sk-serial"><div class="sk-item"><div class="sk-estimator sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="UUID('20aa9021-6cf8-4009-a206-982177768d63')" type="checkbox"><label for="UUID('20aa9021-6cf8-4009-a206-982177768d63')" class="sk-toggleable__label sk-toggleable__label-arrow">RandomForestClassifier</label><div class="sk-toggleable__content"><pre>RandomForestClassifier(min_samples_leaf=30)</pre></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
-</div>
-</div>
-<div id="84c6dcb0" class="cell" data-execution_count="8">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>y_dr_pred <span class="op">=</span> dr.predict_adrf(X, t)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</div>
-<div id="e680d7b5" class="cell" data-execution_count="9">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skcausal.causal_estimators.gps <span class="im">import</span> GPS</span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>gps <span class="op">=</span> GPS(</span>
-<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    treatment_regressor<span class="op">=</span>DiscriminativeWeightBoosting(</span>
-<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>        classifier<span class="op">=</span>RandomForestClassifier(min_samples_leaf<span class="op">=</span><span class="dv">30</span>),</span>
-<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>        n_boosting_iter<span class="op">=</span><span class="dv">5</span>,</span>
-<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>        method<span class="op">=</span><span class="st">"uniform"</span>,</span>
-<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>        complexity_factor<span class="op">=</span><span class="dv">5</span>,</span>
-<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>    outcome_regressor<span class="op">=</span>RandomForestRegressor(min_samples_leaf<span class="op">=</span><span class="dv">30</span>),</span>
-<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>    include_in_outcome_dataset<span class="op">=</span><span class="st">"both"</span>,</span>
-<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>    predict_subsample_size<span class="op">=</span><span class="dv">100</span>,</span>
-<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</div>
-<div id="8f7a3eaf" class="cell" data-execution_count="10">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>gps.fit(X, t<span class="op">=</span>t, y<span class="op">=</span>y)</span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>y_gps_pred <span class="op">=</span> gps.predict_adrf(X, t)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stderr">
-<pre><code>/Users/felipeangelim/Workspace/skcausal/.venv/lib/python3.11/site-packages/sklearn/base.py:1365: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples,), for example using ravel().
-  return fit_method(estimator, *args, **kwargs)</code></pre>
-</div>
-</div>
-<div id="d5414438" class="cell" data-execution_count="11">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skcausal.causal_estimators.continuous <span class="im">import</span> PropensityPseudoOutcomeContinuous</span>
-<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.neural_network <span class="im">import</span> MLPClassifier</span>
-<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>pw <span class="op">=</span> PropensityPseudoOutcomeContinuous(</span>
-<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>    treatment_regressor<span class="op">=</span>DiscriminativeWeightBoosting(</span>
-<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>        classifier<span class="op">=</span>MLPClassifier(hidden_layer_sizes<span class="op">=</span>(<span class="dv">25</span>, <span class="dv">25</span>), max_iter<span class="op">=</span><span class="dv">500</span>),</span>
-<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>        n_boosting_iter<span class="op">=</span><span class="dv">10</span>,</span>
-<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>        method<span class="op">=</span><span class="st">"uniform"</span>,</span>
-<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>        complexity_factor<span class="op">=</span><span class="fl">1.1</span>,</span>
-<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>    pseudo_outcome_regressor<span class="op">=</span>RandomForestRegressor(min_samples_leaf<span class="op">=</span><span class="dv">30</span>),</span>
-<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</div>
-<div id="e934b19e" class="cell" data-execution_count="12">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>pw.fit(X, t<span class="op">=</span>t, y<span class="op">=</span>y)</span>
-<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>y_pw_pred <span class="op">=</span> pw.predict_adrf(X, t)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stderr">
-<pre><code>/Users/felipeangelim/Workspace/skcausal/.venv/lib/python3.11/site-packages/sklearn/neural_network/_multilayer_perceptron.py:781: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (500) reached and the optimization hasn't converged yet.
-  warnings.warn(
-/Users/felipeangelim/Workspace/skcausal/.venv/lib/python3.11/site-packages/sklearn/neural_network/_multilayer_perceptron.py:781: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (500) reached and the optimization hasn't converged yet.
-  warnings.warn(
-/Users/felipeangelim/Workspace/skcausal/.venv/lib/python3.11/site-packages/sklearn/neural_network/_multilayer_perceptron.py:781: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (500) reached and the optimization hasn't converged yet.
-  warnings.warn(
-/Users/felipeangelim/Workspace/skcausal/.venv/lib/python3.11/site-packages/sklearn/neural_network/_multilayer_perceptron.py:781: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (500) reached and the optimization hasn't converged yet.
-  warnings.warn(
-/Users/felipeangelim/Workspace/skcausal/.venv/lib/python3.11/site-packages/sklearn/neural_network/_multilayer_perceptron.py:781: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (500) reached and the optimization hasn't converged yet.
-  warnings.warn(
-/Users/felipeangelim/Workspace/skcausal/.venv/lib/python3.11/site-packages/sklearn/neural_network/_multilayer_perceptron.py:781: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (500) reached and the optimization hasn't converged yet.
-  warnings.warn(
-/Users/felipeangelim/Workspace/skcausal/.venv/lib/python3.11/site-packages/sklearn/neural_network/_multilayer_perceptron.py:781: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (500) reached and the optimization hasn't converged yet.
-  warnings.warn(
-/Users/felipeangelim/Workspace/skcausal/.venv/lib/python3.11/site-packages/sklearn/neural_network/_multilayer_perceptron.py:781: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (500) reached and the optimization hasn't converged yet.
-  warnings.warn(
-/Users/felipeangelim/Workspace/skcausal/.venv/lib/python3.11/site-packages/sklearn/neural_network/_multilayer_perceptron.py:781: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (500) reached and the optimization hasn't converged yet.
-  warnings.warn(
-/Users/felipeangelim/Workspace/skcausal/.venv/lib/python3.11/site-packages/sklearn/neural_network/_multilayer_perceptron.py:781: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (500) reached and the optimization hasn't converged yet.
-  warnings.warn(</code></pre>
-</div>
-</div>
-<div id="635e73ef" class="cell" data-execution_count="13">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots()</span>
-<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>plt.scatter(t, y, alpha<span class="op">=</span><span class="fl">0.3</span>)</span>
-<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Argsort true_adrf for plotting</span></span>
-<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>sorted_indices <span class="op">=</span> np.argsort(t.to_numpy().flatten())</span>
-<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>plt.plot(</span>
-<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>    t[sorted_indices],</span>
-<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>    true_adrf[sorted_indices],</span>
-<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>    color<span class="op">=</span><span class="st">"red"</span>,</span>
-<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>    linewidth<span class="op">=</span><span class="dv">2</span>,</span>
-<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>plt.plot(</span>
-<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a>    t[sorted_indices],</span>
-<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a>    y_pred[sorted_indices],</span>
-<span id="cb18-14"><a href="#cb18-14" aria-hidden="true" tabindex="-1"></a>    color<span class="op">=</span><span class="st">"green"</span>,</span>
-<span id="cb18-15"><a href="#cb18-15" aria-hidden="true" tabindex="-1"></a>    linewidth<span class="op">=</span><span class="dv">2</span>,</span>
-<span id="cb18-16"><a href="#cb18-16" aria-hidden="true" tabindex="-1"></a>    label<span class="op">=</span><span class="st">"DirectNoCovariates"</span>,</span>
-<span id="cb18-17"><a href="#cb18-17" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb18-18"><a href="#cb18-18" aria-hidden="true" tabindex="-1"></a>plt.plot(</span>
-<span id="cb18-19"><a href="#cb18-19" aria-hidden="true" tabindex="-1"></a>    t[sorted_indices],</span>
-<span id="cb18-20"><a href="#cb18-20" aria-hidden="true" tabindex="-1"></a>    y_dr_pred[sorted_indices],</span>
-<span id="cb18-21"><a href="#cb18-21" aria-hidden="true" tabindex="-1"></a>    color<span class="op">=</span><span class="st">"blue"</span>,</span>
-<span id="cb18-22"><a href="#cb18-22" aria-hidden="true" tabindex="-1"></a>    linewidth<span class="op">=</span><span class="dv">2</span>,</span>
-<span id="cb18-23"><a href="#cb18-23" aria-hidden="true" tabindex="-1"></a>    label<span class="op">=</span><span class="st">"DoublyRobustPseudoOutcome"</span>,</span>
-<span id="cb18-24"><a href="#cb18-24" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb18-25"><a href="#cb18-25" aria-hidden="true" tabindex="-1"></a>plt.plot(</span>
-<span id="cb18-26"><a href="#cb18-26" aria-hidden="true" tabindex="-1"></a>    t[sorted_indices],</span>
-<span id="cb18-27"><a href="#cb18-27" aria-hidden="true" tabindex="-1"></a>    y_gps_pred[sorted_indices],</span>
-<span id="cb18-28"><a href="#cb18-28" aria-hidden="true" tabindex="-1"></a>    color<span class="op">=</span><span class="st">"orange"</span>,</span>
-<span id="cb18-29"><a href="#cb18-29" aria-hidden="true" tabindex="-1"></a>    linewidth<span class="op">=</span><span class="dv">2</span>,</span>
-<span id="cb18-30"><a href="#cb18-30" aria-hidden="true" tabindex="-1"></a>    label<span class="op">=</span><span class="st">"GPS"</span>,</span>
-<span id="cb18-31"><a href="#cb18-31" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb18-32"><a href="#cb18-32" aria-hidden="true" tabindex="-1"></a>plt.plot(</span>
-<span id="cb18-33"><a href="#cb18-33" aria-hidden="true" tabindex="-1"></a>    t[sorted_indices],</span>
-<span id="cb18-34"><a href="#cb18-34" aria-hidden="true" tabindex="-1"></a>    y_pw_pred[sorted_indices],</span>
-<span id="cb18-35"><a href="#cb18-35" aria-hidden="true" tabindex="-1"></a>    color<span class="op">=</span><span class="st">"purple"</span>,</span>
-<span id="cb18-36"><a href="#cb18-36" aria-hidden="true" tabindex="-1"></a>    linewidth<span class="op">=</span><span class="dv">2</span>,</span>
-<span id="cb18-37"><a href="#cb18-37" aria-hidden="true" tabindex="-1"></a>    label<span class="op">=</span><span class="st">"PropensityPseudoOutcomeContinuous"</span>,</span>
-<span id="cb18-38"><a href="#cb18-38" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb18-39"><a href="#cb18-39" aria-hidden="true" tabindex="-1"></a>plt.legend()</span>
-<span id="cb18-40"><a href="#cb18-40" aria-hidden="true" tabindex="-1"></a>fig.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stderr">
-<pre><code>/var/folders/_2/9y4tsvdd2n3gqjgd2zmlr1km0000gn/T/ipykernel_77708/894538282.py:40: UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
-  fig.show()</code></pre>
-</div>
+</section>
+<section id="error-profile-by-treatment-value" class="level2">
+<h2 class="anchored" data-anchor-id="error-profile-by-treatment-value">Error profile by treatment value</h2>
+<p>The final chart shows the curves directly. The next plot turns that same comparison into absolute error, which makes it easier to see <em>where</em> each estimator fails along the treatment range.</p>
+<div id="2d15d782" class="cell" data-execution_count="11">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">8</span>, <span class="fl">4.5</span>))</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>ax.plot(grid_values, np.<span class="bu">abs</span>(naive_curve <span class="op">-</span> true_curve), linewidth<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="st">"DirectNoCovariates"</span>)</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>ax.plot(grid_values, np.<span class="bu">abs</span>(direct_curve <span class="op">-</span> true_curve), linewidth<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="st">"DirectRegressor"</span>)</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>ax.plot(grid_values, np.<span class="bu">abs</span>(gps_curve <span class="op">-</span> true_curve), linewidth<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="st">"GPS"</span>)</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>ax.plot(grid_values, np.<span class="bu">abs</span>(dr_curve <span class="op">-</span> true_curve), linewidth<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="st">"DoublyRobustPseudoOutcome"</span>)</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"Treatment"</span>)</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"Absolute error"</span>)</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Where each estimator deviates from the truth"</span>)</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>ax.legend()</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="dose_response_curve_files/figure-html/cell-14-output-2.png" width="569" height="411" class="figure-img"></p>
+<p><img src="dose_response_curve_files/figure-html/cell-12-output-1.png" width="661" height="422" class="figure-img"></p>
 </figure>
 </div>
 </div>
 </div>
+</section>
+<section id="error-table" class="level2">
+<h2 class="anchored" data-anchor-id="error-table">Error table</h2>
+<div id="2a0495a6" class="cell" data-execution_count="12">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>pl.DataFrame(</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    {</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>        <span class="st">"estimator"</span>: [</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>            <span class="st">"DirectNoCovariates"</span>,</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>            <span class="st">"DirectRegressor"</span>,</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>            <span class="st">"GPS"</span>,</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>            <span class="st">"DoublyRobustPseudoOutcome"</span>,</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>        ],</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>        <span class="st">"mean_absolute_error"</span>: [</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>            <span class="bu">float</span>(np.mean(np.<span class="bu">abs</span>(naive_curve <span class="op">-</span> true_curve))),</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>            <span class="bu">float</span>(np.mean(np.<span class="bu">abs</span>(direct_curve <span class="op">-</span> true_curve))),</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>            <span class="bu">float</span>(np.mean(np.<span class="bu">abs</span>(gps_curve <span class="op">-</span> true_curve))),</span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>            <span class="bu">float</span>(np.mean(np.<span class="bu">abs</span>(dr_curve <span class="op">-</span> true_curve))),</span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>        ],</span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>).sort(<span class="st">"mean_absolute_error"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="12">
+<div><style>
+.dataframe > thead > tr,
+.dataframe > tbody > tr {
+  text-align: right;
+  white-space: pre-wrap;
+}
+</style>
+<small>shape: (4, 2)</small>
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th">estimator</th>
+<th data-quarto-table-cell-role="th">mean_absolute_error</th>
+</tr>
+<tr class="even">
+<td>str</td>
+<td>f64</td>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>"DoublyRobustPseudoOutcome"</td>
+<td>0.051407</td>
+</tr>
+<tr class="even">
+<td>"DirectRegressor"</td>
+<td>0.072385</td>
+</tr>
+<tr class="odd">
+<td>"GPS"</td>
+<td>0.104473</td>
+</tr>
+<tr class="even">
+<td>"DirectNoCovariates"</td>
+<td>0.235799</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<p>The table makes the bias from ignoring covariates visible: <code>DirectNoCovariates</code> has the highest MAE. In this run, <code>DirectRegressor</code> has the lowest MAE, which suggests the flexible outcome model matches this dataset well. On real problems with model misspecification, GPS and doubly robust can offer useful protection.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>When <code>DirectRegressor</code> and <code>DoublyRobustPseudoOutcome</code> agree closely, that is a useful diagnostic that the outcome model may already be capturing most of the structure in the data. When they diverge, the doubly robust estimate can be more resistant to nuisance-model misspecification because, in theory, only one of the two nuisance components needs to be correct.</p>
+</div>
+</div>
+</section>
+<section id="what-to-try-next" class="level2">
+<h2 class="anchored" data-anchor-id="what-to-try-next">What to try next</h2>
+<p>If you want the shortest continuous-treatment example, go to the <a href="../examples/continuous_treatments.html">continuous treatments guide</a>.</p>
+<p>If your treatment is boolean or multi-level instead of numeric, return to the <a href="../examples/index.html">examples hub</a>.</p>
 
 
+</section>
 
 </main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
@@ -939,8 +1204,22 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   });
   </script>
 </div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>skcausal</p>
+</div>   
+    <div class="nav-footer-center">
+<p>State-of-the-art unified API for causal inference</p>
+</div>
+    <div class="nav-footer-right">
+<p><a href="https://github.com/felipeangelimvieira/skcausal">GitHub</a></p>
+</div>
+  </div>
+</footer>
 
 
 
 
+<script src="../site_libs/quarto-html/zenscroll-min.js"></script>
 </body></html>

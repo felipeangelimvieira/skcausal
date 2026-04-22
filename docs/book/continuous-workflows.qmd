@@ -1,0 +1,55 @@
+# Continuous Workflows
+
+Continuous-treatment workflows are where the package's design becomes most visible: instead of asking for a single treated-vs-control contrast, you ask for a whole response curve.
+
+## The Core Workflow
+
+```{mermaid}
+flowchart LR
+  A["Observed data: X, t, y"] --> B["Fit estimator"]
+  B --> C["Build treatment grid"]
+  C --> D["Predict on the grid"]
+  D --> E["Plot ADRF or compare to truth"]
+```
+
+## Step 1: Build A Grid
+
+```python
+import numpy as np
+import polars as pl
+
+grid = pl.DataFrame(
+    {"t0": np.linspace(float(t["t0"].min()), float(t["t0"].max()), X.height)}
+)
+```
+
+The grid has the same row count as `X` because `predict(X, t)` expects the two inputs to align row-wise.
+
+## Step 2: Predict A Curve
+
+```python
+from skcausal.causal_estimators import DirectRegressor
+from sklearn.linear_model import LinearRegression
+
+estimator = DirectRegressor(outcome_regressor=LinearRegression())
+estimator.fit(X, t, y)
+curve = estimator.predict(X, grid)
+```
+
+For a direct method, the returned curve is the average of `\hat{E}[Y | X, T=t]` over the observed covariate sample.
+
+## Step 3: Compare Methods Carefully
+
+The docs examples pair `DirectRegressor` with `GPS`, but the important point is not that one is “regression” and one is “weighting”. The important point is that they use different nuisance-model structure to target the same ADRF.
+
+::: {.callout-tip}
+Use the [continuous treatments example](../examples/continuous_treatments.html){.book-page-link} when you want the short version, and the [SyntheticDataset2 walkthrough](../examples/dose_response_curve.html){.book-page-link} when you want a fuller benchmark with multiple estimators.
+:::
+
+## The Main Habit To Keep
+
+When a continuous-treatment result looks surprising, check three things before trusting the curve:
+
+1. Whether the requested treatment grid stays inside the observed treatment support.
+2. Whether the estimator returns a response curve or a density-like score.
+3. Whether the observed association is clearly confounded relative to the synthetic truth or domain knowledge.

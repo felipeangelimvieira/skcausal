@@ -2,21 +2,21 @@
 
 Direct regression methods try to approximate $\mathbb{E}[Y|X, T]$ directly, using
 both X and T as inputs to the regressor. This regression can be weighted, so that
-each sample weight is proportional to the inverse of the propensity score $P(t_i|x_i)$.
+each sample weight is proportional to the inverse treatment density $1 / P(t_i|x_i)$.
 """
 
 import numpy as np
 import pandas as pd
 from sklearn.base import RegressorMixin
 from sklearn.pipeline import Pipeline
-import polars as pl
 from skcausal.causal_estimators.base import BaseAverageCausalResponseEstimator
-from skcausal.weight_estimators.base import BaseBalancingWeightRegressor
+from skcausal.causal_estimators._density_utils import predict_inverse_density_weight
+from skcausal.density.base import BaseDensityEstimator
 
-__all__ = ["WeightedDirectRegressor", "WeightedIndividualDirectRegressor"]
+__all__ = ["DirectRegressor"]
 
 
-class WeightedDirectRegressor(BaseAverageCausalResponseEstimator):
+class DirectRegressor(BaseAverageCausalResponseEstimator):
     """
     Perform direct regression with optional weighted samples.
 
@@ -28,26 +28,24 @@ class WeightedDirectRegressor(BaseAverageCausalResponseEstimator):
     outcome_regressor : RegressorMixin
         Sklearn-like regressor to use for estimating the outcome.
 
-    sample_weight_regressor : BaseSampleWeightRegressor, optional
-        SampleWeight regressor to use for estimating the sample weights.
+    sample_weight_regressor : BaseDensityEstimator, optional
+        Density estimator used to derive inverse-density sample weights.
         Default is None, which means no sample weights are used.
     """
 
-    _tags = {
-        "t_inner_mtype": pl.DataFrame,
-    }
+    _tags = {"backend": "pandas"}
 
     def __init__(
         self,
         outcome_regressor: RegressorMixin,
-        sample_weight_regressor: BaseBalancingWeightRegressor = None,
+        sample_weight_regressor: BaseDensityEstimator = None,
     ):
 
         self.outcome_regressor = outcome_regressor
         self.sample_weight_regressor = sample_weight_regressor
         super().__init__()
 
-    def _fit(self, X: np.ndarray, y: np.ndarray, t: np.ndarray):
+    def _fit(self, X: pd.DataFrame, t: pd.DataFrame, y: pd.DataFrame):
         """Fit the outcome model to the data.
 
         The treatment vector is concatenated to X before passing the inputs to
@@ -55,12 +53,12 @@ class WeightedDirectRegressor(BaseAverageCausalResponseEstimator):
 
         Parameters
         ----------
-        X : np.ndarray
+        X : pd.DataFrame
             Input features.
-        y : np.ndarray
-            Target variable.
-        t : np.ndarray
+        t : pd.DataFrame
             Treatment variable.
+        y : pd.DataFrame
+            Target variable.
 
         Returns
         -------
@@ -69,19 +67,25 @@ class WeightedDirectRegressor(BaseAverageCausalResponseEstimator):
         """
         if self.sample_weight_regressor is not None:
             self.sample_weight_regressor.fit(X, t)
-            self.weights_ = self.sample_weight_regressor.predict_sample_weight(
-                X=X, t=t
-            ).flatten()
+            self.weights_ = predict_inverse_density_weight(
+                self.sample_weight_regressor,
+                X,
+                t,
+            ).reshape(-1)
         else:
             self.weights_ = None
 
-        self.fit_kwargs_ = self._prepare_fit_kwargs(X, y, t, self.weights_)
+        self.fit_kwargs_ = self._prepare_fit_kwargs(X, t, y, self.weights_)
         self.outcome_regressor.fit(**self.fit_kwargs_)
         return self
 
     def _prepare_fit_kwargs(
-        self, X: np.ndarray, y: np.ndarray, t: np.ndarray, weights: np.ndarray
-    ) -> tuple:
+        self,
+        X: pd.DataFrame,
+        t: pd.DataFrame,
+        y: pd.DataFrame,
+        weights: np.ndarray,
+    ) -> dict:
 
         dataset = {"X": self._prepare_input_array(X, t), "y": y}
 
@@ -92,37 +96,47 @@ class WeightedDirectRegressor(BaseAverageCausalResponseEstimator):
             dataset[kwarg_name] = weights
         return dataset
 
-    def _prepare_input_array(self, X: np.ndarray, t: np.ndarray) -> np.ndarray:
+    def _get_n_samples(self, value) -> int:
+        if isinstance(value, (pd.DataFrame, pd.Series)):
+            return len(value)
+        return super()._get_n_samples(value)
+
+    def _prepare_input_array(
+        self,
+        X: pd.DataFrame,
+        t: pd.DataFrame,
+    ) -> pd.DataFrame:
         """Handles how to use X and t as input.
 
         Parameters
         ----------
-        X : np.ndarray
+        X : pd.DataFrame
             Input features.
-        t : np.ndarray
+        t : pd.DataFrame
             Treatment variable.
 
         Returns
         -------
-        np.ndarray
-            Array to be passed to outcome regressor
+        pd.DataFrame
+            DataFrame to be passed to outcome regressor
         """
         return self._concat(X, t)
 
     def _concat(self, X, t):
-        if not isinstance(t, np.ndarray):
-            t = t.to_numpy()
-        return np.concatenate([X, t.reshape((X.shape[0], -1))], axis=1)
+        return pd.concat(
+            [X.reset_index(drop=True), t.reset_index(drop=True)],
+            axis=1,
+        )
 
-    def _predict_adrf(self, X: pd.DataFrame, t: list[float]) -> list[float]:
+    def _predict(self, X: pd.DataFrame, t: pd.DataFrame) -> list[float]:
         """Predict the Average Dose-Response Curve for a list of treatment values.
 
         Parameters
         ----------
         X : pd.DataFrame
             Input data
-        t : list[float]
-            List of treatment values
+        t : pd.DataFrame
+            Treatment values at which to evaluate the response.
 
         Returns
         -------
@@ -131,11 +145,37 @@ class WeightedDirectRegressor(BaseAverageCausalResponseEstimator):
         """
         ys = []
 
-        t = t.to_numpy()
         for i in range(t.shape[0]):
-            _t = t[i]
+            repeated_t = pd.concat([t.iloc[[i]].copy()] * X.shape[0], ignore_index=True)
             ate = self.outcome_regressor.predict(
-                self._prepare_input_array(X, _t * np.ones((X.shape[0], 1)))
-            )[0]
+                self._prepare_input_array(X, repeated_t)
+            ).mean()
             ys.append(ate)
         return ys
+
+    @classmethod
+    def get_test_params(cls, parameter_set="default"):
+        from sklearn.compose import ColumnTransformer, make_column_selector
+        from sklearn.linear_model import LinearRegression
+        from sklearn.pipeline import make_pipeline
+        from sklearn.preprocessing import OneHotEncoder
+
+        preprocessor = ColumnTransformer(
+            transformers=[
+                (
+                    "encode_categorical",
+                    OneHotEncoder(
+                        drop="first",
+                        handle_unknown="ignore",
+                        sparse_output=False,
+                    ),
+                    make_column_selector(
+                        dtype_include=["category", "object", "string"]
+                    ),
+                )
+            ],
+            remainder="passthrough",
+            verbose_feature_names_out=False,
+        )
+
+        return [{"outcome_regressor": make_pipeline(preprocessor, LinearRegression())}]

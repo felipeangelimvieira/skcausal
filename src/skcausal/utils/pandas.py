@@ -2,23 +2,6 @@ import numpy as np
 import pandas as pd
 from pandas.api import types as pdt
 
-INTEGER_DTYPES = [
-    np.dtype("uint8"),
-    np.dtype("uint16"),
-    np.dtype("uint32"),
-    np.dtype("uint64"),
-    np.dtype("int8"),
-    np.dtype("int16"),
-    np.dtype("int32"),
-    np.dtype("int64"),
-]
-
-FLOAT_DTYPES = [np.dtype("float32"), np.dtype("float64")]
-
-BOOLEAN_DTYPES = [np.dtype("bool"), "bool", "boolean"]
-
-ALL_DTYPES = ["category", *BOOLEAN_DTYPES, *INTEGER_DTYPES, *FLOAT_DTYPES]
-
 
 def _dtype_equals(left, right) -> bool:
     try:
@@ -44,7 +27,9 @@ def is_dtype_supported(dtype, allowed_dtypes) -> bool:
                 return True
             continue
         if isinstance(allowed, np.dtype):
-            if not pdt.is_extension_array_dtype(dtype) and _dtype_equals(dtype, allowed):
+            if not pdt.is_extension_array_dtype(dtype) and _dtype_equals(
+                dtype, allowed
+            ):
                 return True
             continue
         if isinstance(allowed, type):

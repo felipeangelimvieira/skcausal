@@ -1,14 +1,16 @@
 import numpy as np
-import polars as pl
+import pandas as pd
 from sklearn.base import BaseEstimator, clone
 
 from skcausal.causal_estimators.base import BaseAverageCausalResponseEstimator
-from skcausal.utils.polars import convert_categorical_to_dummies
 
 
 class DirectNoCovariates(BaseAverageCausalResponseEstimator):
     """
     Predicts E[Y|T] directly, ignoring covariates X.
+
+    This estimator should be used as baseline to compare against other
+    causal estimators.
 
 
     Parameters
@@ -20,10 +22,9 @@ class DirectNoCovariates(BaseAverageCausalResponseEstimator):
     """
 
     _tags = {
-        "capability:supports_multidimensional_treatment": True,
-        "t_inner_mtype": pl.DataFrame,
-        "store_X": True,
-        "one_hot_encode_enum_columns": False,
+        "capability:multidimensional_treatment": True,
+        "backend": "pandas",
+        "capability:t_type": ["continuous", "categorical"],
     }
 
     def __init__(
@@ -36,19 +37,17 @@ class DirectNoCovariates(BaseAverageCausalResponseEstimator):
 
         super().__init__()
 
-    def _fit(self, X: np.ndarray, y: np.ndarray, t: pl.DataFrame):
-        """Fits the GPS estimator.
-
-        First, fits the treatment regressor to estimate the propensity score.
-        Then, fits the outcome regressor to estimate the outcome.
+    def _fit(self, X: pd.DataFrame, t: pd.DataFrame, y: pd.DataFrame):
+        """Fits the DirectNoCovariates estimator.
 
         Parameters
         ----------
-        X : np.ndarray
+        X : pd.DataFrame
             Input features.
-        y : np.ndarray
+        y : pd.DataFrame
             Target variable.
-        t : np.ndarray
+        t : pd.DataFrame
+            Treatment values.
 
         Returns
         -------
@@ -56,40 +55,24 @@ class DirectNoCovariates(BaseAverageCausalResponseEstimator):
             The object itself
         """
 
-        t = self._prepare_t(t)
-
         self.outcome_regressor_ = clone(self.outcome_regressor)
         self.outcome_regressor_.fit(X=t, y=y)
+        return self
 
-    def _prepare_t(self, t: pl.DataFrame) -> np.ndarray:
-        """Prepare treatment values for prediction.
+    def _get_n_samples(self, value) -> int:
+        if isinstance(value, (pd.DataFrame, pd.Series)):
+            return len(value)
+        return super()._get_n_samples(value)
 
-        Parameters
-        ----------
-        t : pl.DataFrame
-            Treatment values.
-
-        Returns
-        -------
-        np.ndarray
-            Prepared treatment values.
-        """
-
-        t = convert_categorical_to_dummies(t)
-
-        t = t.to_numpy().astype(np.float32)
-
-        return t
-
-    def _predict_adrf(self, X: np.ndarray, t: pl.DataFrame) -> list[float]:
+    def _predict(self, X: pd.DataFrame, t: pd.DataFrame) -> list[float]:
         """
         Predict the average response for each treatment value in t.
 
         Parameters
         ----------
-        X : np.ndarray
+        X : pd.DataFrame
             The input data
-        t : list[float]
+        t : pd.DataFrame
             The treatment values
 
         Returns
@@ -97,7 +80,34 @@ class DirectNoCovariates(BaseAverageCausalResponseEstimator):
         list[float]
             The average response for each treatment value in t.
         """
-        t = self._prepare_t(t)
+
         effect = self.outcome_regressor_.predict(t)
 
         return effect.flatten().tolist()
+
+    @classmethod
+    def get_test_params(cls, parameter_set="default"):
+        from sklearn.compose import ColumnTransformer, make_column_selector
+        from sklearn.linear_model import LinearRegression
+        from sklearn.pipeline import make_pipeline
+        from sklearn.preprocessing import OneHotEncoder
+
+        preprocessor = ColumnTransformer(
+            transformers=[
+                (
+                    "encode_categorical",
+                    OneHotEncoder(
+                        drop="first",
+                        handle_unknown="ignore",
+                        sparse_output=False,
+                    ),
+                    make_column_selector(
+                        dtype_include=["category", "object", "string"]
+                    ),
+                )
+            ],
+            remainder="passthrough",
+            verbose_feature_names_out=False,
+        )
+
+        return [{"outcome_regressor": make_pipeline(preprocessor, LinearRegression())}]

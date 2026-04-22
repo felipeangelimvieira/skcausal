@@ -1,0 +1,26 @@
+project:
+  type: book
+  output-dir: _book
+
+book:
+  title: "skcausal Book"
+  subtitle: "A structured guide to treatment-aware causal inference in skcausal."
+  chapters:
+    - index.qmd
+    - getting-started.qmd
+    - estimator-contract.qmd
+    - continuous-workflows.qmd
+
+execute:
+  enabled: false
+  warning: false
+
+format:
+  html:
+    theme: cosmo
+    css: book.css
+    toc: true
+    code-copy: true
+    smooth-scroll: true
+    mermaid:
+      theme: neutral

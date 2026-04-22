@@ -1,1 +1,105 @@
-# Examples
+---
+title: "Examples"
+subtitle: "Pick the treatment regime, then reuse the same fit, predict, and compare workflow."
+page-layout: full
+toc: false
+---
+
+::: {.surface-section}
+The examples are organized by treatment semantics first, because the intervention type determines both the estimator family and the quantity you should interpret.
+:::
+
+[`Treatment map`]{.section-kicker}
+## Pick The Right Example
+
+::: {.docs-card-grid}
+::: {.docs-card}
+### Binary treatments
+
+Use this guide when treatment is a treated-vs-control flag such as `True` and `False`.
+
+[Open binary guide](binary_treatments.qmd){.card-link}
+:::
+
+::: {.docs-card}
+### Continuous treatments
+
+Use this guide when treatment is a numeric exposure such as a dose, score, or intensity.
+
+[Open continuous guide](continuous_treatments.qmd){.card-link}
+:::
+
+::: {.docs-card}
+### Categorical treatments
+
+Use this guide when treatment has more than two levels such as `control`, `placebo`, and `treated`.
+
+[Open categorical guide](categorical_treatments.qmd){.card-link}
+:::
+
+::: {.docs-card}
+### Full SyntheticDataset2 walkthrough
+
+Use this guide when you want one end-to-end benchmark example with a known ground-truth dose-response curve.
+
+[Open benchmark](dose_response_curve.qmd){.card-link}
+:::
+:::
+
+[`Shared workflow`]{.section-kicker}
+## The Examples Reuse One Contract
+
+::: {.workflow-grid}
+::: {.workflow-step}
+### 1. Build `X`, `t`, and `y`
+
+Start from observed covariates, treatment assignments, and outcomes.
+:::
+
+::: {.workflow-step}
+### 2. Fit one estimator
+
+Choose direct, weighting, or doubly robust estimators depending on the treatment type and estimand.
+:::
+
+::: {.workflow-step}
+### 3. Build requested interventions
+
+Create the treatment table that represents the treatment levels or treatment grid you want to evaluate.
+:::
+
+::: {.workflow-step}
+### 4. Predict and compare
+
+Interpret average potential outcomes, response curves, or benchmark error against known truth where available.
+:::
+:::
+
+[`What changes across guides`]{.section-kicker}
+## What Varies By Treatment Type
+
+::: {.feature-grid}
+::: {.feature-card}
+### Binary and categorical guides
+
+These guides focus on requested treatment levels and return average potential outcomes for those levels.
+:::
+
+::: {.feature-card}
+### Continuous guides
+
+These guides build a treatment grid and visualize the resulting dose-response curve.
+:::
+
+::: {.feature-card}
+### Density-aware workflows
+
+Continuous examples can plug treatment-density estimators into GPS-style estimators when the assignment model matters.
+:::
+
+::: {.feature-card}
+### Synthetic benchmark pages
+
+Benchmark examples add known ground truth so you can evaluate the shape and error of the estimated curve directly.
+:::
+:::

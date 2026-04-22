@@ -1,8 +1,18 @@
 project:
   type: website
+  render:
+    - "*.qmd"
+    - "*.md"
+    - "datasets/*.qmd"
+    - "density/*.qmd"
+    - "examples/*.qmd"
+    - "!book/"
+  post-render:
+    - ./render-book.sh
 
 website:
   title: "skcausal"
+  description: "Unified API for causal inference across binary, categorical, and continuous treatments."
   search:
     location: navbar
     limit: 5
@@ -10,18 +20,50 @@ website:
   navbar:
     search: true
     left:
-      - href: examples/dose_response_curve.qmd
-        text: "Example"
+#      - href: book/index.html
+#        text: "Book"
+      - text: "Examples"
+        menu:
+          - href: examples/index.qmd
+            text: "Overview"
+          - href: examples/binary_treatments.qmd
+            text: "Binary Treatments"
+          - href: examples/continuous_treatments.qmd
+            text: "Continuous Treatments"
+          - href: examples/categorical_treatments.qmd
+            text: "Categorical Treatments"
+          - href: examples/dose_response_curve.qmd
+            text: "SyntheticDataset2 Walkthrough"
+      - text: "Density"
+        menu:
+          - href: density/index.qmd
+            text: "Overview"
+          - href: density/continuous.qmd
+            text: "Continuous Treatments"
+      - href: about.qmd
+        text: "About"
+    right:
+      - icon: github
+        href: https://github.com/felipeangelimvieira/skcausal
+        aria-label: "GitHub repository"
+  page-footer:
+    left: "skcausal"
+    center: "State-of-the-art unified API for causal inference"
+    right: "[GitHub](https://github.com/felipeangelimvieira/skcausal)"
 
 format:
   html:
+    theme: cosmo
+    css: styles.css
     mermaid:
       theme: neutral
     toc: true
     toc-expand: true
-    theme:
-      - cosmo
-      - brand
+    toc-location: right
+    title-block-banner: true
+    code-copy: true
+    code-overflow: wrap
+    smooth-scroll: true
 
 
 

@@ -1,0 +1,50 @@
+# Estimator Contract
+
+The package is organized around a small public contract: fit on observed data, then predict at requested treatment levels or treatment grids.
+
+## One Interface, Different Estimands
+
+```{mermaid}
+flowchart TD
+  A["Binary or categorical treatment"] --> B["Average potential outcomes"]
+  C["Continuous treatment"] --> D["Average dose-response function"]
+  E["Density estimator"] --> F["Treatment assignment score"]
+```
+
+The method names stay compact, but the returned quantity depends on the estimator family.
+
+| Family | Typical output | Interpretation |
+| --- | --- | --- |
+| Categorical response estimators | One value per requested treatment level | Average potential outcome |
+| Continuous response estimators | One value per requested grid point | Average dose-response function |
+| Density estimators | One value per observed row | Treatment density or stabilized density ratio |
+
+## Prediction Requires A Requested Treatment Table
+
+The package does not treat prediction as “just give me `X`”. It treats prediction as “give me `X` and the intervention I want to evaluate”.
+
+```python
+estimator.fit(X, t, y)
+estimated_effect = estimator.predict(X, requested_treatment)
+```
+
+That means the *shape* of `requested_treatment` matters:
+
+1. For binary or categorical problems, it usually contains a small set of treatment levels.
+2. For continuous problems, it usually contains a dense treatment grid.
+
+## Density Outputs Need Interpretation Discipline
+
+Not every density-like quantity is a normalized density.
+
+::: {.callout-important}
+In `skcausal`, some density estimators return a conditional density `p(t | x)` while others return a stabilized ratio `p(t | x) / p(t)`. Always check `estimator.get_tag("density_kind")` before interpreting the output.
+:::
+
+That distinction is why the density docs separate `SkproDensityEstimator` from `PermutationWeighting`.
+
+## Reading The Examples Correctly
+
+The examples compare estimators on synthetic datasets, but they are not all trying to estimate the exact same intermediate object. They are trying to estimate the same **causal target**, sometimes through different nuisance models.
+
+Continue to [Continuous Workflows](continuous-workflows.qmd) for the cleanest grid-based example.

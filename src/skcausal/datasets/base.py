@@ -4,48 +4,79 @@ from typing import List, Tuple
 
 import numpy as np
 import polars as pl
+from skbase.base import BaseObject
 
 __all__ = ["BaseDataset", "split_dataset"]
 
 
-class BaseDataset(ABC):
+class BaseDataset(BaseObject):
+    _tags = {"object_type": ["dataset"]}
+
+    def load(self):
+        return self._load()
+
+    def _load(self):
+        raise NotImplementedError("Dataset classes should implement _load")
+
+
+class BaseSyntheticDataset(BaseDataset):
     """
     Abstract base class for datasets used in continuous treatment effect benchmarking.
 
     Base classes should implement the following methods:
 
-    * generate_covariates
+    * get_covariates
     * get_treatments
     * get_outcomes
-    * get_mean_outcomes
+    * predict_y
     * pdf_treatments
     """
 
-    TREATMENT_SCHEMA = None
+    def __init__(self, n: int, seed=42):
 
-    def __init__(self):
+        self.n = n
+        self.seed = seed
+
+        super().__init__()
 
         self._covariates = None
         self._treatments = None
         self._outcomes = None
         self.train_dataset_ = None
         self.test_dataset_ = None
+        self._rng = np.random.default_rng(seed)
 
-    @abstractmethod
-    def generate_covariates(self, n: int):
+    def _load(self) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
+        """
+        Generates a dataset with the specified number of samples.
+
+        Args:
+            n (int): Number of samples to generate.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray, np.ndarray]: Tuple containing the covariates, treatments, and outcomes.
+        """
+        return self._covariates, self._treatments, self._outcomes
+
+    def _get_covariates(self) -> np.array:
         """
         Generates covariates for the dataset.
 
-        Args:
-            n (int): Number of covariates to generate.
+        Parameters
+        ----------
+        n : int
+            Number of covariates to generate.
 
-        Returns:
-            np.ndarray: Array of shape (n, m) containing the generated covariates.
+        Returns
+        -------
+        np.ndarray
+            Array of shape (n, m) containing the generated covariates.
         """
-        ...
+        raise NotImplementedError(
+            "get_covariates method not implemented for this dataset."
+        )
 
-    @abstractmethod
-    def get_treatments(self, covariates: np.ndarray) -> np.ndarray:
+    def _get_treatments(self, covariates: np.ndarray):
         """
         Generates treatment assignments based on the given covariates.
 
@@ -55,10 +86,11 @@ class BaseDataset(ABC):
         Returns:
             np.ndarray: Array of shape (n,) containing the treatment assignments.
         """
-        ...
+        raise NotImplementedError(
+            "get_treatments method not implemented for this dataset."
+        )
 
-    @abstractmethod
-    def get_outcomes(
+    def _get_outcomes(
         self, covariates: np.ndarray, treatments: np.ndarray
     ) -> np.ndarray:
         """
@@ -67,16 +99,20 @@ class BaseDataset(ABC):
         Args:
             covariates (np.ndarray): Array of shape (n, m) containing the covariates.
             treatments (np.ndarray): Array of shape (n,) containing the treatment assignments.
-
         Returns:
             np.ndarray: Array of shape (n,) containing the outcomes.
         """
-        ...
 
-    @abstractmethod
-    def get_mean_outcomes(
-        self, covariates: np.ndarray, treatments: np.ndarray
-    ) -> np.ndarray:
+        expected_outcomes = self.predict_y(covariates=covariates, treatments=treatments)
+        # Add noise
+        return self._inject_outcome_noise(
+            expected_outcomes, covariates=covariates, treatments=treatments
+        )
+
+    def _inject_outcome_noise(self, expected_outcomes, covariates, treatments):
+        return expected_outcomes + self._rng.normal(size=expected_outcomes.shape)
+
+    def predict_y(self, covariates: np.ndarray, treatments: np.ndarray) -> np.ndarray:
         """
         Generates mean outcomes based on the given covariates and treatment assignments.
 
@@ -88,36 +124,26 @@ class BaseDataset(ABC):
             np.ndarray: Array of shape (n,) containing the mean outcomes.
 
         """
-        ...
+        return self._predict_y(covariates, treatments)
 
-    def get_dataset(self, n: int) -> np.ndarray:
+    def _predict_y(self, covariates: np.ndarray, treatments: np.ndarray) -> np.ndarray:
         """
-        Generates a dataset with the specified number of samples.
+        Generates mean outcomes based on the given covariates and treatment assignments.
 
         Args:
-            n (int): Number of samples to generate.
+            covariates (np.ndarray): Array of shape (n, m) containing the covariates.
+            treatments (np.ndarray): Array of shape (n,) containing the treatment assignments.
 
         Returns:
-            Tuple[np.ndarray, np.ndarray, np.ndarray]: Tuple containing the covariates, treatments, and outcomes.
+            np.ndarray: Array of shape (n,) containing the mean outcomes.
+
         """
-        covariates = self.generate_covariates(n)
-        treatments = self.get_treatments(covariates)
-        outcomes = self.get_outcomes(covariates, treatments)
+        raise NotImplementedError("predict_y method not implemented for this dataset.")
 
-        treatments = self._to_polars(treatments)
-
-        return (
-            pl.DataFrame(covariates),
-            pl.DataFrame(treatments),
-            pl.DataFrame(outcomes),
-        )
-
-    def _to_polars(self, treatments: np.ndarray) -> np.ndarray:
-
-        return pl.DataFrame(treatments, schema=self.TREATMENT_SCHEMA)
-
-    def prepare(
-        self, n: int = None, test_ratio=0, preparation_seed=None, split_seed=None
+    def _prepare(
+        self,
+        n: int = None,
+        seed=42,
     ) -> np.ndarray:
         """
         Precompiles a dataset with the specified number of samples.
@@ -128,32 +154,50 @@ class BaseDataset(ABC):
         Returns:
             Tuple[np.ndarray, np.ndarray, np.ndarray]: Tuple containing the covariates, treatments, and outcomes.
         """
-        self._rng_preparation = np.random.default_rng(preparation_seed)
 
-        covariates, treatments, outcomes = self.get_dataset(n)
-        self._covariates = covariates
+        if n is not None:
+            self.n = n
+
+        covariates = self._get_covariates()
+        treatments = self._get_treatments(covariates)
+        outcomes = self._get_outcomes(covariates, treatments)
+
+        treatments = self._to_polars(treatments)
+
+        self._covariates = pl.DataFrame(covariates)
         self._treatments = treatments
-        self._outcomes = outcomes
+        self._outcomes = pl.DataFrame(outcomes)
 
-        self.train_dataset_, self.test_dataset_ = split_dataset(
-            self._covariates,
-            self._treatments,
-            self._outcomes,
-            test_ratio,
-            seed=split_seed,
-        )
         return self
+
+    def prepare(self, n: int = None, seed=42):
+        return self._prepare(n=n, seed=seed)
 
     @property
     def is_prepared(self):
-        return self.train_dataset_ is not None and self.test_dataset_ is not None
+        return all(
+            dataset is not None
+            for dataset in (self._covariates, self._treatments, self._outcomes)
+        )
 
     def retrieve(self, test=False):
         if test:
-            return self.test_dataset_
-        return self.train_dataset_
+            raise NotImplementedError(
+                "Test split retrieval is not implemented for BaseSyntheticDataset."
+            )
+        return self.load()
 
-    def get_adrf(self, covariates: np.ndarray, treatment_list: pl.DataFrame):
+    def _to_polars(self, treatments) -> pl.DataFrame:
+        if isinstance(treatments, pl.DataFrame):
+            return treatments
+
+        schema = getattr(self, "TREATMENT_SCHEMA", None)
+        if schema is None:
+            return pl.DataFrame(treatments)
+
+        return pl.DataFrame(treatments, schema=schema)
+
+    def predict(self, covariates: np.ndarray, treatment_list: pl.DataFrame):
         """
         Computes the Average Direct Response Function (ADRF) for the given covariates and treatment list.
 
@@ -175,51 +219,7 @@ class BaseDataset(ABC):
                 treatments = np.tile(treatments, (covariates.shape[0], 1))
             else:
                 treatments = np.full(covariates.shape[0], treatment)
-            outcomes = self.get_mean_outcomes(covariates, treatments)
+            outcomes = self.predict_y(covariates, treatments)
             adrf.append(outcomes.mean())
 
         return np.array(adrf)
-
-    def pdf_treatments(self, treatments, covariates: np.ndarray) -> np.ndarray:
-        raise NotImplementedError(
-            "pdf_treatments method not implemented for this dataset."
-        )
-
-
-def split_dataset(
-    X: np.ndarray, t: pl.DataFrame, y: np.ndarray, test_ratio: float = 0.2, seed=None
-):
-    """
-    Splits the dataset into training and testing sets.
-
-    Args:
-        X (np.ndarray): The covariates of the dataset with shape (n_samples, n_features).
-        t (np.ndarray): The treatment assignments with shape (n_samples,).
-        y (np.ndarray): The outcomes with shape (n_samples,).
-        test_ratio (float, optional): The proportion of the dataset to include in the test split. Defaults to 0.2.
-
-    Returns:
-        Tuple[Tuple[np.ndarray, np.ndarray, np.ndarray], Tuple[np.ndarray, np.ndarray, np.ndarray]]:
-        A tuple containing two tuples:
-            - The first tuple contains the training covariates, treatments, and outcomes.
-            - The second tuple contains the testing covariates, treatments, and outcomes.
-
-    Example:
-        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [9, 10]])
-        t = np.array([0, 1, 0, 1, 0])
-        y = np.array([1, 3, 5, 7, 9])
-        train_data, test_data = split_dataset(X, t, y, test_ratio=0.4)
-    """
-    n = len(X)
-    test_size = int(n * test_ratio)
-    train_size = n - test_size
-
-    rng = np.random.default_rng(seed)
-    indices = rng.permutation(n)
-    train_indices = indices[:train_size]
-    test_indices = indices[train_size:]
-
-    train_set = (X[train_indices], t[train_indices], y[train_indices])
-    test_set = (X[test_indices], t[test_indices], y[test_indices])
-
-    return train_set, test_set
