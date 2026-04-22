@@ -119,6 +119,7 @@ def use_theme(overrides: Mapping[str, object] | None = None) -> dict[str, object
     mpl = _require_matplotlib()
     theme = get_theme(overrides)
     mpl.rcParams.update(theme)
+    return theme
 
 
 @contextmanager
