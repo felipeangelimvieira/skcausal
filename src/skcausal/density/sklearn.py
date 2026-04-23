@@ -23,7 +23,7 @@ class SklearnCategoricalDensity(BaseDensityEstimator):
         "backend": "pandas",
         "capability:t_type": ["categorical"],
         "density_kind": "conditional",
-        "soft_dependencies": ["sklearn"],
+        "soft_dependencies": ["scikit-learn"],
     }
 
     def __init__(self, classifier):

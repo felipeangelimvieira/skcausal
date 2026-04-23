@@ -148,6 +148,13 @@ class Pipeline(_MetaObjectMixin, BaseAverageCausalResponseEstimator):
             "Pipeline overrides predict directly and does not use _predict."
         )
 
+    def _set_params(self, attr: str, **params):
+        """Delegate to parent _set_params, preserving apply_to in 3-tuple steps."""
+        if attr in params:
+            new_steps = params[attr]
+            params[attr] = [(s[0], s[1]) + s[2:] for s in new_steps]
+        return super()._set_params(attr, **params)
+
     def _transform_inputs(self, X, t):
         X_transformed, t_transformed = X, t
 

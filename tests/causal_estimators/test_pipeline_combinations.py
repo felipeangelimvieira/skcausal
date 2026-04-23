@@ -146,8 +146,12 @@ def test_density_pipeline_can_be_used_inside_doubly_robust_pseudo_outcome():
     assert estimator.density_estimator_.get_tag("density_kind") == "stabilized"
     assert estimator.density_estimator_.density_estimator_.fit_X_.equals(expected_fit_X)
     assert estimator.density_estimator_.density_estimator_.fit_t_.equals(expected_fit_t)
-    assert estimator.density_estimator_.density_estimator_.predict_X_.equals(expected_fit_X)
-    assert estimator.density_estimator_.density_estimator_.predict_t_.equals(expected_fit_t)
+    assert estimator.density_estimator_.density_estimator_.predict_X_.equals(
+        expected_fit_X
+    )
+    assert estimator.density_estimator_.density_estimator_.predict_t_.equals(
+        expected_fit_t
+    )
 
     prediction = estimator.predict(X.iloc[:2], pd.DataFrame({"t": [2.5, 4.5]}))
 
