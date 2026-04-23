@@ -77,7 +77,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../site_libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-6dce83697ef593b6f21f66f8d1a1696b.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-471f0014554f81eb40722b8717d96524.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -359,7 +359,7 @@ Note
 </section>
 <section id="step-1-import-dependencies" class="level2">
 <h2 class="anchored" data-anchor-id="step-1-import-dependencies">Step 1: Import dependencies</h2>
-<div id="f14a1ca5" class="cell" data-execution_count="1">
+<div id="437a1991" class="cell" data-execution_count="1">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> polars <span class="im">as</span> pl</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
@@ -426,7 +426,7 @@ Note
 </section>
 <section id="step-2-load-the-data" class="level2">
 <h2 class="anchored" data-anchor-id="step-2-load-the-data">Step 2: Load the data</h2>
-<div id="6ac054cd" class="cell" data-execution_count="2">
+<div id="bed2cfd5" class="cell" data-execution_count="2">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>dataset <span class="op">=</span> SimpleLinearDataset(</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    n<span class="op">=</span><span class="dv">250</span>,</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    t_types<span class="op">=</span>(<span class="st">"continuous"</span>,),</span>
@@ -518,7 +518,7 @@ Note
 <section id="step-3-build-the-evaluation-grid" class="level2">
 <h2 class="anchored" data-anchor-id="step-3-build-the-evaluation-grid">Step 3: Build the evaluation grid</h2>
 <p>Instead of a small table of discrete levels, we build a fine grid spanning the observed treatment range:</p>
-<div id="3b252f0e" class="cell" data-execution_count="3">
+<div id="9f70a890" class="cell" data-execution_count="3">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>grid <span class="op">=</span> pl.DataFrame(</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    {</span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>        <span class="st">"t0"</span>: np.linspace(</span>
@@ -548,7 +548,7 @@ Note
 <section id="step-3b-plot-the-naive-observational-curve" class="level2">
 <h2 class="anchored" data-anchor-id="step-3b-plot-the-naive-observational-curve">Step 3b: Plot the naive observational curve</h2>
 <p>Before fitting any estimator, compare the raw observed averages to the true ADRF. This is the continuous-treatment version of the confounding problem: the observed association between <code>T</code> and <code>Y</code> is not automatically the causal curve.</p>
-<div id="207b599b" class="cell" data-execution_count="4">
+<div id="69e80946" class="cell" data-execution_count="4">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>t_values <span class="op">=</span> t[<span class="st">"t0"</span>].to_numpy()</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>y_values <span class="op">=</span> y[<span class="st">"y"</span>].to_numpy()</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>bin_edges <span class="op">=</span> np.linspace(<span class="bu">float</span>(t[<span class="st">"t0"</span>].<span class="bu">min</span>()), <span class="bu">float</span>(t[<span class="st">"t0"</span>].<span class="bu">max</span>()), <span class="dv">15</span>)</span>
@@ -556,7 +556,7 @@ Note
 <span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>bin_centers <span class="op">=</span> <span class="fl">0.5</span> <span class="op">*</span> (bin_edges[:<span class="op">-</span><span class="dv">1</span>] <span class="op">+</span> bin_edges[<span class="dv">1</span>:])</span>
 <span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>observed_curve <span class="op">=</span> np.array([y_values[bin_ids <span class="op">==</span> i].mean() <span class="cf">if</span> np.<span class="bu">any</span>(bin_ids <span class="op">==</span> i) <span class="cf">else</span> np.nan <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(bin_centers))])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<div id="6e599174" class="cell" data-execution_count="5">
+<div id="05729f23" class="cell" data-execution_count="5">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">8</span>, <span class="fl">4.5</span>))</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>ax.plot(bin_centers, observed_curve, marker<span class="op">=</span><span class="st">"o"</span>, linewidth<span class="op">=</span><span class="fl">1.5</span>, label<span class="op">=</span><span class="st">"Observed mean within bins"</span>)</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>ax.plot(grid[<span class="st">"t0"</span>].to_numpy(), truth, linewidth<span class="op">=</span><span class="fl">2.5</span>, label<span class="op">=</span><span class="st">"Truth"</span>)</span>
@@ -581,7 +581,7 @@ Note
 <h3 class="anchored" data-anchor-id="direct-regressor">Direct regressor</h3>
 <p><code>DirectRegressor</code> fits an outcome model <span class="math inline">\(\hat{m}(x, t) = \hat{E}[Y \mid X=x, T=t]\)</span> and estimates the ADRF by averaging over the covariate distribution:</p>
 <p><span class="math display">\[\hat{\mu}_{DM}(t) = \frac{1}{n} \sum_{i=1}^{n} \hat{m}(X_i,\, t)\]</span></p>
-<div id="dfcca634" class="cell" data-execution_count="6">
+<div id="46f54658" class="cell" data-execution_count="6">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>direct <span class="op">=</span> DirectRegressor(outcome_regressor<span class="op">=</span>LinearRegression())</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>_ <span class="op">=</span> direct.fit(X, t, y)</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>direct_curve <span class="op">=</span> np.asarray(direct.predict(X, grid), dtype<span class="op">=</span><span class="bu">float</span>).reshape(<span class="op">-</span><span class="dv">1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -595,7 +595,7 @@ Note
 <p>and then fits an outcome model on the pair <span class="math inline">\((\hat{g}_i, T_i)\)</span> using out-of-fold scores during training. At prediction time, it recomputes the score at each requested treatment value and averages the fitted outcome model over the observed covariate sample:</p>
 <p><span class="math display">\[\hat{\mu}_{GPS}(t) = \frac{1}{n} \sum_{i=1}^{n} \hat{m}(\hat{g}(X_i, t),\, t)\]</span></p>
 <p>In this example, <code>PermutationWeighting</code> supplies the treatment score. Because that density estimator returns a stabilized ratio, the GPS features here are built from a density-ratio estimate rather than a normalized conditional density:</p>
-<div id="a899bb9b" class="cell" data-execution_count="7">
+<div id="97db00d3" class="cell" data-execution_count="7">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>permutation_weighting <span class="op">=</span> PermutationWeighting(</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    classifier<span class="op">=</span>RandomForestClassifier(</span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>        n_estimators<span class="op">=</span><span class="dv">200</span>,</span>
@@ -633,7 +633,7 @@ Important
 <p>Despite the weighting intuition often used to motivate generalized propensity scores, the current <code>GPS</code> implementation in <code>skcausal</code> does <strong>not</strong> estimate the ADRF by reweighting observations. It trains an outcome regressor on the score-and-treatment features produced by <code>predict_density</code>.</p>
 </div>
 </div>
-<div id="33051199" class="cell" data-execution_count="8">
+<div id="63b72570" class="cell" data-execution_count="8">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.ensemble <span class="im">import</span> RandomForestRegressor</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>gps <span class="op">=</span> GPS(</span>
@@ -649,7 +649,7 @@ Important
 </section>
 <section id="step-5-plot-the-response-curves" class="level2">
 <h2 class="anchored" data-anchor-id="step-5-plot-the-response-curves">Step 5: Plot the response curves</h2>
-<div id="135be446" class="cell" data-execution_count="9">
+<div id="50e82cd4" class="cell" data-execution_count="9">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>grid_values <span class="op">=</span> grid[<span class="st">"t0"</span>].to_numpy()</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">8</span>, <span class="dv">5</span>))</span>
@@ -673,7 +673,7 @@ Important
 </section>
 <section id="step-6-compare-numerically" class="level2">
 <h2 class="anchored" data-anchor-id="step-6-compare-numerically">Step 6: Compare numerically</h2>
-<div id="15d8b44f" class="cell" data-execution_count="10">
+<div id="19343395" class="cell" data-execution_count="10">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>pl.DataFrame(</span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    {</span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>        <span class="st">"estimator"</span>: [<span class="st">"DirectRegressor"</span>, <span class="st">"GPS"</span>],</span>
@@ -710,7 +710,7 @@ Important
 </tr>
 <tr class="even">
 <td>"GPS"</td>
-<td>0.361912</td>
+<td>0.388378</td>
 </tr>
 </tbody>
 </table>
