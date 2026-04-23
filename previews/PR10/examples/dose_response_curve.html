@@ -312,7 +312,7 @@ window.Quarto = {
 </section>
 <section id="step-1-import-dependencies" class="level2">
 <h2 class="anchored" data-anchor-id="step-1-import-dependencies">Step 1: Import dependencies</h2>
-<div id="790b7563" class="cell" data-execution_count="1">
+<div id="1592fc45" class="cell" data-execution_count="1">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> polars <span class="im">as</span> pl</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
@@ -388,7 +388,7 @@ window.Quarto = {
 <section id="step-2-define-spline-regression-helpers" class="level2">
 <h2 class="anchored" data-anchor-id="step-2-define-spline-regression-helpers">Step 2: Define spline regression helpers</h2>
 <p>The doubly robust estimator needs flexible regressors to capture <code>SyntheticDataset2</code>’s nonlinear response. These helpers build sklearn pipelines that expand the treatment column into spline basis functions:</p>
-<div id="4eba1c26" class="cell" data-execution_count="2">
+<div id="db0ad31a" class="cell" data-execution_count="2">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> make_joint_spline_regressor(treatment_column: <span class="bu">str</span>):</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Spline-expand T; pass X through unchanged</span></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    preprocessor <span class="op">=</span> ColumnTransformer(</span>
@@ -400,7 +400,7 @@ window.Quarto = {
 <span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    )</span>
 <span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> make_pipeline(preprocessor, LinearRegression())</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<div id="3eea3723" class="cell" data-execution_count="3">
+<div id="1f69fb15" class="cell" data-execution_count="3">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> make_treatment_spline_regressor(treatment_column: <span class="bu">str</span>):</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Spline-expand T only; drop X entirely</span></span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    preprocessor <span class="op">=</span> ColumnTransformer(</span>
@@ -432,7 +432,7 @@ Tip
 </section>
 <section id="step-3-load-the-data-and-build-the-evaluation-grid" class="level2">
 <h2 class="anchored" data-anchor-id="step-3-load-the-data-and-build-the-evaluation-grid">Step 3: Load the data and build the evaluation grid</h2>
-<div id="e2c89b1b" class="cell" data-execution_count="4">
+<div id="0f2a886b" class="cell" data-execution_count="4">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>dataset <span class="op">=</span> SyntheticDataset2(n<span class="op">=</span><span class="dv">2000</span>, n_features<span class="op">=</span><span class="dv">6</span>, random_state<span class="op">=</span><span class="dv">0</span>)</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>X, t, y <span class="op">=</span> dataset.retrieve()</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -537,7 +537,7 @@ Tip
 <section id="step-4-inspect-the-raw-data" class="level2">
 <h2 class="anchored" data-anchor-id="step-4-inspect-the-raw-data">Step 4: Inspect the raw data</h2>
 <p>Before fitting, plot the observed data against the true curve to see how much confounding is present:</p>
-<div id="41bbfc45" class="cell" data-execution_count="5">
+<div id="05237b29" class="cell" data-execution_count="5">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">8</span>, <span class="dv">5</span>))</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>ax.scatter(t[<span class="st">"t_0"</span>].to_numpy(), y[<span class="st">"y"</span>].to_numpy(), s<span class="op">=</span><span class="dv">12</span>, alpha<span class="op">=</span><span class="fl">0.2</span>, label<span class="op">=</span><span class="st">"Observed data"</span>)</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>ax.plot(grid_values, true_curve, linewidth<span class="op">=</span><span class="fl">2.5</span>, label<span class="op">=</span><span class="st">"Truth"</span>)</span>
@@ -561,7 +561,7 @@ Tip
 <section id="baseline-ignore-covariates" class="level3">
 <h3 class="anchored" data-anchor-id="baseline-ignore-covariates">1. Baseline: ignore covariates</h3>
 <p><code>DirectNoCovariates</code> fits <span class="math inline">\(E[Y \mid T]\)</span> without including <code>X</code>. This is the naive estimator — useful only as a baseline to measure the cost of ignoring confounding:</p>
-<div id="4e3c47ac" class="cell" data-execution_count="6">
+<div id="771e0fce" class="cell" data-execution_count="6">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>naive <span class="op">=</span> DirectNoCovariates(</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    outcome_regressor<span class="op">=</span>HistGradientBoostingRegressor(</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>        random_state<span class="op">=</span><span class="dv">0</span>, max_depth<span class="op">=</span><span class="dv">3</span>, max_iter<span class="op">=</span><span class="dv">120</span>,</span>
@@ -587,7 +587,7 @@ Warning
 <section id="outcome-regression-with-covariates" class="level3">
 <h3 class="anchored" data-anchor-id="outcome-regression-with-covariates">2. Outcome regression with covariates</h3>
 <p><code>DirectRegressor</code> models the outcome as a function of both <code>X</code> and <code>T</code>. Including <code>X</code> removes the portion of outcome variation explained by covariates:</p>
-<div id="6cbbeb22" class="cell" data-execution_count="7">
+<div id="c3c5390f" class="cell" data-execution_count="7">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>direct <span class="op">=</span> DirectRegressor(</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    outcome_regressor<span class="op">=</span>HistGradientBoostingRegressor(</span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>        random_state<span class="op">=</span><span class="dv">0</span>, max_depth<span class="op">=</span><span class="dv">4</span>, max_iter<span class="op">=</span><span class="dv">160</span>,</span>
@@ -601,7 +601,7 @@ Warning
 <section id="generalized-propensity-score-gps" class="level3">
 <h3 class="anchored" data-anchor-id="generalized-propensity-score-gps">3. Generalized propensity score (GPS)</h3>
 <p><code>GPS</code> takes an alternative route: it first estimates a treatment score from <code>predict_density(X, T)</code> and then fits an outcome model on that score together with the treatment value. In this walkthrough, <code>PermutationWeighting</code> supplies the score, so the outcome model is adjusted using a stabilized density-ratio estimate rather than a normalized conditional density.</p>
-<div id="f128137c" class="cell" data-execution_count="8">
+<div id="428ae657" class="cell" data-execution_count="8">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>gps_density <span class="op">=</span> PermutationWeighting(</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    classifier<span class="op">=</span>RandomForestClassifier(</span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>        n_estimators<span class="op">=</span><span class="dv">200</span>, min_samples_leaf<span class="op">=</span><span class="dv">5</span>, random_state<span class="op">=</span><span class="dv">0</span>,</span>
@@ -626,7 +626,7 @@ Warning
 <section id="doubly-robust-pseudo-outcome" class="level3">
 <h3 class="anchored" data-anchor-id="doubly-robust-pseudo-outcome">4. Doubly robust pseudo-outcome</h3>
 <p><code>DoublyRobustPseudoOutcome</code> combines an outcome model and a treatment-density model. Under the method’s identification and nuisance-model assumptions, the pseudo-outcome construction can remain consistent if either nuisance component is correctly specified. Spline regressors keep the fitted curve smooth:</p>
-<div id="359c36c5" class="cell" data-execution_count="9">
+<div id="491bc8cf" class="cell" data-execution_count="9">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>dr_density <span class="op">=</span> PermutationWeighting(</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    classifier<span class="op">=</span>RandomForestClassifier(</span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>        n_estimators<span class="op">=</span><span class="dv">200</span>,</span>
@@ -654,7 +654,7 @@ Warning
 </section>
 <section id="final-comparison-chart" class="level2">
 <h2 class="anchored" data-anchor-id="final-comparison-chart">Final comparison chart</h2>
-<div id="101e2933" class="cell" data-execution_count="10">
+<div id="623d9f13" class="cell" data-execution_count="10">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">8</span>, <span class="dv">5</span>))</span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>ax.scatter(t[<span class="st">"t_0"</span>].to_numpy(), y[<span class="st">"y"</span>].to_numpy(), s<span class="op">=</span><span class="dv">12</span>, alpha<span class="op">=</span><span class="fl">0.15</span>, label<span class="op">=</span><span class="st">"Observed data"</span>)</span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>ax.plot(grid_values, true_curve, linewidth<span class="op">=</span><span class="fl">2.5</span>, label<span class="op">=</span><span class="st">"Truth"</span>)</span>
@@ -679,7 +679,7 @@ Warning
 <section id="error-profile-by-treatment-value" class="level2">
 <h2 class="anchored" data-anchor-id="error-profile-by-treatment-value">Error profile by treatment value</h2>
 <p>The final chart shows the curves directly. The next plot turns that same comparison into absolute error, which makes it easier to see <em>where</em> each estimator fails along the treatment range.</p>
-<div id="eb3a86fb" class="cell" data-execution_count="11">
+<div id="c0ef7461" class="cell" data-execution_count="11">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">8</span>, <span class="fl">4.5</span>))</span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>ax.plot(grid_values, np.<span class="bu">abs</span>(naive_curve <span class="op">-</span> true_curve), linewidth<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="st">"DirectNoCovariates"</span>)</span>
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>ax.plot(grid_values, np.<span class="bu">abs</span>(direct_curve <span class="op">-</span> true_curve), linewidth<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="st">"DirectRegressor"</span>)</span>
@@ -701,7 +701,7 @@ Warning
 </section>
 <section id="error-table" class="level2">
 <h2 class="anchored" data-anchor-id="error-table">Error table</h2>
-<div id="469c3e36" class="cell" data-execution_count="12">
+<div id="bd63504a" class="cell" data-execution_count="12">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>pl.DataFrame(</span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    {</span>
 <span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>        <span class="st">"estimator"</span>: [</span>

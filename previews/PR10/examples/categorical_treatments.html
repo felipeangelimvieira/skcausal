@@ -334,7 +334,7 @@ Note
 </section>
 <section id="step-1-import-dependencies" class="level2">
 <h2 class="anchored" data-anchor-id="step-1-import-dependencies">Step 1: Import dependencies</h2>
-<div id="5ebf63f3" class="cell" data-execution_count="1">
+<div id="8f6df478" class="cell" data-execution_count="1">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> polars <span class="im">as</span> pl</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
@@ -405,7 +405,7 @@ Note
 <h2 class="anchored" data-anchor-id="step-2-generate-confounded-data">Step 2: Generate confounded data</h2>
 <section id="a.-create-covariates" class="level3">
 <h3 class="anchored" data-anchor-id="a.-create-covariates">2a. Create covariates</h3>
-<div id="832cd578" class="cell" data-execution_count="2">
+<div id="b72f0ff2" class="cell" data-execution_count="2">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>rng <span class="op">=</span> np.random.default_rng(<span class="dv">0</span>)</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>X <span class="op">=</span> pl.DataFrame(</span>
@@ -420,7 +420,7 @@ Note
 <section id="b.-assign-treatments-with-confounding" class="level3">
 <h3 class="anchored" data-anchor-id="b.-assign-treatments-with-confounding">2b. Assign treatments — with confounding</h3>
 <p>Treatment is assigned by thresholding a linear score that depends on <code>x0</code> and <code>x1</code>:</p>
-<div id="1d2d1187" class="cell" data-execution_count="3">
+<div id="aefce963" class="cell" data-execution_count="3">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>score <span class="op">=</span> X[<span class="st">"x0"</span>].to_numpy() <span class="op">-</span> <span class="fl">0.5</span> <span class="op">*</span> X[<span class="st">"x1"</span>].to_numpy() <span class="op">+</span> rng.normal(scale<span class="op">=</span><span class="fl">0.4</span>, size<span class="op">=</span><span class="dv">500</span>)</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>labels <span class="op">=</span> np.where(score <span class="op">&gt;</span> <span class="fl">0.6</span>, <span class="st">"treated"</span>, np.where(score <span class="op">&lt;</span> <span class="op">-</span><span class="fl">0.6</span>, <span class="st">"placebo"</span>, <span class="st">"control"</span>))</span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>t <span class="op">=</span> pl.Series(<span class="st">"treatment"</span>, labels).cast(pl.Categorical).to_frame()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -442,7 +442,7 @@ Important
 <section id="c.-define-the-true-treatment-effects" class="level3">
 <h3 class="anchored" data-anchor-id="c.-define-the-true-treatment-effects">2c. Define the true treatment effects</h3>
 <p>The data-generating process adds a fixed constant for each treatment level:</p>
-<div id="4d246ae4" class="cell" data-execution_count="4">
+<div id="69c4f68b" class="cell" data-execution_count="4">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>treatment_effects <span class="op">=</span> {</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">"control"</span>: <span class="fl">0.0</span>,</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">"placebo"</span>: <span class="op">-</span><span class="fl">0.5</span>,</span>
@@ -453,7 +453,7 @@ Important
 </section>
 <section id="d.-generate-outcomes" class="level3">
 <h3 class="anchored" data-anchor-id="d.-generate-outcomes">2d. Generate outcomes</h3>
-<div id="3cc20bbd" class="cell" data-execution_count="5">
+<div id="e377e056" class="cell" data-execution_count="5">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>y <span class="op">=</span> pl.DataFrame(</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    {</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>        <span class="st">"y"</span>: <span class="fl">0.8</span> <span class="op">*</span> X[<span class="st">"x0"</span>].to_numpy()</span>
@@ -528,14 +528,14 @@ Important
 </section>
 <section id="step-3-define-treatment-levels-and-prediction-helpers" class="level2">
 <h2 class="anchored" data-anchor-id="step-3-define-treatment-levels-and-prediction-helpers">Step 3: Define treatment levels and prediction helpers</h2>
-<div id="85e8b022" class="cell" data-execution_count="6">
+<div id="8dc64635" class="cell" data-execution_count="6">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>levels <span class="op">=</span> (</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    pl.DataFrame({<span class="st">"treatment"</span>: [<span class="st">"control"</span>, <span class="st">"placebo"</span>, <span class="st">"treated"</span>]})</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    .with_columns(pl.col(<span class="st">"treatment"</span>).cast(pl.Categorical))</span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>As in the binary guide, the predict API requires <code>X</code> and the treatment table to have the same number of rows:</p>
-<div id="dd8c007a" class="cell" data-execution_count="7">
+<div id="52f09ff9" class="cell" data-execution_count="7">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> repeat_levels_to_match_X(levels: pl.DataFrame, n_rows: <span class="bu">int</span>) <span class="op">-&gt;</span> pl.DataFrame:</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    repeats <span class="op">=</span> (n_rows <span class="op">+</span> levels.height <span class="op">-</span> <span class="dv">1</span>) <span class="op">//</span> levels.height</span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> pl.concat([levels] <span class="op">*</span> repeats, how<span class="op">=</span><span class="st">"vertical"</span>).head(n_rows)</span>
@@ -555,7 +555,7 @@ Important
 <section id="step-4-compute-the-truth" class="level2">
 <h2 class="anchored" data-anchor-id="step-4-compute-the-truth">Step 4: Compute the truth</h2>
 <p>Because this is a synthetic dataset, we can compute the true average potential outcome analytically — the mean covariate effect plus the known treatment constant:</p>
-<div id="2a407f2f" class="cell" data-execution_count="8">
+<div id="2261d8b8" class="cell" data-execution_count="8">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>truth <span class="op">=</span> (</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    pl.DataFrame(</span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>        {</span>
@@ -575,7 +575,7 @@ Important
 <section id="direct-method" class="level3">
 <h3 class="anchored" data-anchor-id="direct-method">Direct method</h3>
 <p><code>CategoricalDirectMethod</code> fits a regression model for <span class="math inline">\(E[Y \mid X, T]\)</span> and averages predictions at each treatment level. It relies entirely on the outcome model — no propensity model is needed or fitted:</p>
-<div id="d546619c" class="cell" data-execution_count="9">
+<div id="b04e5056" class="cell" data-execution_count="9">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>direct <span class="op">=</span> CategoricalDirectMethod(outcome_regressor<span class="op">=</span>LinearRegression())</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>_ <span class="op">=</span> direct.fit(X, t, y)</span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>direct_summary <span class="op">=</span> summarize_level_predictions(direct, X, levels, <span class="st">"direct"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -585,7 +585,7 @@ Important
 <section id="inverse-propensity-weighting" class="level3">
 <h3 class="anchored" data-anchor-id="inverse-propensity-weighting">Inverse propensity weighting</h3>
 <p><code>CategoricalInversePropensityWeighting</code> uses inverse-probability-style correction terms derived from <span class="math inline">\(P(T = j \mid X)\)</span>. With the default <code>target_density_kind="stabilized"</code> used here, the effective correction scale is <span class="math inline">\(P(T=j) / P(T=j \mid X)\)</span> rather than a raw <span class="math inline">\(1 / P(T=j \mid X)\)</span> weight. It requires a propensity model:</p>
-<div id="8be508e1" class="cell" data-execution_count="10">
+<div id="34215817" class="cell" data-execution_count="10">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>density_estimator <span class="op">=</span> SklearnCategoricalDensity(LogisticRegression(max_iter<span class="op">=</span><span class="dv">1000</span>))</span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>ipw <span class="op">=</span> CategoricalInversePropensityWeighting(density_estimator<span class="op">=</span>density_estimator)</span>
@@ -609,7 +609,7 @@ Warning
 <section id="doubly-robust" class="level3">
 <h3 class="anchored" data-anchor-id="doubly-robust">Doubly robust</h3>
 <p><code>CategoricalDoublyRobust</code> combines the outcome model and the propensity model. A residual correction from the treatment model adjusts the direct estimate; under the identification conditions above, the estimator is designed to remain consistent if either nuisance model is correctly specified:</p>
-<div id="dd612f9a" class="cell" data-execution_count="11">
+<div id="e382fb06" class="cell" data-execution_count="11">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>dr <span class="op">=</span> CategoricalDoublyRobust(</span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>    density_estimator<span class="op">=</span>density_estimator,</span>
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    outcome_regressor<span class="op">=</span>LinearRegression(),</span>
@@ -634,7 +634,7 @@ Tip
 </section>
 <section id="step-6-compare-to-the-truth" class="level2">
 <h2 class="anchored" data-anchor-id="step-6-compare-to-the-truth">Step 6: Compare to the truth</h2>
-<div id="ec9a8732" class="cell" data-execution_count="12">
+<div id="e2ae3212" class="cell" data-execution_count="12">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>observed_means <span class="op">=</span> (</span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    t.with_columns(y[<span class="st">"y"</span>])</span>
 <span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    .group_by(<span class="st">"treatment"</span>)</span>
@@ -710,7 +710,7 @@ Tip
 </div>
 </div>
 <p>Each row is the estimated average potential outcome under one treatment level. Values close to <code>truth</code> indicate a well-calibrated estimator.</p>
-<div id="f0e58470" class="cell" data-execution_count="13">
+<div id="f75079ef" class="cell" data-execution_count="13">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>plot_frame <span class="op">=</span> comparison.with_columns(pl.col(<span class="st">"treatment"</span>).cast(pl.Utf8))</span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>labels <span class="op">=</span> plot_frame[<span class="st">"treatment"</span>].to_list()</span>
 <span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>x <span class="op">=</span> np.arange(<span class="bu">len</span>(labels))</span>
