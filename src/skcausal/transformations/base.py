@@ -139,7 +139,6 @@ class SklearnBaseTransformation(BaseTransformation):
 
     _tags = {
         "backend": "pandas",
-        "soft_dependencies": ["scikit-learn"],
     }
 
     def __init__(self, transformer):
