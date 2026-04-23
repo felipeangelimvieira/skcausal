@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>About skcausal – skcausal</title>
+<title>3&nbsp; Estimator Contract – skcausal Book</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -23,6 +23,41 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
 </style>
 
 
@@ -33,6 +68,8 @@ ul.task-list li input[type="checkbox"] {
 <script src="site_libs/quarto-search/fuse.min.js"></script>
 <script src="site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="./">
+<link href="./continuous-workflows.html" rel="next">
+<link href="./getting-started.html" rel="prev">
 <script src="site_libs/quarto-html/quarto.js" type="module"></script>
 <script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
 <script src="site_libs/quarto-html/popper.min.js"></script>
@@ -42,19 +79,20 @@ ul.task-list li input[type="checkbox"] {
 <link href="site_libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-6dce83697ef593b6f21f66f8d1a1696b.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-c25b1cc7189173f1b155a78bf3851d93.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
-  "location": "navbar",
+  "location": "sidebar",
   "copy-button": false,
   "collapse-after": 3,
-  "panel-placement": "end",
+  "panel-placement": "start",
   "type": "textbox",
-  "limit": 5,
+  "limit": 50,
   "keyboard-shortcut": [
     "f",
     "/",
     "s"
   ],
+  "show-item-context": false,
   "language": {
     "search-no-results-text": "No results",
     "search-matching-documents-text": "matching documents",
@@ -70,148 +108,199 @@ ul.task-list li input[type="checkbox"] {
   }
 }</script>
 <style>html{ scroll-behavior: smooth; }</style>
+<meta name="mermaid-theme" content="neutral">
+<script src="site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
 
 
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="book.css">
 </head>
 
-<body class="nav-fixed quarto-light">
+<body class="nav-sidebar floating quarto-light">
 
 <div id="quarto-search-results"></div>
-  <header id="quarto-header" class="headroom fixed-top quarto-banner">
-    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
-      <div class="navbar-container container-fluid">
-      <div class="navbar-brand-container mx-auto">
-    <a class="navbar-brand" href="./index.html">
-    <span class="navbar-title">skcausal</span>
-    </a>
-  </div>
-            <div id="quarto-search" class="" title="Search"></div>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
-  <span class="navbar-toggler-icon"></span>
-</button>
-          <div class="collapse navbar-collapse" id="navbarCollapse">
-            <ul class="navbar-nav navbar-nav-scroll me-auto">
-  <li class="nav-item dropdown ">
-    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-examples" role="link" data-bs-toggle="dropdown" aria-expanded="false">
- <span class="menu-text">Examples</span>
-    </a>
-    <ul class="dropdown-menu" aria-labelledby="nav-menu-examples">    
-        <li>
-    <a class="dropdown-item" href="./examples/index.html">
- <span class="dropdown-text">Overview</span></a>
-  </li>  
-        <li>
-    <a class="dropdown-item" href="./examples/binary_treatments.html">
- <span class="dropdown-text">Binary Treatments</span></a>
-  </li>  
-        <li>
-    <a class="dropdown-item" href="./examples/continuous_treatments.html">
- <span class="dropdown-text">Continuous Treatments</span></a>
-  </li>  
-        <li>
-    <a class="dropdown-item" href="./examples/categorical_treatments.html">
- <span class="dropdown-text">Categorical Treatments</span></a>
-  </li>  
-        <li>
-    <a class="dropdown-item" href="./examples/dose_response_curve.html">
- <span class="dropdown-text">SyntheticDataset2 Walkthrough</span></a>
-  </li>  
-    </ul>
-  </li>
-  <li class="nav-item dropdown ">
-    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-density" role="link" data-bs-toggle="dropdown" aria-expanded="false">
- <span class="menu-text">Density</span>
-    </a>
-    <ul class="dropdown-menu" aria-labelledby="nav-menu-density">    
-        <li>
-    <a class="dropdown-item" href="./density/index.html">
- <span class="dropdown-text">Overview</span></a>
-  </li>  
-        <li>
-    <a class="dropdown-item" href="./density/continuous.html">
- <span class="dropdown-text">Continuous Treatments</span></a>
-  </li>  
-    </ul>
-  </li>
-  <li class="nav-item">
-    <a class="nav-link active" href="./about.html" aria-current="page"> 
-<span class="menu-text">About</span></a>
-  </li>  
-</ul>
-            <ul class="navbar-nav navbar-nav-scroll ms-auto">
-  <li class="nav-item compact">
-    <a class="nav-link" href="https://github.com/felipeangelimvieira/skcausal"> <i class="bi bi-github" role="img" aria-label="GitHub repository">
-</i> 
-<span class="menu-text"></span></a>
-  </li>  
-</ul>
-          </div> <!-- /navcollapse -->
-            <div class="quarto-navbar-tools">
-</div>
-      </div> <!-- /container-fluid -->
-    </nav>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./estimator-contract.html"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">Estimator Contract</span></a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
 </header>
 <!-- content -->
-<header id="title-block-header" class="quarto-title-block default page-columns page-full">
-  <div class="quarto-title-banner page-columns page-full">
-    <div class="quarto-title column-page">
-      <h1 class="title">About skcausal</h1>
-            <p class="subtitle lead">A modern causal inference toolkit organized around one clear estimator contract.</p>
-                      </div>
-  </div>
-    
-  
-  <div class="quarto-title-meta column-page">
-
-      
-    
-      
-    </div>
-    
-  
-  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-full page-navbar">
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
 <!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="./">skcausal Book</a> 
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">1</span>&nbsp; <span class="chapter-title">Welcome</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./getting-started.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Getting Started</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./estimator-contract.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">Estimator Contract</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./continuous-workflows.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Continuous Workflows</span></span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
 <!-- margin-sidebar -->
-    
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#one-interface-different-estimands" id="toc-one-interface-different-estimands" class="nav-link active" data-scroll-target="#one-interface-different-estimands"><span class="header-section-number">3.1</span> One Interface, Different Estimands</a></li>
+  <li><a href="#prediction-requires-a-requested-treatment-table" id="toc-prediction-requires-a-requested-treatment-table" class="nav-link" data-scroll-target="#prediction-requires-a-requested-treatment-table"><span class="header-section-number">3.2</span> Prediction Requires A Requested Treatment Table</a></li>
+  <li><a href="#density-outputs-need-interpretation-discipline" id="toc-density-outputs-need-interpretation-discipline" class="nav-link" data-scroll-target="#density-outputs-need-interpretation-discipline"><span class="header-section-number">3.3</span> Density Outputs Need Interpretation Discipline</a></li>
+  <li><a href="#reading-the-examples-correctly" id="toc-reading-the-examples-correctly" class="nav-link" data-scroll-target="#reading-the-examples-correctly"><span class="header-section-number">3.4</span> Reading The Examples Correctly</a></li>
+  </ul>
+</nav>
+    </div>
 <!-- main -->
-<main class="content quarto-banner-title-block column-page" id="quarto-document-content">
+<main class="content" id="quarto-document-content">
 
-
-
-
-
-<div class="surface-section">
-<p><code>skcausal</code> is a Python library for causal inference workflows that tries to keep three things explicit: the treatment type, the estimator contract, and the quantity returned by the model. The documentation follows the same structure so users can move from binary effects to density-based continuous treatments without relearning the whole interface.</p>
-</div>
-<p><span class="section-kicker"><code>Design principles</code></span> ## Why The Docs Are Structured This Way</p>
-<div class="feature-grid">
-<section id="treatment-type-comes-first" class="level3 feature-card">
-<h3 class="anchored" data-anchor-id="treatment-type-comes-first">Treatment type comes first</h3>
-<p>Binary, categorical, and continuous treatments correspond to different estimator families and different prediction semantics.</p>
-</section>
-<section id="returned-quantities-stay-explicit" class="level3 feature-card">
-<h3 class="anchored" data-anchor-id="returned-quantities-stay-explicit">Returned quantities stay explicit</h3>
-<p>The docs call out whether a model returns an average potential outcome, a response curve, a conditional density, or a stabilized ratio.</p>
-</section>
-<section id="estimators-are-composable" class="level3 feature-card">
-<h3 class="anchored" data-anchor-id="estimators-are-composable">Estimators are composable</h3>
-<p>Outcome models, treatment models, and density estimators are documented as separate pieces so users can see how the full workflow is assembled.</p>
-</section>
-<section id="examples-stay-practical" class="level3 feature-card">
-<h3 class="anchored" data-anchor-id="examples-stay-practical">Examples stay practical</h3>
-<p>The guides use example-ready <code>polars.DataFrame</code> inputs and familiar <code>scikit-learn</code> components so the examples are easy to adapt.</p>
-</section>
-</div>
-<p><span class="section-kicker"><code>Explore the project</code></span> ## Useful Starting Points</p>
-<div class="button-row">
-<p><a href="https://github.com/felipeangelimvieira/skcausal" class="hero-button hero-button-primary">View the repository</a> <a href="./examples/index.html" class="hero-button hero-button-secondary">Browse the examples hub</a> <a href="./density/index.html" class="hero-button hero-button-secondary">Read the density overview</a></p>
-</div>
-<div class="surface-section">
-<p>The goal is not just to expose more estimators. It is to make the causal question, the treatment representation, and the model output easy to understand before you trust the result.</p>
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">Estimator Contract</span></h1>
 </div>
 
 
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>The package is organized around a small public contract: fit on observed data, then predict at requested treatment levels or treatment grids.</p>
+<section id="one-interface-different-estimands" class="level2" data-number="3.1">
+<h2 data-number="3.1" class="anchored" data-anchor-id="one-interface-different-estimands"><span class="header-section-number">3.1</span> One Interface, Different Estimands</h2>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">flowchart TD
+  A["Binary or categorical treatment"] --&gt; B["Average potential outcomes"]
+  C["Continuous treatment"] --&gt; D["Average dose-response function"]
+  E["Density estimator"] --&gt; F["Treatment assignment score"]
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>The method names stay compact, but the returned quantity depends on the estimator family.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Family</th>
+<th>Typical output</th>
+<th>Interpretation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Categorical response estimators</td>
+<td>One value per requested treatment level</td>
+<td>Average potential outcome</td>
+</tr>
+<tr class="even">
+<td>Continuous response estimators</td>
+<td>One value per requested grid point</td>
+<td>Average dose-response function</td>
+</tr>
+<tr class="odd">
+<td>Density estimators</td>
+<td>One value per observed row</td>
+<td>Treatment density or stabilized density ratio</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="prediction-requires-a-requested-treatment-table" class="level2" data-number="3.2">
+<h2 data-number="3.2" class="anchored" data-anchor-id="prediction-requires-a-requested-treatment-table"><span class="header-section-number">3.2</span> Prediction Requires A Requested Treatment Table</h2>
+<p>The package does not treat prediction as “just give me <code>X</code>”. It treats prediction as “give me <code>X</code> and the intervention I want to evaluate”.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>estimator.fit(X, t, y)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>estimated_effect <span class="op">=</span> estimator.predict(X, requested_treatment)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>That means the <em>shape</em> of <code>requested_treatment</code> matters:</p>
+<ol type="1">
+<li>For binary or categorical problems, it usually contains a small set of treatment levels.</li>
+<li>For continuous problems, it usually contains a dense treatment grid.</li>
+</ol>
+</section>
+<section id="density-outputs-need-interpretation-discipline" class="level2" data-number="3.3">
+<h2 data-number="3.3" class="anchored" data-anchor-id="density-outputs-need-interpretation-discipline"><span class="header-section-number">3.3</span> Density Outputs Need Interpretation Discipline</h2>
+<p>Not every density-like quantity is a normalized density.</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>In <code>skcausal</code>, some density estimators return a conditional density <code>p(t | x)</code> while others return a stabilized ratio <code>p(t | x) / p(t)</code>. Always check <code>estimator.get_tag("density_kind")</code> before interpreting the output.</p>
+</div>
+</div>
+<p>That distinction is why the density docs separate <code>SkproDensityEstimator</code> from <code>PermutationWeighting</code>.</p>
+</section>
+<section id="reading-the-examples-correctly" class="level2" data-number="3.4">
+<h2 data-number="3.4" class="anchored" data-anchor-id="reading-the-examples-correctly"><span class="header-section-number">3.4</span> Reading The Examples Correctly</h2>
+<p>The examples compare estimators on synthetic datasets, but they are not all trying to estimate the exact same intermediate object. They are trying to estimate the same <strong>causal target</strong>, sometimes through different nuisance models.</p>
+<p>Continue to <a href="./continuous-workflows.html">Continuous Workflows</a> for the cleanest grid-based example.</p>
+
+
+</section>
 
 </main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
@@ -614,20 +703,19 @@ ul.task-list li input[type="checkbox"] {
     }
   });
   </script>
-</div> <!-- /content -->
-<footer class="footer">
-  <div class="nav-footer">
-    <div class="nav-footer-left">
-<p>skcausal</p>
-</div>   
-    <div class="nav-footer-center">
-<p>State-of-the-art unified API for causal inference</p>
-</div>
-    <div class="nav-footer-right">
-<p><a href="https://github.com/felipeangelimvieira/skcausal">GitHub</a></p>
-</div>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="./getting-started.html" class="pagination-link" aria-label="Getting Started">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Getting Started</span></span>
+      </a>          
   </div>
-</footer>
+  <div class="nav-page nav-page-next">
+      <a href="./continuous-workflows.html" class="pagination-link" aria-label="Continuous Workflows">
+        <span class="nav-page-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Continuous Workflows</span></span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav>
+</div> <!-- /content -->
 
 
 

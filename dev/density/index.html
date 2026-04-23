@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>About skcausal – skcausal</title>
+<title>Density Estimators – skcausal</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -23,26 +23,61 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
 </style>
 
 
-<script src="site_libs/quarto-nav/quarto-nav.js"></script>
-<script src="site_libs/quarto-nav/headroom.min.js"></script>
-<script src="site_libs/clipboard/clipboard.min.js"></script>
-<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
-<script src="site_libs/quarto-search/fuse.min.js"></script>
-<script src="site_libs/quarto-search/quarto-search.js"></script>
-<meta name="quarto:offset" content="./">
-<script src="site_libs/quarto-html/quarto.js" type="module"></script>
-<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
-<script src="site_libs/quarto-html/popper.min.js"></script>
-<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
-<script src="site_libs/quarto-html/anchor.min.js"></script>
-<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
-<script src="site_libs/bootstrap/bootstrap.min.js"></script>
-<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-6dce83697ef593b6f21f66f8d1a1696b.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-6dce83697ef593b6f21f66f8d1a1696b.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -71,8 +106,37 @@ ul.task-list li input[type="checkbox"] {
 }</script>
 <style>html{ scroll-behavior: smooth; }</style>
 
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
 
-<link rel="stylesheet" href="styles.css">
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="../styles.css">
 </head>
 
 <body class="nav-fixed quarto-light">
@@ -82,7 +146,7 @@ ul.task-list li input[type="checkbox"] {
     <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
-    <a class="navbar-brand" href="./index.html">
+    <a class="navbar-brand" href="../index.html">
     <span class="navbar-title">skcausal</span>
     </a>
   </div>
@@ -98,23 +162,23 @@ ul.task-list li input[type="checkbox"] {
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-examples">    
         <li>
-    <a class="dropdown-item" href="./examples/index.html">
+    <a class="dropdown-item" href="../examples/index.html">
  <span class="dropdown-text">Overview</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./examples/binary_treatments.html">
+    <a class="dropdown-item" href="../examples/binary_treatments.html">
  <span class="dropdown-text">Binary Treatments</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./examples/continuous_treatments.html">
+    <a class="dropdown-item" href="../examples/continuous_treatments.html">
  <span class="dropdown-text">Continuous Treatments</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./examples/categorical_treatments.html">
+    <a class="dropdown-item" href="../examples/categorical_treatments.html">
  <span class="dropdown-text">Categorical Treatments</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./examples/dose_response_curve.html">
+    <a class="dropdown-item" href="../examples/dose_response_curve.html">
  <span class="dropdown-text">SyntheticDataset2 Walkthrough</span></a>
   </li>  
     </ul>
@@ -125,17 +189,17 @@ ul.task-list li input[type="checkbox"] {
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-density">    
         <li>
-    <a class="dropdown-item" href="./density/index.html">
+    <a class="dropdown-item" href="../density/index.html">
  <span class="dropdown-text">Overview</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./density/continuous.html">
+    <a class="dropdown-item" href="../density/continuous.html">
  <span class="dropdown-text">Continuous Treatments</span></a>
   </li>  
     </ul>
   </li>
   <li class="nav-item">
-    <a class="nav-link active" href="./about.html" aria-current="page"> 
+    <a class="nav-link" href="../about.html"> 
 <span class="menu-text">About</span></a>
   </li>  
 </ul>
@@ -156,8 +220,8 @@ ul.task-list li input[type="checkbox"] {
 <header id="title-block-header" class="quarto-title-block default page-columns page-full">
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-page">
-      <h1 class="title">About skcausal</h1>
-            <p class="subtitle lead">A modern causal inference toolkit organized around one clear estimator contract.</p>
+      <h1 class="title">Density Estimators</h1>
+            <p class="subtitle lead">Model the treatment assignment mechanism explicitly and keep the returned quantity clear.</p>
                       </div>
   </div>
     
@@ -182,33 +246,89 @@ ul.task-list li input[type="checkbox"] {
 
 
 <div class="surface-section">
-<p><code>skcausal</code> is a Python library for causal inference workflows that tries to keep three things explicit: the treatment type, the estimator contract, and the quantity returned by the model. The documentation follows the same structure so users can move from binary effects to density-based continuous treatments without relearning the whole interface.</p>
+<p>Density estimators model the treatment assignment mechanism rather than the outcome model. In <code>skcausal</code>, the public interface stays intentionally small:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>estimator.fit(X, t)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>scores <span class="op">=</span> estimator.predict_density(X, t)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The documented density estimators take <code>polars.DataFrame</code> inputs for both covariates <code>X</code> and treatment <code>t</code>.</p>
 </div>
-<p><span class="section-kicker"><code>Design principles</code></span> ## Why The Docs Are Structured This Way</p>
-<div class="feature-grid">
-<section id="treatment-type-comes-first" class="level3 feature-card">
-<h3 class="anchored" data-anchor-id="treatment-type-comes-first">Treatment type comes first</h3>
-<p>Binary, categorical, and continuous treatments correspond to different estimator families and different prediction semantics.</p>
+<p><span class="section-kicker"><code>Returned quantity</code></span> ## What <code>predict_density</code> Means</p>
+<p><code>skcausal</code> currently exposes two density-like output kinds.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><code>density_kind</code></th>
+<th>Quantity</th>
+<th>Interpretation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>"conditional"</code></td>
+<td><span class="math inline">\(p(t \mid x)\)</span></td>
+<td>A conditional treatment density.</td>
+</tr>
+<tr class="even">
+<td><code>"stabilized"</code></td>
+<td><span class="math inline">\(p(t \mid x) / p(t)\)</span></td>
+<td>A stabilized density ratio on the treatment scale.</td>
+</tr>
+</tbody>
+</table>
+<p>Inspect <code>estimator.get_tag("density_kind")</code> before comparing estimators or choosing an evaluation metric.</p>
+<p><span class="section-kicker"><code>Estimator map</code></span> ## Documented Density Components</p>
+<div class="docs-card-grid">
+<section id="skprodensityestimator" class="level3 docs-card">
+<h3 class="anchored" data-anchor-id="skprodensityestimator">SkproDensityEstimator</h3>
+<p>Use this when you need a proper conditional treatment density from a probabilistic regressor.</p>
 </section>
-<section id="returned-quantities-stay-explicit" class="level3 feature-card">
-<h3 class="anchored" data-anchor-id="returned-quantities-stay-explicit">Returned quantities stay explicit</h3>
-<p>The docs call out whether a model returns an average potential outcome, a response curve, a conditional density, or a stabilized ratio.</p>
+<section id="permutationweighting" class="level3 docs-card">
+<h3 class="anchored" data-anchor-id="permutationweighting">PermutationWeighting</h3>
+<p>Use this when you need a classifier-based stabilized density ratio for single-column continuous treatments.</p>
 </section>
-<section id="estimators-are-composable" class="level3 feature-card">
-<h3 class="anchored" data-anchor-id="estimators-are-composable">Estimators are composable</h3>
-<p>Outcome models, treatment models, and density estimators are documented as separate pieces so users can see how the full workflow is assembled.</p>
+<section id="compositefactorizeddensityestimator" class="level3 docs-card">
+<h3 class="anchored" data-anchor-id="compositefactorizeddensityestimator">CompositeFactorizedDensityEstimator</h3>
+<p>Use this when treatment has multiple columns and you want a factorized or autoregressive density decomposition.</p>
 </section>
-<section id="examples-stay-practical" class="level3 feature-card">
-<h3 class="anchored" data-anchor-id="examples-stay-practical">Examples stay practical</h3>
-<p>The guides use example-ready <code>polars.DataFrame</code> inputs and familiar <code>scikit-learn</code> components so the examples are easy to adapt.</p>
+<section id="evaluate..." class="level3 docs-card">
+<h3 class="anchored" data-anchor-id="evaluate..."><code>evaluate(...)</code></h3>
+<p>Use this when you want cross-validated density scoring with <code>LogLikelihoodMetric()</code> or another explicit metric.</p>
 </section>
 </div>
-<p><span class="section-kicker"><code>Explore the project</code></span> ## Useful Starting Points</p>
+<p><span class="section-kicker"><code>Interpretation</code></span> ## Continuous Estimators In This Guide</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Estimator</th>
+<th>Returns</th>
+<th>Core idea</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>SkproDensityEstimator</code></td>
+<td>Conditional density</td>
+<td>Wrap a skpro probabilistic regressor and evaluate its <code>pdf</code> at the supplied treatment values.</td>
+</tr>
+<tr class="even">
+<td><code>PermutationWeighting</code></td>
+<td>Stabilized density ratio</td>
+<td>Train a classifier to separate observed <code>(X, t)</code> pairs from pairs with permuted treatments.</td>
+</tr>
+</tbody>
+</table>
+<p>Because <code>LogLikelihoodMetric()</code> applies <code>log</code> to the output of <code>predict_density</code>, it is directly interpretable as a log-likelihood when <code>density_kind</code> is <code>"conditional"</code>. For <code>"stabilized"</code> estimators, it becomes a log-score on the returned ratio scale instead.</p>
 <div class="button-row">
-<p><a href="https://github.com/felipeangelimvieira/skcausal" class="hero-button hero-button-primary">View the repository</a> <a href="./examples/index.html" class="hero-button hero-button-secondary">Browse the examples hub</a> <a href="./density/index.html" class="hero-button hero-button-secondary">Read the density overview</a></p>
-</div>
-<div class="surface-section">
-<p>The goal is not just to expose more estimators. It is to make the causal question, the treatment representation, and the model output easy to understand before you trust the result.</p>
+<p><a href="../density/continuous.html" class="hero-button hero-button-primary">Continue to the continuous density guide</a> <a href="../examples/index.html" class="hero-button hero-button-secondary">Open example workflows</a></p>
 </div>
 
 
@@ -632,5 +752,5 @@ ul.task-list li input[type="checkbox"] {
 
 
 
-<script src="site_libs/quarto-html/zenscroll-min.js"></script>
+<script src="../site_libs/quarto-html/zenscroll-min.js"></script>
 </body></html>
