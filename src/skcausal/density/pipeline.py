@@ -121,6 +121,76 @@ class Pipeline(_MetaObjectMixin, BaseDensityEstimator):
             "Pipeline overrides predict_density directly and does not use _predict_density."
         )
 
+    def _set_params(self, attr: str, **params):
+        """Set params while treating step tuples as ``(name, obj, ...)``."""
+        if not params:
+            return self
+
+        # Mirror skbase's reset semantics when we consume replacement params here.
+        params_handled_locally = False
+
+        if attr in params:
+            setattr(self, attr, params.pop(attr))
+            params_handled_locally = True
+
+        items = getattr(self, attr, None)
+        names = []
+        if isinstance(items, dict):
+            names = list(items.keys())
+        elif items and isinstance(items, (list, tuple)):
+            # Pipelines store steps as (name, obj, apply_to), so only read index 0.
+            names = [item[0] for item in items]
+
+        for name in list(params.keys()):
+            if "__" not in name and name in names:
+                self._replace_object(attr, name, params.pop(name))
+                params_handled_locally = True
+
+        # Skip _MetaObjectMixin.set_params because it assumes named objects are 2-tuples.
+        super(_MetaObjectMixin, self).set_params(**params)
+
+        if params_handled_locally and not params:
+            self.reset()
+
+        return self
+
+    def _get_params(self, attr, deep=True, fitted=False):
+        """Get params while treating step tuples as ``(name, obj, ...)``."""
+        if fitted:
+            method_shallow = "_get_fitted_params"
+            method_public = "get_fitted_params"
+            deepkw = {}
+        else:
+            method_shallow = "get_params"
+            method_public = "get_params"
+            deepkw = {"deep": deep}
+
+        # Start from BaseObject/BaseEstimator params, bypassing skbase's 2-tuple coercion.
+        out = getattr(super(_MetaObjectMixin, self), method_shallow)(**deepkw)
+
+        if deep and hasattr(self, attr):
+            named_objects = getattr(self, attr)
+            if isinstance(named_objects, dict):
+                named_objects_ = list(named_objects.items())
+            else:
+                # Expose only (name, obj) to the parameter API while keeping apply_to internal.
+                named_objects_ = [
+                    (obj[0], obj[1])
+                    for obj in named_objects
+                    if isinstance(obj, tuple) and len(obj) >= 2
+                ]
+
+            out.update(named_objects_)
+            for name, obj in named_objects_:
+                cond1 = hasattr(obj, method_public)
+                is_fitted = hasattr(obj, "is_fitted") and obj.is_fitted
+                cond2 = not fitted or is_fitted
+                if cond1 and cond2:
+                    for key, value in getattr(obj, method_public)(**deepkw).items():
+                        out[f"{name}__{key}"] = value
+
+        return out
+
     def _transform_inputs(self, X, t):
         X_transformed, t_transformed = X, t
 

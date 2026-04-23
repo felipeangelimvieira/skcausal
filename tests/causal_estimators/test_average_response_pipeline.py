@@ -189,6 +189,43 @@ def test_pipeline_meta_object_mixin_replaces_step_without_losing_apply_to():
     assert pipeline.steps[0][2] == "y"
 
 
+def test_pipeline_meta_object_mixin_round_trips_get_set_params_without_losing_apply_to():
+    pipeline = Pipeline(
+        steps=[
+            ("transform_y", ShiftAndRenameTransformation(offset=1.0, prefix="y_"), "y"),
+            ("estimator", RecordingAverageResponseEstimator(prediction_value=2.0)),
+        ]
+    )
+
+    params = pipeline.get_params()
+    pipeline.set_params(**params)
+
+    assert pipeline.steps[0][2] == "y"
+    assert pipeline.get_params()["transform_y__offset"] == 1.0
+    assert pipeline.get_params()["estimator__prediction_value"] == 2.0
+
+
+def test_pipeline_meta_object_mixin_replaces_full_steps_without_losing_apply_to():
+    pipeline = Pipeline(
+        steps=[
+            ("transform_X", ShiftAndRenameTransformation(offset=1.0, prefix="x_"), "X"),
+            ("estimator", RecordingAverageResponseEstimator(prediction_value=2.0)),
+        ]
+    )
+
+    replacement_steps = [
+        ("transform_y", ShiftAndRenameTransformation(offset=-2.0, prefix="y_"), "y"),
+        ("estimator", RecordingAverageResponseEstimator(prediction_value=4.0)),
+    ]
+
+    pipeline.set_params(steps=replacement_steps)
+
+    assert pipeline.steps[0][0] == "transform_y"
+    assert pipeline.steps[0][2] == "y"
+    assert pipeline.get_params()["transform_y__offset"] == -2.0
+    assert pipeline.get_params()["estimator__prediction_value"] == 4.0
+
+
 def test_pipeline_get_test_params_are_instantiable():
     test_params = Pipeline.get_test_params()
     if isinstance(test_params, dict):

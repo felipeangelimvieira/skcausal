@@ -168,6 +168,43 @@ def test_pipeline_meta_object_mixin_replaces_step_without_losing_apply_to():
     assert pipeline.steps[0][2] == "X"
 
 
+def test_pipeline_meta_object_mixin_round_trips_get_set_params_without_losing_apply_to():
+    pipeline = Pipeline(
+        steps=[
+            ("transform_X", ShiftAndRenameTransformation(offset=1.0, prefix="x_"), "X"),
+            ("density", NaiveDensityEstimator(epsilon=1e-4)),
+        ]
+    )
+
+    params = pipeline.get_params()
+    pipeline.set_params(**params)
+
+    assert pipeline.steps[0][2] == "X"
+    assert pipeline.get_params()["transform_X__offset"] == 1.0
+    assert pipeline.get_params()["density__epsilon"] == 1e-4
+
+
+def test_pipeline_meta_object_mixin_replaces_full_steps_without_losing_apply_to():
+    pipeline = Pipeline(
+        steps=[
+            ("transform_X", ShiftAndRenameTransformation(offset=1.0, prefix="x_"), "X"),
+            ("density", NaiveDensityEstimator(epsilon=1e-4)),
+        ]
+    )
+
+    replacement_steps = [
+        ("transform_t", ShiftAndRenameTransformation(offset=-2.0, prefix="t_"), "t"),
+        ("density", NaiveDensityEstimator(epsilon=1e-3)),
+    ]
+
+    pipeline.set_params(steps=replacement_steps)
+
+    assert pipeline.steps[0][0] == "transform_t"
+    assert pipeline.steps[0][2] == "t"
+    assert pipeline.get_params()["transform_t__offset"] == -2.0
+    assert pipeline.get_params()["density__epsilon"] == 1e-3
+
+
 def test_pipeline_get_test_params_are_instantiable():
     test_params = Pipeline.get_test_params()
     if isinstance(test_params, dict):
