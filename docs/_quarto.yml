@@ -22,6 +22,8 @@ website:
     left:
 #      - href: book/index.html
 #        text: "Book"
+      - href: learn/learn.qmd
+        text: "15-min theory"
       - text: "Examples"
         menu:
           - href: examples/index.qmd

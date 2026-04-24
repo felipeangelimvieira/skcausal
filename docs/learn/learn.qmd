@@ -1,0 +1,163 @@
+---
+title: "Methodology"
+subtitle: "How causal inference works for multiple treatment types"
+page-layout: full
+toc: true
+---
+
+## Causal Inference Task
+
+Causal Inference is usually taught as a set of methods for estimating the average treatment effect (ATE) of a binary treatment. In `skcausal`, we take a more general view: causal inference is the task of estimating potential outcomes under different treatment types: binary, categorical, or continuous. 
+
+### Problem setting
+
+We formulate the causal problem using potential outcome framework. Let $X$, $T$, $Y$ represent the covariates, treatment, and outcome, respectively, sampled from a joint density $P(X,T,Y)$. We introduce the random variable $Y^*(t)$ to represent the potential outcome that would be observed if the treatment were set to $t$. We can understand this as having a dataframe like the one below, where we do not observe any of the $Y^*(t)$ columns, but we want to estimate them:
+
+| X1 | X2 | T  | Y  | Y*(t=0) | Y*(t=1) | Y*(t=2) |
+|----|----|----|----|---------|---------|---------|
+| 2.0  | 1.0  | 0  | 10  | ?        | ?        | ?        |
+| 2.5  | 0.2  | 1  | 5  | ?        | ?        | ?        |
+| 1.0  | 0.5  | 2  | 15  | ?        | ?        | ?        |
+
+For continuouts treaments, we have "infinite" potential outcomes, one for each possible treatment level. In that case, we can think of $Y^*(t)$ as a function of $t$ that gives us the potential outcome for any treatment level.
+
+One assumption we make is **consistency**: the observed outcome $Y$ is equal to the potential outcome $Y^*(T)$ when the treatment is set to its observed value. Formally, $Y = Y^*(T)$. This means that when we observe for a given unit a treatment level $T=t$ the observed outcome $Y$ corresponds to the potential outcome $Y^*(t)$ for that unit. In other words, we can fill the table below with the observed outcomes:
+
+| X1 | X2 | T  | Y  | Y*(t=0) | Y*(t=1) | Y*(t=2) |
+|----|----|----|----|---------|---------|---------|
+| 2.0  | 1.0  | 0  | 10  | 10       | ?        | ?        |
+| 2.5  | 0.2  | 1  | 5  | ?        | 5        | ?        |
+| 1.0  | 0.5  | 2  | 15  | ?        | ?        | 15       |
+
+Another key assumption is **unconfoundedness**: the potential outcomes are independent of the treatment assignment given the covariates. Formally, $Y^*(t) \perp T \mid X$ for all $t$. All variables influencing treatment assignment and outcomes are measured and accounted for in our covariates $X$.
+
+Our quantity of interest is the Average Response Function (ARF), defined as:
+
+$$
+\mu(t) = \mathbb{E}_P[Y^*(t)]
+$$
+
+Which can be seen as taking the average of the table with the potential outcomes. If this was a sql query, it would look like:
+
+```sql
+SELECT AVG(Y*(t))
+FROM data
+```
+
+But we cannot take the average since we do not observe any of the $Y^*(t)$ columns. 
+
+### Causal inference challenge
+
+The problem is that data distribution from where our samples are obtained $P(X,T,Y) = P(Y|X,T)P(T|X)P(X)$ has the sampling of the treatment $P(T|X)$ dependent on $X$. This means that some units are more likely to receive certain treatment levels than others, which creates bias if we simply take an average of the observed outcomes for each treatment level.
+
+Therefore, a naive and uninformed practitioner might try to ignore $X$ and compute:
+
+$$
+\hat{\mu}(T) = E[Y|T]
+$$
+
+by using a machine learning model that takes $T$ as input and predicts $Y$. This approach would return a number but this number would **certainly** be wrong because of the confounding bias. The goal of causal inference is to find ways to adjust for this bias and estimate the true ARF $\mu(t)$.
+
+Below, we show the main approaches to adjust for confounding bias and estimate the ARF $\mu(t)$.
+
+
+## The three main approaches to adjust for confounding bias
+
+## Direct method
+
+According to our assumption of consistency and unconfoundedness, we can estimate the ARF $\mu(t)$ by first estimating the conditional expectation $\mathbb{E}[Y|X,T]$ of $Y$ given $X$ and $T$ with a model $\hat{\mu}(X,T)$. This is often called the direct approach. We can then take the average of this conditional expectation over the distribution of $X$ to get an estimate of the ARF:
+
+$$
+\hat{\mu}(t) = \mathbb{E}_P[\hat{\mu}(X,t)] \approx \frac{1}{n} \sum_{i=1}^n \hat{\mu}(x_i,t)
+$$
+
+Note that this is true because, if $\hat{\mu}(X,T)$ is a consistent estimator of $\mathbb{E}[Y|X,T]$:
+
+$$
+\mathbb{E}_P[\hat{\mu}(X,t)] \approx \mathbb{E}_P[\mathbb{E}[Y|X,t]] = \mathbb{E}_P[\mathbb{E}[Y^*(t)|X]] = \mu(t)
+$$
+
+## Inverse probability weighting
+
+Another approach is to estimate specific types of densities and use them to remove the bias of our data, by reweighting the samples to look like they came from a randomized experiment. 
+
+// Add an image with X on x-axis and Y on y axis and where there exists normal (non diagonal covariance) of X,T, and with another image with the same X and Y but where the covariance of X,T is diagonal, showing how the reweighting makes the data look like it came from a randomized experiment.
+
+To understand how this method works, we first need to understand what expectation means. Expectation is an integral of a function times a probability density over a domain:
+
+$$
+\mathbb{E}_P[f(X)] = \int_{\mathcal{X}} f(x) P(x) dx
+$$
+
+and in finite samples we approximate it by the average:
+
+$$
+\mathbb{E}_P[f(X)] \approx \frac{1}{n} \sum_{i=1}^n f(x_i)
+$$
+
+where $x_i$ are samples from the distribution $P(X)$.
+
+As we said, the naive conditional mean $\mathbb{E}_P[Y \mid T=t]$ generally cannot be used as the counterfactual response $\mu(t)$. The reason is that it averages outcomes over the covariate distribution of units who actually received treatment level $t$, rather than over the full population distribution of $X$:
+
+$$
+\mathbb{E}_P[Y \mid T=t]
+=
+\int_{\mathcal{X}} \mathbb{E}_P[Y \mid X=x, T=t] P(x \mid T=t) dx.
+$$
+
+Under consistency, unconfoundedness, and positivity, the causal response function is identified as:
+
+$$
+\mu(t)
+=
+\mathbb{E}_P[Y^*(t)]
+=
+\int_{\mathcal{X}} \mathbb{E}_P[Y \mid X=x, T=t] P(x) dx.
+$$
+
+The difference between $P(x \mid T=t)$ and $P(x)$ is what creates confounding bias. Inverse probability weighting addresses this by reweighting observations so that the weighted covariate distribution among units receiving treatment level $t$ resembles the target population distribution. We aim to find a quantity $w(x,t)$ such that:
+
+$$
+\int_{\mathcal{X}} \mathbb{E}_P[Y \mid X=x, T=t] P(x \mid T=t) \cdot w(x,t)dx = \int_{\mathcal{X}} \mathbb{E}_P[Y \mid X=x, T=t] P(x) dx
+$$
+
+We can clearly see that:
+
+$$
+w(X,T) = \frac{P(X)}{P(X \mid T)} = \frac{P(X)}{P(X,T)/P(T)} = \frac{P(T)}{P(X,T)/P(X)} = \frac{P(T)}{P(T \mid X)}
+$$
+
+
+We call this $w(X,T) = \frac{P(T)}{P(T|X)}$ a stabilized propensity score. To translate this into an estimator, we can, for each t, select the samples with $T=t$ and take a weighted average of their outcomes to obtain our counterfactual response:
+
+$$
+\hat{\mu}(t) = \frac{1}{n_t}\sum_{i : t_i = t} w(x_i,t) y_i,\quad n_t = \sum_{i=1}^n \mathbb{1}\{t_i = t\}
+$$
+
+Another approach is to average over all samples, but add an indicator function to only use the samples with $T=t$, zeroing out the contribution of the other samples:
+
+$$              
+  \begin{aligned}                                                                                    
+  &\int_{\mathcal{X}} \mathbb{E}_P[Y \mathbb{1}\{T=t\} \mid X=x, T=t] P(x \mid T=t) \cdot w(x,t)\,dx  \\
+  &= \int_{\mathcal{X}} \mathbb{E}_P[Y \mid X=x, T=t] P(T=t) P(x \mid T=t) \cdot w(x,t)\,dx \\       
+  &= \int_{\mathcal{X}} \mathbb{E}_P[Y \mid X=x, T=t] P(x)\,dx                                       
+  \end{aligned}                                                                                      
+$$  
+
+In this case, our weighting function would be:
+
+$$
+w(X,T)= \frac{P(X)}{P(X\mid T)P(T)} = \frac{P(X)}{P(X,T)} = \frac{1}{P(T|X)}
+$$
+
+which is the inverse propensity score. The corresponding estimator would be:
+
+$$
+\hat{\mu}(t) = \frac{1}{n} \sum_{i=1}^n w(x_i,t) \mathbb{1}\{t_i = t\} y_i
+$$
+
+The difference here is that we do not filter by $T=t$ before taking the average, but we add an indicator function to zero out the contribution of samples with $T \neq t$. 
+
+## Doubly robust methods and Pseudo-outcome regression 
+
+* Explain Kennedy's paper and how doubly robust works. Explain the bias correction term.
