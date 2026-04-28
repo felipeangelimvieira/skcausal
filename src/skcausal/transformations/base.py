@@ -138,6 +138,7 @@ class SklearnBaseTransformation(BaseTransformation):
     """
 
     _tags = {
+        "object_type": ["transformation"],
         "backend": "pandas",
     }
 

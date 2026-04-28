@@ -24,6 +24,7 @@ class BaseAverageCausalResponseEstimator(TreatmentCheckMixin, _BaseEstimator):
     """
 
     _tags = {
+        "object_type": ["average_causal_response_estimator"],
         "backend": "polars",
         "capability:t_type": ["continuous", "categorical"],
         "capability:multidimensional_treatment": False,

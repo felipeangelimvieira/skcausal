@@ -42,6 +42,7 @@ class BaseDensityEstimator(TreatmentCheckMixin, _BaseEstimator):
     """
 
     _tags = {
+        "object_type": ["density_estimator"],
         "backend": "polars",
         "capability:t_type": ["continuous", "categorical"],
         "capability:multidimensional_treatment": False,
