@@ -3,7 +3,9 @@ import polars as pl
 
 def to_dummies(df: pl.DataFrame, column: str) -> pl.DataFrame:
 
-    for cat in df.schema[column].categories[:-1]:
+    categories = df.get_column(column).cat.get_categories().to_list()
+
+    for cat in categories[:-1]:
         df = df.with_columns(
             pl.when(pl.col(column) == cat)
             .then(1)

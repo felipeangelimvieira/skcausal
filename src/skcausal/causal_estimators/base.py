@@ -1,6 +1,7 @@
 """Base classes for ADRF estimations"""
 
 import numpy as np
+import pandas as pd
 import polars as pl
 from skbase.base import BaseEstimator as _BaseEstimator
 from skcausal.datatypes import convert
@@ -28,9 +29,11 @@ class BaseAverageCausalResponseEstimator(TreatmentCheckMixin, _BaseEstimator):
         "backend": "polars",
         "capability:t_type": ["continuous", "categorical"],
         "capability:multidimensional_treatment": False,
+        "capability:predicts_for_new_X": False,
     }
 
-    def __init__(self): ...
+    def __init__(self):
+        super().__init__()
 
     def fit(self, X, t, y):
         """
@@ -59,6 +62,7 @@ class BaseAverageCausalResponseEstimator(TreatmentCheckMixin, _BaseEstimator):
             If not implemented by the subclass.
         """
         X, t, y = self._check_and_transform(X, t, y, is_fit=True)
+        self._X = X
 
         self._fit(X=X, t=t, y=y)
         return self
@@ -90,22 +94,105 @@ class BaseAverageCausalResponseEstimator(TreatmentCheckMixin, _BaseEstimator):
         """
         raise NotImplementedError("This method must be implemented by subclasses.")
 
-    def predict(self, X, t):
+    def predict(self, t, X=None):
         """
         Predict the average response for each treatment value in t.
 
         """
 
-        X, t, _ = self._check_and_transform(X, t, y=None, is_fit=False)
+        t = self._check_and_transform_t(t, is_fit=False)
+        X = self._resolve_predict_X(X, is_fit=False)
 
-        return np.array(self._predict(X, t))
+        return np.array(self._predict(t=t, X=X))
 
-    def _predict(self, X, t):
+    def _predict(self, t, X=None):
         """
         Predict using backend-native inputs.
         """
 
         raise NotImplementedError("This method must be implemented by subclasses.")
+
+    def predict_curve(self, t, X=None):
+        """
+        Predict a response curve for the requested treatment table.
+
+        This is a convenience alias for `predict` that preserves the historical
+        two-dimensional output shape used by the plotting and docs examples.
+        When the estimator predicts for new covariate samples, omitted `X`
+        defaults to the training covariates stored during `fit`.
+
+        Parameters
+        ----------
+        t : DataFrame-like
+            Treatment variable.
+        X : DataFrame-like, optional
+            Input features over which to average the response. If omitted and
+            the estimator predicts for new covariate samples, the training
+            covariates stored during `fit` are reused.
+
+        Returns
+        -------
+        np.ndarray
+            The predicted average response for each treatment value in t.
+        """
+        predicts_for_new_X = self.get_tag("capability:predicts_for_new_X", False)
+
+        if not predicts_for_new_X:
+            predictions = np.asarray(self.predict(t=t, X=None))
+        else:
+            t = self._check_and_transform_t(t, is_fit=False)
+            X = self._resolve_predict_X(X, is_fit=False)
+
+            n_x = self._get_n_samples(X)
+            n_t = self._get_n_samples(t)
+
+            if n_x == 0 or n_t == 0:
+                raise ValueError(
+                    "predict_curve requires X and t to contain at least one sample."
+                )
+
+            x_indices = np.tile(np.arange(n_x, dtype=int), n_t)
+            t_indices = np.repeat(np.arange(n_t, dtype=int), n_x)
+
+            expanded_X = self._take_rows(X, x_indices)
+            expanded_t = self._take_rows(t, t_indices)
+
+            predictions = np.asarray(self.predict(t=expanded_t, X=expanded_X))
+            if predictions.ndim == 0 or predictions.shape[0] != n_x * n_t:
+                raise ValueError(
+                    "predict must return one prediction per expanded X/t row pair."
+                )
+
+            if predictions.ndim == 1:
+                predictions = predictions.reshape(-1, 1)
+            else:
+                predictions = predictions.reshape(predictions.shape[0], -1)
+
+            return predictions.reshape(n_t, n_x, -1).mean(axis=1)
+
+        if predictions.ndim == 0:
+            raise ValueError("predict must return at least one prediction.")
+
+        if predictions.ndim == 1:
+            predictions = predictions.reshape(-1, 1)
+        else:
+            predictions = predictions.reshape(predictions.shape[0], -1)
+
+        return predictions
+
+    def _resolve_predict_X(self, X, is_fit=False):
+        if not self.get_tag("capability:predicts_for_new_X", False):
+            return None
+
+        if X is None:
+            if not hasattr(self, "_X"):
+                raise ValueError(
+                    "X must be provided at predict time unless the estimator has "
+                    "stored training covariates during fit."
+                )
+            X = self._X
+
+        return self._check_and_transform_X(X, is_fit=is_fit)
 
     def _check_and_transform_y(self, y, is_fit=False):
         y = convert(y, self.get_tag("backend"))
@@ -115,6 +202,15 @@ class BaseAverageCausalResponseEstimator(TreatmentCheckMixin, _BaseEstimator):
         X = convert(X, self.get_tag("backend"))
         return X
 
+    def _take_rows(self, value, row_indices):
+        if isinstance(value, np.ndarray):
+            return value[row_indices]
+        if isinstance(value, pl.DataFrame):
+            return value.select(pl.all().gather(row_indices.tolist()))
+        if isinstance(value, (pd.DataFrame, pd.Series)):
+            return value.iloc[row_indices].reset_index(drop=True)
+        raise TypeError(f"Cannot take rows from object of type {type(value).__name__}.")
+
     def _get_n_samples(self, value) -> int:
         if isinstance(value, np.ndarray):
             if value.ndim == 0:
@@ -122,6 +218,8 @@ class BaseAverageCausalResponseEstimator(TreatmentCheckMixin, _BaseEstimator):
                     "Expected array-like input with at least one dimension."
                 )
             return value.shape[0]
+        if isinstance(value, (pd.DataFrame, pd.Series)):
+            return len(value)
         if isinstance(value, pl.DataFrame):
             return value.height
         raise TypeError(

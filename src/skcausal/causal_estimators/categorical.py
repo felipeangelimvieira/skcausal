@@ -130,10 +130,15 @@ class CategoricalDoublyRobustMixin:
             eps=1e-8,
         )
 
-    def _predict(self, X: pd.DataFrame, t: pd.DataFrame) -> list[float]:
+    def _predict(self, t: pd.DataFrame, X: pd.DataFrame = None) -> list[float]:
         """
         Predict the average response for each treatment value in t.
         """
+
+        if X is None and self.get_tag("capability:predicts_for_new_X", False):
+            raise ValueError(
+                f"{self.__class__.__name__} requires X to predict average responses."
+            )
 
         requested_t = coerce_categorical_treatment(
             t,
@@ -148,7 +153,10 @@ class CategoricalDoublyRobustMixin:
 
         estimates_by_level = {}
         for level in self.treatment_levels_:
-            outcome_prediction = self._predict_outcome_for_level(X, level)
+            outcome_mean = 0.0
+            if X is not None:
+                outcome_prediction = self._predict_outcome_for_level(X, level)
+                outcome_mean = float(np.asarray(outcome_prediction).mean())
             training_outcome_prediction = self._predict_outcome_for_level(
                 self._X,
                 level,
@@ -158,7 +166,7 @@ class CategoricalDoublyRobustMixin:
                 level,
             )
 
-            estimates_by_level[level] = outcome_prediction.mean() + bias_correction_term
+            estimates_by_level[level] = outcome_mean + bias_correction_term
 
         return np.array(
             [estimates_by_level[level] for level in requested_t], dtype=float
@@ -261,6 +269,11 @@ class CategoricalDoublyRobust(
         ``1 / P(T=t | X)``, while ``"stabilized"`` applies inverse stabilized
         weighting, ``P(T=t) / P(T=t | X)``.
     """
+
+    _tags = {
+        "backend": "pandas",
+        "capability:predicts_for_new_X": True,
+    }
 
     def __init__(
         self,
@@ -413,6 +426,11 @@ class CategoricalDirectMethod(
         Regressor cloned once per observed treatment level and fit on the
         subset of training rows assigned to that level.
     """
+
+    _tags = {
+        "backend": "pandas",
+        "capability:predicts_for_new_X": True,
+    }
 
     def __init__(self, outcome_regressor: BaseEstimator):
 

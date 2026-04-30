@@ -33,7 +33,10 @@ class DirectRegressor(BaseAverageCausalResponseEstimator):
         Default is None, which means no sample weights are used.
     """
 
-    _tags = {"backend": "pandas"}
+    _tags = {
+        "backend": "pandas",
+        "capability:predicts_for_new_X": True,
+    }
 
     def __init__(
         self,
@@ -128,30 +131,33 @@ class DirectRegressor(BaseAverageCausalResponseEstimator):
             axis=1,
         )
 
-    def _predict(self, X: pd.DataFrame, t: pd.DataFrame) -> list[float]:
-        """Predict the Average Dose-Response Curve for a list of treatment values.
+    def _predict(self, t: pd.DataFrame, X: pd.DataFrame = None) -> np.ndarray:
+        """Predict the outcome for aligned rows of ``X`` and ``t``.
 
         Parameters
         ----------
-        X : pd.DataFrame
-            Input data
         t : pd.DataFrame
-            Treatment values at which to evaluate the response.
+            Treatment values aligned row-wise with ``X``.
+        X : pd.DataFrame, optional
+            Input data aligned row-wise with ``t``.
 
         Returns
         -------
-        list[float]
-            List of predicted average treatment effects for each treatment value.
+        np.ndarray
+            One prediction per row pair in ``X`` and ``t``.
         """
-        ys = []
+        if X is None:
+            raise ValueError("DirectRegressor requires X to predict average responses.")
+        if X.shape[0] != t.shape[0]:
+            raise ValueError(
+                "DirectRegressor.predict requires X and t to contain the same "
+                "number of rows. Use predict_curve when averaging over a "
+                "covariate sample."
+            )
 
-        for i in range(t.shape[0]):
-            repeated_t = pd.concat([t.iloc[[i]].copy()] * X.shape[0], ignore_index=True)
-            ate = self.outcome_regressor.predict(
-                self._prepare_input_array(X, repeated_t)
-            ).mean()
-            ys.append(ate)
-        return ys
+        return np.asarray(
+            self.outcome_regressor.predict(self._prepare_input_array(X, t))
+        )
 
     @classmethod
     def get_test_params(cls, parameter_set="default"):

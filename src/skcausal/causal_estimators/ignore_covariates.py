@@ -64,16 +64,16 @@ class DirectNoCovariates(BaseAverageCausalResponseEstimator):
             return len(value)
         return super()._get_n_samples(value)
 
-    def _predict(self, X: pd.DataFrame, t: pd.DataFrame) -> list[float]:
+    def _predict(self, t: pd.DataFrame, X: pd.DataFrame = None) -> list[float]:
         """
         Predict the average response for each treatment value in t.
 
         Parameters
         ----------
-        X : pd.DataFrame
-            The input data
         t : pd.DataFrame
             The treatment values
+        X : pd.DataFrame, optional
+            Ignored. Included for compatibility with the base estimator API.
 
         Returns
         -------
