@@ -23,7 +23,7 @@ graph LR
   X["X: covariates"] --> F["fit(X, t, y)"]
   T["t: treatment"] --> F
   Y["y: outcome"] --> F
-  F --> P["predict(X, requested treatments)"]
+  F --> P["predict(requested treatments, X=None)"]
 ```
 
 In the documentation examples, those tables are typically `polars.DataFrame` objects. The important part is not the library choice, but the semantics:

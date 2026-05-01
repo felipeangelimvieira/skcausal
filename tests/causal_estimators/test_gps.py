@@ -2,7 +2,10 @@ import numpy as np
 import polars as pl
 import pytest
 from sklearn.base import BaseEstimator, RegressorMixin
+from sklearn.compose import ColumnTransformer, make_column_selector
 from sklearn.model_selection import KFold
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import OneHotEncoder
 from sklearn.tree import DecisionTreeRegressor
 
 from skcausal.causal_estimators.gps import GPS
@@ -80,10 +83,12 @@ class RecordingRegressor(BaseEstimator, RegressorMixin):
     def fit(self, X, y):
         self.fit_X_ = np.asarray(X, dtype=float)
         self.fit_y_ = np.asarray(y, dtype=float)
+        self.predict_shapes_ = []
         return self
 
     def predict(self, X):
         self.last_predict_X_ = np.asarray(X, dtype=float)
+        self.predict_shapes_.append(self.last_predict_X_.shape)
         return np.zeros(self.last_predict_X_.shape[0], dtype=float)
 
 
@@ -115,9 +120,73 @@ def test_gps_estimators_support_configured_mtypes(estimator_cls, init_params):
 
     estimator.fit(scenario.X_polars, scenario.t_polars, scenario.y_polars)
 
-    adrf = estimator.predict(scenario.X_grid_polars, scenario.t_grid_polars)
+    adrf = estimator.predict(scenario.t_grid_polars, X=scenario.X_grid_polars)
     adrf_array = np.atleast_1d(np.asarray(adrf, dtype=float))
     assert adrf_array.shape[0] == scenario.t_grid_polars.height
+    assert np.all(np.isfinite(adrf_array))
+
+
+def test_gps_predict_curve_supports_categorical_polars_treatments_with_user_pipeline():
+    rng = np.random.default_rng(7)
+    n_samples = 24
+
+    X = pl.DataFrame(
+        rng.normal(size=(n_samples, 2)).astype(np.float32),
+        schema=["x0", "x1"],
+    )
+    treatment_labels = np.where(
+        X["x0"].to_numpy() > 0.5,
+        "treated",
+        np.where(X["x0"].to_numpy() < -0.5, "placebo", "control"),
+    )
+    t = pl.DataFrame({"treatment": treatment_labels}).with_columns(
+        pl.col("treatment").cast(pl.Categorical)
+    )
+    y = pl.DataFrame(
+        {
+            "y": (
+                0.8 * X["x0"].to_numpy()
+                + np.where(treatment_labels == "treated", 1.0, 0.0)
+                - np.where(treatment_labels == "placebo", 0.5, 0.0)
+            ).astype(np.float32)
+        }
+    )
+    t_grid = pl.DataFrame(
+        {"treatment": ["control", "placebo", "treated"]}
+    ).with_columns(pl.col("treatment").cast(pl.Categorical))
+
+    outcome_regressor = make_pipeline(
+        ColumnTransformer(
+            transformers=[
+                (
+                    "encode_categorical",
+                    OneHotEncoder(handle_unknown="ignore", sparse_output=False),
+                    make_column_selector(
+                        dtype_include=["category", "object", "string"]
+                    ),
+                )
+            ],
+            remainder="passthrough",
+            verbose_feature_names_out=False,
+        ),
+        DecisionTreeRegressor(max_depth=3, random_state=0),
+    )
+
+    estimator = GPS(
+        density_regressor=DummyDensityEstimator(random_state=3),
+        outcome_regressor=outcome_regressor,
+        cv=2,
+        random_state=0,
+    )
+
+    estimator.fit(X, t, y)
+
+    assert list(estimator.oof_treatment_gps_.columns) == ["gps", "treatment"]
+
+    adrf = estimator.predict_curve(t_grid)
+
+    adrf_array = np.asarray(adrf, dtype=float).reshape(-1)
+    assert adrf_array.shape == (t_grid.height,)
     assert np.all(np.isfinite(adrf_array))
 
 
@@ -165,10 +234,76 @@ def test_gps_out_uses_oof_gps_for_training_and_full_fit_for_prediction():
     assert estimator.treatment_regressor_ is estimator.density_regressor_
 
     t_grid = pl.DataFrame({"t": np.array([-0.5, 0.5], dtype=np.float32)})
-    estimator.predict(X_frame.head(t_grid.height), t_grid)
+    estimator.predict(t_grid, X=X_frame.head(t_grid.height))
 
     expected_predict_gps = n_samples + X[:, :1] * density_regressor.scale
     np.testing.assert_allclose(
         estimator.outcome_regressor_.last_predict_X_[:, :1],
         expected_predict_gps[: t_grid.height],
     )
+
+
+def test_gps_can_subsample_x_at_predict_time():
+    n_samples = 12
+    X = np.arange(n_samples * 2, dtype=np.float32).reshape(n_samples, 2)
+    y = np.linspace(0.0, 1.0, n_samples, dtype=np.float32)
+    t = pl.DataFrame({"t": np.linspace(-1.0, 1.0, n_samples, dtype=np.float32)})
+
+    density_regressor = TrainSizeDensityEstimator(scale=0.01, random_state=7)
+    outcome_regressor = RecordingRegressor(random_state=11)
+    estimator = GPS(
+        density_regressor=density_regressor,
+        outcome_regressor=outcome_regressor,
+        cv=0,
+        max_samples_predict=3,
+        random_state=0,
+    )
+
+    X_frame = pl.DataFrame(X, schema=["x0", "x1"])
+    y_frame = pl.DataFrame({"y": y})
+    t_grid = pl.DataFrame({"t": np.array([-0.5, 0.5], dtype=np.float32)})
+
+    estimator.fit(X_frame, t, y_frame)
+    estimator.predict(t_grid, X=X_frame)
+
+    selected = np.sort(
+        np.random.default_rng(0).choice(n_samples, size=3, replace=False)
+    )
+    expected_predict_gps = n_samples + X[selected, :1] * density_regressor.scale
+
+    assert estimator.outcome_regressor_.predict_shapes_ == [(3, 2), (3, 2)]
+    np.testing.assert_allclose(
+        estimator.outcome_regressor_.last_predict_X_[:, :1],
+        expected_predict_gps,
+    )
+
+
+def test_gps_rejects_invalid_max_samples_predict():
+    with pytest.raises(
+        TypeError, match="max_samples_predict must be an integer or None"
+    ):
+        GPS(
+            density_regressor=DummyDensityEstimator(),
+            outcome_regressor=DecisionTreeRegressor(max_depth=3, random_state=0),
+            max_samples_predict="3",
+        )
+
+    with pytest.raises(ValueError, match="greater than or equal to 1"):
+        GPS(
+            density_regressor=DummyDensityEstimator(),
+            outcome_regressor=DecisionTreeRegressor(max_depth=3, random_state=0),
+            max_samples_predict=0,
+        )
+
+
+def test_gps_preserves_public_max_samples_predict_argument():
+    max_samples_predict = np.int64(3)
+
+    estimator = GPS(
+        density_regressor=DummyDensityEstimator(),
+        outcome_regressor=DecisionTreeRegressor(max_depth=3, random_state=0),
+        max_samples_predict=max_samples_predict,
+    )
+
+    assert estimator.max_samples_predict is max_samples_predict
+    assert estimator._max_samples_predict == 3

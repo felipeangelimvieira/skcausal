@@ -28,14 +28,12 @@ website:
         menu:
           - href: examples/index.qmd
             text: "Overview"
-          - href: examples/binary_treatments.qmd
-            text: "Binary Treatments"
           - href: examples/continuous_treatments.qmd
             text: "Continuous Treatments"
           - href: examples/categorical_treatments.qmd
             text: "Categorical Treatments"
-          - href: examples/dose_response_curve.qmd
-            text: "SyntheticDataset2 Walkthrough"
+          #- href: examples/dose_response_curve.qmd
+          #  text: "SyntheticDataset2 Walkthrough"
       - text: "Density"
         menu:
           - href: density/index.qmd

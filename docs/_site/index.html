@@ -106,20 +106,12 @@ ul.task-list li input[type="checkbox"] {
  <span class="dropdown-text">Overview</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./examples/binary_treatments.html">
- <span class="dropdown-text">Binary Treatments</span></a>
-  </li>  
-        <li>
     <a class="dropdown-item" href="./examples/continuous_treatments.html">
  <span class="dropdown-text">Continuous Treatments</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="./examples/categorical_treatments.html">
  <span class="dropdown-text">Categorical Treatments</span></a>
-  </li>  
-        <li>
-    <a class="dropdown-item" href="./examples/dose_response_curve.html">
- <span class="dropdown-text">SyntheticDataset2 Walkthrough</span></a>
   </li>  
     </ul>
   </li>
@@ -211,7 +203,7 @@ estimator = DirectRegressor(
     outcome_regressor=LinearRegression()
 )
 estimator.fit(X, t, y)
-curve = estimator.predict(X, t)</code></pre>
+curve = estimator.predict(t, X=X)</code></pre>
     </div>
   </div>
 </div>

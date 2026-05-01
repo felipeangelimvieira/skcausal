@@ -84,7 +84,6 @@ from skcausal.density.permutation_weighting import PermutationWeighting
 
 ratio_estimator = PermutationWeighting(
     classifier=LogisticRegression(max_iter=1000),
-    treatment_transformation="spline",
     max_trials=3,
     random_state=0,
 )

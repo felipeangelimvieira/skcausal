@@ -1,7 +1,9 @@
 ---
 title: "SyntheticDataset2 Walkthrough"
+draft: true
 execute:
   warning: false
+  
 ---
 
 Use this page when you want one full benchmark-style example with a known dose-response curve.
@@ -99,7 +101,11 @@ X, t, y = dataset.retrieve()
 X = X.rename({col: f"x{i}" for i, col in enumerate(X.columns)})
 y = y.rename({y.columns[0]: "y"})
 
-grid = dataset.get_grid(X.height)
+from skcausal.utils.treatment_grid import make_cartesian_treatment_grid
+grid = make_cartesian_treatment_grid(
+    t=t,
+    n_continuous_points=25
+)
 true_curve = np.asarray(dataset.predict(X, grid), dtype=float).reshape(-1)
 grid_values = grid["t_0"].to_numpy()
 
@@ -114,7 +120,9 @@ Before fitting, plot the observed data against the true curve to see how much co
 
 ```{python}
 fig, ax = plt.subplots(figsize=(8, 5))
-ax.scatter(t["t_0"].to_numpy(), y["y"].to_numpy(), s=12, alpha=0.2, label="Observed data")
+ax.scatter(
+    t["t_0"].to_numpy(), y["y"].to_numpy(), s=12, alpha=0.2, label="Observed data"
+)
 ax.plot(grid_values, true_curve, linewidth=2.5, label="Truth")
 ax.set_xlabel("Treatment")
 ax.set_ylabel("Average outcome")
@@ -138,7 +146,7 @@ naive = DirectNoCovariates(
     )
 )
 _ = naive.fit(X, t, y)
-naive_curve = np.asarray(naive.predict(X, grid), dtype=float).reshape(-1)
+naive_curve = np.asarray(naive.predict(t=grid), dtype=float).reshape(-1)
 ```
 
 ::: {.callout-warning}
@@ -152,11 +160,13 @@ This estimator is intentionally biased. Do not use it for causal inference on re
 ```{python}
 direct = DirectRegressor(
     outcome_regressor=HistGradientBoostingRegressor(
-        random_state=0, max_depth=4, max_iter=160,
+        random_state=0,
+        max_depth=4,
+        max_iter=160,
     )
 )
 _ = direct.fit(X, t, y)
-direct_curve = np.asarray(direct.predict(X, grid), dtype=float).reshape(-1)
+direct_curve = np.asarray(direct.predict_curve(t=grid), dtype=float).reshape(-1)
 ```
 
 This is a strong baseline when the outcome model is correctly specified. In this walkthrough it ends up as the best-performing estimator.
@@ -168,23 +178,26 @@ This is a strong baseline when the outcome model is correctly specified. In this
 ```{python}
 gps_density = PermutationWeighting(
     classifier=RandomForestClassifier(
-        n_estimators=200, min_samples_leaf=5, random_state=0,
+        n_estimators=200,
+        min_samples_leaf=5,
+        random_state=0,
     ),
-    treatment_transformation="spline",
-    max_trials=3,
+    max_trials=20,
     random_state=0,
 )
 
 gps = GPS(
     density_regressor=gps_density,
     outcome_regressor=HistGradientBoostingRegressor(
-        random_state=0, max_depth=3, max_iter=120,
+        random_state=0,
+        max_depth=3,
+        max_iter=120,
     ),
     cv=3,
     random_state=0,
 )
 _ = gps.fit(X, t, y)
-gps_curve = np.asarray(gps.predict(X, grid), dtype=float).reshape(-1)
+gps_curve = np.asarray(gps.predict(t=grid), dtype=float).reshape(-1)
 ```
 
 ### 4. Doubly robust pseudo-outcome
@@ -198,8 +211,7 @@ dr_density = PermutationWeighting(
         min_samples_leaf=5,
         random_state=0,
     ),
-    treatment_transformation="spline",
-    max_trials=3,
+    max_trials=20,
     random_state=0,
 )
 
@@ -213,7 +225,7 @@ dr = DoublyRobustPseudoOutcome(
     random_state=0,
 )
 _ = dr.fit(X, t, y)
-dr_curve = np.asarray(dr.predict(X, grid), dtype=float).reshape(-1)
+dr_curve = np.asarray(dr.predict(t=grid), dtype=float).reshape(-1)
 ```
 
 ## Final comparison chart

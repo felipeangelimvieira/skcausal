@@ -21,14 +21,14 @@ The method names stay compact, but the returned quantity depends on the estimato
 
 ## Prediction Requires A Requested Treatment Table
 
-The package does not treat prediction as “just give me `X`”. It treats prediction as “give me `X` and the intervention I want to evaluate”.
+The package does not treat prediction as “just give me `X`”. It treats prediction as “give me the intervention I want to evaluate, and optionally the covariate sample I want to average over”.
 
 ```python
 estimator.fit(X, t, y)
-estimated_effect = estimator.predict(X, requested_treatment)
+estimated_effect = estimator.predict(requested_treatment, X=X)
 ```
 
-That means the *shape* of `requested_treatment` matters:
+That means the *shape* of `requested_treatment` matters, and `X` is optional when you want to reuse the covariate sample stored during `fit`:
 
 1. For binary or categorical problems, it usually contains a small set of treatment levels.
 2. For continuous problems, it usually contains a dense treatment grid.

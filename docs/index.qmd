@@ -32,7 +32,7 @@ estimator = DirectRegressor(
     outcome_regressor=LinearRegression()
 )
 estimator.fit(X, t, y)
-curve = estimator.predict(X, t)</code></pre>
+curve = estimator.predict(t, X=X)</code></pre>
     </div>
   </div>
 </div>

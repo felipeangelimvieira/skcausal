@@ -98,7 +98,7 @@ def test_categorical_doubly_robust_corrects_constant_outcome_bias(
     )
 
     estimator.fit(X_train, t_train, y_train)
-    prediction = estimator.predict(X_query, t_query)
+    prediction = estimator.predict(t_query, X=X_query)
 
     np.testing.assert_allclose(prediction, expected)
 
@@ -116,7 +116,7 @@ def test_categorical_inverse_propensity_weighting_matches_observed_level_means(
     )
 
     estimator.fit(X_train, t_train, y_train)
-    prediction = estimator.predict(X_query, t_query)
+    prediction = estimator.predict(t_query, X=X_query)
 
     np.testing.assert_allclose(prediction, expected)
 
@@ -130,7 +130,7 @@ def test_categorical_direct_method_fits_without_density_estimator():
     )
 
     estimator.fit(X_train, t_train, y_train)
-    prediction = estimator.predict(X_query, t_query)
+    prediction = estimator.predict(t_query, X=X_query)
 
     np.testing.assert_allclose(prediction, expected)
 

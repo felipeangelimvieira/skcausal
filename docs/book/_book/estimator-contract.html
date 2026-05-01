@@ -267,10 +267,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="prediction-requires-a-requested-treatment-table" class="level2" data-number="3.2">
 <h2 data-number="3.2" class="anchored" data-anchor-id="prediction-requires-a-requested-treatment-table"><span class="header-section-number">3.2</span> Prediction Requires A Requested Treatment Table</h2>
-<p>The package does not treat prediction as “just give me <code>X</code>”. It treats prediction as “give me <code>X</code> and the intervention I want to evaluate”.</p>
+<p>The package does not treat prediction as “just give me <code>X</code>”. It treats prediction as “give me the intervention I want to evaluate, and optionally the covariate sample I want to average over”.</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>estimator.fit(X, t, y)</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>estimated_effect <span class="op">=</span> estimator.predict(X, requested_treatment)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>That means the <em>shape</em> of <code>requested_treatment</code> matters:</p>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>estimated_effect <span class="op">=</span> estimator.predict(requested_treatment, X<span class="op">=</span>X)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>That means the <em>shape</em> of <code>requested_treatment</code> matters, and <code>X</code> is optional when you want to reuse the covariate sample stored during <code>fit</code>:</p>
 <ol type="1">
 <li>For binary or categorical problems, it usually contains a small set of treatment levels.</li>
 <li>For continuous problems, it usually contains a dense treatment grid.</li>

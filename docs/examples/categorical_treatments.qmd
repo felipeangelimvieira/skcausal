@@ -12,21 +12,31 @@ Use this guide when treatment has more than two levels — such as `control`, `p
 Start here if the treatment is a label rather than a numeric dose. Each distinct observed treatment level is treated as a valid intervention level at prediction time.
 :::
 
-## What changes from binary
+## What changes from binary treatments
 
 A categorical treatment is a generalization: instead of two worlds (treated vs. control), there are $k$ worlds — one per treatment level. The question is the same: *what would the average outcome be if everyone received treatment level $j$?*
 
-The same three estimator families apply:
+To verify available estimators, we can use:
 
-| Estimator | Approach |
-|---|---|
-| `CategoricalDirectMethod` | Fit $E[Y \mid X, T]$ with a multiclass outcome model |
-| `CategoricalInversePropensityWeighting` | Reweight by $P(T = j \mid X)$ for each level $j$ |
-| `CategoricalDoublyRobust` | Combine both — robust if either model is correct |
+```{python}
+from skcausal.utils.lookup import all_causal_average_response_estimators
 
-::: {.callout-note}
-As in the binary case, causal interpretations here rely on standard identification conditions: consistency, no unmeasured confounding after conditioning on `X`, and overlap across the treatment levels being compared.
-:::
+all_causal_average_response_estimators(
+    as_dataframe=True,
+    filter_tags={"capability:t_type": "categorical"},
+    return_tags=["capability:t_type"],
+)
+```
+
+Categorical treatments are usually easier to work with than continuous treatments because there is a finite number of treatment levels to predict for. Therefore, some estimators that handle hardest use cases (e.g. continuous treatments) are also able to handle categorical treatments.
+
+There are, as of now, three estimators designed for categorical treatments in particular:
+
+- `CategoricalDirectMethod`
+- `CategoricalInversePropensityWeighting`
+- `CategoricalDoublyRobust`
+
+We should always give preference doubly robust. But we will see below how to use each of these and how they compare to each other and to the truth on a synthetic dataset.
 
 This example has three levels — `"control"`, `"placebo"`, and `"treated"` — with known true effects we can verify against.
 
@@ -44,26 +54,34 @@ from skcausal.causal_estimators import (
     CategoricalDoublyRobust,
     CategoricalInversePropensityWeighting,
 )
+from skcausal.datasets import ExampleCategorical
 from skcausal.density.sklearn import SklearnCategoricalDensity
-from skcausal.plotting import use_theme
+from skcausal.plotting import plot_marginal_curves, use_theme
 
 use_theme()
 ```
 
-## Step 2: Generate confounded data
+## Step 2: Load a confounded categorical dataset
+
+```{python}
+dataset = ExampleCategorical(n=500, random_state=0)
+X, t, y = dataset.retrieve()
+
+pl.concat([X.head(5), t.head(5), y.head(5)], how="horizontal")
+```
+
+The table has two observed covariates, one categorical treatment column, and one outcome column. This is observational data: treatment assignment depends on the covariates, so the raw group means are confounded.
+
+::: {.callout-note collapse="true"}
+## Optional: Exact Data-Generating Process
 
 ### 2a. Create covariates
 
-```{python}
-rng = np.random.default_rng(0)
+The dataset samples two observed confounders:
 
-X = pl.DataFrame(
-    {
-        "x0": rng.normal(size=500),
-        "x1": rng.normal(size=500),
-    }
-)
-```
+$$
+x_0, x_1 \overset{iid}{\sim} \mathcal{N}(0, 1)
+$$
 
 Both `x0` and `x1` influence who receives which treatment *and* what outcome they have — the definition of a confounding variable.
 
@@ -71,47 +89,54 @@ Both `x0` and `x1` influence who receives which treatment *and* what outcome the
 
 Treatment is assigned by thresholding a linear score that depends on `x0` and `x1`:
 
-```{python}
-score = X["x0"].to_numpy() - 0.5 * X["x1"].to_numpy() + rng.normal(scale=0.4, size=500)
-labels = np.where(score > 0.6, "treated", np.where(score < -0.6, "placebo", "control"))
-t = pl.Series("treatment", labels).cast(pl.Categorical).to_frame()
-```
+$$
+s = x_0 - 0.5x_1 + \varepsilon_t, \quad \varepsilon_t \sim \mathcal{N}(0, 0.4^2)
+$$
+
+$$
+T =
+\begin{cases}
+    \operatorname{treated}, & s > 0.6 \\
+    \operatorname{placebo}, & s < -0.6 \\
+    \operatorname{control}, & \text{otherwise}
+\end{cases}
+$$
+
+### 2c. Average response at each treatment level
+
+Using the notation from the methodology page, the true average response function is:
+
+$$
+\mu(\text{control}) = 0.8\,\mathbb{E}[x_0] + 0.0, \quad
+\mu(\text{placebo}) = 0.8\,\mathbb{E}[x_0] - 0.5, \quad
+\mu(\text{treated}) = 0.8\,\mathbb{E}[x_0] + 1.2
+$$
+
+### 2d. Generate observed outcomes
+
+For each individual unit, the observed outcome is:
+
+$$
+Y = 0.8x_0 +
+\begin{cases}
+0.0, & T = \text{control} \\
+-0.5, & T = \text{placebo} \\
+1.2, & T = \text{treated}
+\end{cases}
++ \varepsilon_y,
+\quad \varepsilon_y \sim \mathcal{N}(0, 0.2^2)
+$$
+
+This exact data-generating process is implemented in `ExampleCategorical`.
+:::
 
 ::: {.callout-important}
 **This is confounding**: people with high `x0` are more likely to receive `"treated"`, *and* `x0` also directly affects the outcome (see step 2d below). An estimator that ignores `X` will incorrectly attribute `x0`'s effect to the treatment label.
 :::
 
-### 2c. Define the true treatment effects
-
-The data-generating process adds a fixed constant for each treatment level:
-
-```{python}
-treatment_effects = {
-    "control": 0.0,
-    "placebo": -0.5,
-    "treated": 1.2,
-}
-```
-
-These are the true **average treatment effects** relative to `"control"`. A well-calibrated estimator should recover values close to these differences when contrasting levels.
-
-### 2d. Generate outcomes
-
-```{python}
-y = pl.DataFrame(
-    {
-        "y": 0.8 * X["x0"].to_numpy()
-        + np.array([treatment_effects[label] for label in labels])
-        + rng.normal(scale=0.2, size=500)
-    }
-)
-
-pl.concat([X.head(5), t.head(5), y.head(5)], how="horizontal")
-```
-
 The outcome is a linear function of `x0` plus the treatment constant plus noise. Notice that `x0` drives both treatment assignment (step 2b) and the outcome — this is the confounding the estimators must remove.
 
-## Step 3: Define treatment levels and prediction helpers
+## Step 3: Define treatment levels
 
 ```{python}
 levels = (
@@ -120,42 +145,21 @@ levels = (
 )
 ```
 
-As in the binary guide, the predict API requires `X` and the treatment table to have the same number of rows:
+We create the intervention table explicitly here so the three treatment levels being evaluated are visible in the tutorial.
 
-```{python}
-def repeat_levels_to_match_X(levels: pl.DataFrame, n_rows: int) -> pl.DataFrame:
-    repeats = (n_rows + levels.height - 1) // levels.height
-    return pl.concat([levels] * repeats, how="vertical").head(n_rows)
+`predict` now accepts the requested treatment table as its first argument and returns one average response per row in `levels`. If you omit `X`, X-aware estimators reuse the covariate sample stored during `fit`. `predict_curve` remains a convenience alias with the same semantics.
 
-
-def summarize_level_predictions(estimator, X, levels, column_name):
-    repeated_levels = repeat_levels_to_match_X(levels, X.height)
-    predictions = np.asarray(estimator.predict(X, repeated_levels), dtype=float).reshape(-1)
-    return (
-        repeated_levels.with_columns(pl.Series(column_name, predictions))
-        .group_by(levels.columns)
-        .agg(pl.col(column_name).mean())
-        .sort(levels.columns)
-    )
-```
+::: {.callout-note}
+This keeps the categorical example aligned with the continuous-treatment API: define a treatment table, call `predict` or `predict_curve`, and then visualize the returned response values.
+:::
 
 ## Step 4: Compute the truth
 
-Because this is a synthetic dataset, we can compute the true average potential outcome analytically — the mean covariate effect plus the known treatment constant:
+Because this is a synthetic dataset, we can compute the true average potential outcome exactly from the dataset's closed-form response function. In the notation from the methodology page, `truth_curve` contains the three values of $\mu(t)$ corresponding to the rows in `levels`.
 
 ```{python}
-truth = (
-    pl.DataFrame(
-        {
-            "treatment": ["control", "placebo", "treated"],
-            "truth": [
-                0.8 * float(X["x0"].mean()) + treatment_effects[level]
-                for level in ["control", "placebo", "treated"]
-            ],
-        }
-    )
-    .with_columns(pl.col("treatment").cast(pl.Categorical))
-)
+truth_curve = np.asarray(dataset.predict(X, levels), dtype=float).reshape(-1)
+truth = levels.with_columns(pl.Series("truth", truth_curve))
 ```
 
 ## Step 5: Fit the estimators
@@ -167,7 +171,7 @@ truth = (
 ```{python}
 direct = CategoricalDirectMethod(outcome_regressor=LinearRegression())
 _ = direct.fit(X, t, y)
-direct_summary = summarize_level_predictions(direct, X, levels, "direct")
+direct_curve = np.asarray(direct.predict_curve(t=levels), dtype=float).reshape(-1)
 ```
 
 This is the fastest estimator to set up and a reliable baseline when the outcome model is well specified. On this dataset, where the outcome is a linear function of `x0`, a `LinearRegression` should recover the true effects closely.
@@ -181,7 +185,7 @@ density_estimator = SklearnCategoricalDensity(LogisticRegression(max_iter=1000))
 
 ipw = CategoricalInversePropensityWeighting(density_estimator=density_estimator)
 _ = ipw.fit(X, t, y)
-ipw_summary = summarize_level_predictions(ipw, X, levels, "ipw")
+ipw_curve = np.asarray(ipw.predict_curve(t=levels), dtype=float).reshape(-1)
 ```
 
 ::: {.callout-warning}
@@ -198,7 +202,7 @@ dr = CategoricalDoublyRobust(
     outcome_regressor=LinearRegression(),
 )
 _ = dr.fit(X, t, y)
-dr_summary = summarize_level_predictions(dr, X, levels, "dr")
+dr_curve = np.asarray(dr.predict_curve(t=levels), dtype=float).reshape(-1)
 ```
 
 ::: {.callout-tip}
@@ -209,18 +213,23 @@ Start with **doubly robust**. Use direct and IPW as sanity checks — if all thr
 
 ```{python}
 observed_means = (
-    t.with_columns(y["y"])
-    .group_by("treatment")
-    .agg(pl.col("y").mean().alias("observed"))
-    .sort("treatment")
+    levels.join(
+        t.with_columns(y["y"])
+        .group_by("treatment")
+        .agg(pl.col("y").mean().alias("observed")),
+        on="treatment",
+        how="left",
+    )
 )
 
 comparison = (
-    truth
-    .join(direct_summary, on="treatment")
-    .join(ipw_summary, on="treatment")
-    .join(dr_summary, on="treatment")
-    .join(observed_means, on="treatment")
+    observed_means
+    .with_columns(
+        pl.Series("truth", truth_curve),
+        pl.Series("direct", direct_curve),
+        pl.Series("ipw", ipw_curve),
+        pl.Series("dr", dr_curve),
+    )
 )
 
 comparison
@@ -229,16 +238,18 @@ comparison
 Each row is the estimated average potential outcome under one treatment level. Values close to `truth` indicate a well-calibrated estimator.
 
 ```{python}
-plot_frame = comparison.with_columns(pl.col("treatment").cast(pl.Utf8))
-labels = plot_frame["treatment"].to_list()
-x = np.arange(len(labels))
-width = 0.15
-
 fig, ax = plt.subplots(figsize=(9, 4.5))
-series = [("observed", "Observed"), ("truth", "Truth"), ("direct", "Direct"), ("ipw", "IPW"), ("dr", "Doubly robust")]
-for index, (column, label) in enumerate(series):
-    ax.bar(x + (index - 2) * width, plot_frame[column].to_numpy(), width, label=label)
-ax.set_xticks(x, labels)
+plot_marginal_curves(
+    levels,
+    {
+        "Observed": comparison["observed"].to_numpy(),
+        "Truth": comparison["truth"].to_numpy(),
+        "Direct": comparison["direct"].to_numpy(),
+        "IPW": comparison["ipw"].to_numpy(),
+        "Doubly robust": comparison["dr"].to_numpy(),
+    },
+    ax=ax,
+)
 ax.set_ylabel("Average outcome")
 ax.set_title("Observed means vs categorical-treatment estimates")
 ax.legend(ncols=3)
@@ -256,3 +267,162 @@ The **average treatment effect** of switching from one level to another is simpl
 If you only have two treatment levels, the [binary treatments guide](binary_treatments.qmd) is the shortest version of the same API.
 
 If your treatment is numeric and you want a dose-response curve instead, continue to the [continuous treatments guide](continuous_treatments.qmd).
+
+::: {.callout-note collapse="true"}
+## Optional: Benchmark the estimators that also handle continuous treatments
+
+The package also exposes general-purpose estimators that can work with categorical treatments here and with continuous treatments in other workflows: `DirectNoCovariates`, `DirectRegressor`, `DoublyRobustPseudoOutcome`, and `GPS`. We do not benchmark `Pipeline` here because it is a wrapper for composing preprocessing with one of those estimators rather than a distinct estimation strategy.
+
+For this categorical example, the nuisance models still need to match the observed treatment type, so we keep using a categorical density estimator inside the broader estimators below. `GPS` now passes the raw treatment column into its outcome model, so the preprocessing pipeline explicitly handles the categorical encoding, expands the `gps` feature with a spline basis, and adds low-order interactions before fitting a linear model.
+
+```{python}
+from sklearn.compose import ColumnTransformer, make_column_selector
+from sklearn.neighbors import KernelDensity
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import OneHotEncoder, PolynomialFeatures, SplineTransformer
+
+from skcausal.causal_estimators import (
+    DirectNoCovariates,
+    DirectRegressor,
+    DoublyRobustPseudoOutcome,
+    GPS,
+)
+from skcausal.density.stabilized_from_conditional import (
+    KernelMarginalAndConditional,
+)
+
+
+def make_linear_pipeline():
+    preprocessor = ColumnTransformer(
+        transformers=[
+            (
+                "encode_categorical",
+                OneHotEncoder(
+                    drop="first",
+                    handle_unknown="ignore",
+                    sparse_output=False,
+                ),
+                make_column_selector(dtype_include=["category", "object", "string"]),
+            )
+        ],
+        remainder="passthrough",
+        verbose_feature_names_out=False,
+    )
+    return make_pipeline(preprocessor, LinearRegression())
+
+
+def make_gps_outcome_pipeline():
+    preprocessor = ColumnTransformer(
+        transformers=[
+            (
+                "expand_gps",
+                SplineTransformer(
+                    n_knots=5,
+                    degree=3,
+                    include_bias=False,
+                ),
+                ["gps"],
+            ),
+            (
+                "encode_categorical",
+                OneHotEncoder(
+                    drop="first",
+                    handle_unknown="ignore",
+                    sparse_output=False,
+                ),
+                make_column_selector(dtype_include=["category", "object", "string"]),
+            ),
+        ],
+        remainder="drop",
+        verbose_feature_names_out=False,
+    )
+    return make_pipeline(
+        preprocessor,
+        PolynomialFeatures(degree=2, include_bias=False),
+        LinearRegression(),
+    )
+
+
+continuous_capable_results = {
+    "Truth": truth_curve,
+    "DirectNoCovariates": np.asarray(
+        DirectNoCovariates(outcome_regressor=make_linear_pipeline())
+        .fit(X, t, y)
+        .predict_curve(t=levels),
+        dtype=float,
+    ).reshape(-1),
+    "DirectRegressor": np.asarray(
+        DirectRegressor(outcome_regressor=make_linear_pipeline())
+        .fit(X, t, y)
+        .predict_curve(t=levels),
+        dtype=float,
+    ).reshape(-1),
+    "DoublyRobustPseudoOutcome": np.asarray(
+        DoublyRobustPseudoOutcome(
+            density_estimator=KernelMarginalAndConditional(
+                conditional_density_estimator=SklearnCategoricalDensity(
+                    LogisticRegression(max_iter=1000)
+                ),
+                kernel=KernelDensity(bandwidth=0.5),
+            ),
+            outcome_regressor=make_linear_pipeline(),
+            pseudo_outcome_regressor=make_linear_pipeline(),
+            random_state=0,
+        )
+        .fit(X, t, y)
+        .predict_curve(t=levels),
+        dtype=float,
+    ).reshape(-1),
+    "GPS": np.asarray(
+        GPS(
+            density_regressor=SklearnCategoricalDensity(
+                LogisticRegression(max_iter=1000)
+            ),
+            outcome_regressor=make_gps_outcome_pipeline(),
+            cv=2,
+            random_state=0,
+        )
+        .fit(X, t, y)
+        .predict_curve(t=levels),
+        dtype=float,
+    ).reshape(-1),
+}
+
+continuous_capable_benchmark = levels.with_columns(
+    *[
+        pl.Series(name, values)
+        for name, values in continuous_capable_results.items()
+    ]
+)
+
+all_estimator_plot_results = {
+    "Truth": truth_curve,
+    "Categorical direct": direct_curve,
+    "Categorical IPW": ipw_curve,
+    "Categorical doubly robust": dr_curve,
+    "DirectNoCovariates": continuous_capable_results["DirectNoCovariates"],
+    "DirectRegressor": continuous_capable_results["DirectRegressor"],
+    "DoublyRobustPseudoOutcome": continuous_capable_results[
+        "DoublyRobustPseudoOutcome"
+    ],
+    "GPS": continuous_capable_results["GPS"],
+}
+
+continuous_capable_benchmark
+```
+
+These estimators trade specialization for a broader treatment interface. On a simple categorical benchmark like this one, that broader interface is convenient for comparing workflows across treatment types, but the fit can differ noticeably from the categorical-specific estimators above. The final plot overlays both families so you can compare everything on the same treatment grid.
+
+```{python}
+fig, ax = plt.subplots(figsize=(12, 5))
+plot_marginal_curves(
+    levels,
+    all_estimator_plot_results,
+    ax=ax,
+)
+ax.set_ylabel("Average outcome")
+ax.set_title("Categorical-specific and general-purpose estimators")
+ax.legend(ncols=3)
+plt.show()
+```
+:::
