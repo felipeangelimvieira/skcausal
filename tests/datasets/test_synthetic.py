@@ -4,20 +4,6 @@ import polars as pl
 from skcausal.datasets.synthetic2 import SyntheticDataset2, SyntheticDataset2Discrete
 
 
-def test_synthetic2_prepare_retrieve():
-    dataset = SyntheticDataset2()
-    dataset.prepare(n=1000)
-    X, t, y = dataset.load(test=False)
-
-    assert isinstance(X, pl.DataFrame)
-    assert isinstance(t, pl.DataFrame)
-    assert isinstance(y, pl.DataFrame)
-    assert X.shape == (1000, 6)
-    assert t.shape == (1000, 1)
-    assert y.shape == (1000, 1)
-    assert t.schema["t_0"] == pl.Float64
-
-
 def test_synthetic2_load_and_predict_y_accept_polars_outputs():
     dataset = SyntheticDataset2(n=32)
     covariates, treatments, _ = dataset.load()

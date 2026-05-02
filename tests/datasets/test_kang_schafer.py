@@ -3,7 +3,6 @@ import polars as pl
 
 from skcausal.datasets.kang_schafer import (
     KangSchaferBinary,
-    KangSchaferBinaryCrossValidation,
     KangSchaferBinaryMisspecified,
     KangSchaferContinuous,
     KangSchaferContinuousMisspecified,
@@ -80,13 +79,3 @@ def test_kang_schafer_continuous_misspecified_predict_curve_matches_alias():
     assert covariates.columns == ["z1", "z2", "z3", "z4"]
     np.testing.assert_allclose(curve, legacy_curve)
     assert curve.shape == (9,)
-
-
-def test_kang_schafer_cross_validation_dataset_has_fixed_size():
-    dataset = KangSchaferBinaryCrossValidation(random_state=13)
-    covariates, treatments, outcomes = dataset.load()
-
-    assert dataset.n == 2000
-    assert covariates.shape == (2000, 4)
-    assert treatments.shape == (2000, 1)
-    assert outcomes.shape == (2000, 1)

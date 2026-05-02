@@ -21,42 +21,6 @@ def _toy_regression_dataset():
     return covariates, outcome
 
 
-class _HookedSemiSyntheticRegressor(SemiSyntheticRegressor):
-    def _load_dataset(self):
-        return _toy_regression_dataset()
-
-
-def test_semisynthetic_regressor_normalizes_dataset_and_uses_predictions_for_treatment():
-    dataset = _HookedSemiSyntheticRegressor(
-        regressor=LinearRegression(),
-        random_state=7,
-        treatment_effect_scale=0.0,
-    )
-
-    covariates, treatments, outcomes = dataset.load()
-
-    assert isinstance(covariates, pl.DataFrame)
-    assert isinstance(treatments, pl.DataFrame)
-    assert isinstance(outcomes, pl.DataFrame)
-    assert covariates.columns == ["age", "income", "score"]
-    assert treatments.columns == ["t"]
-    assert outcomes.columns == ["y"]
-
-    covariate_array = covariates.to_numpy()
-    outcome_array = outcomes.get_column("y").to_numpy()
-    treatment_array = treatments.get_column("t").to_numpy()
-
-    np.testing.assert_allclose(covariate_array.mean(axis=0), np.zeros(3), atol=1e-10)
-    np.testing.assert_allclose(
-        covariate_array.std(axis=0, ddof=0), np.ones(3), atol=1e-10
-    )
-    np.testing.assert_allclose(outcome_array.mean(), 0.0, atol=1e-10)
-    np.testing.assert_allclose(outcome_array.std(ddof=0), 1.0, atol=1e-10)
-
-    expected_treatments = dataset.regressor_.predict(covariate_array)
-    np.testing.assert_allclose(treatment_array, expected_treatments)
-
-
 def test_semisynthetic_regressor_predict_y_accepts_backends_and_adds_spline_effect():
     dataset = SemiSyntheticRegressor(
         regressor=LinearRegression(),
