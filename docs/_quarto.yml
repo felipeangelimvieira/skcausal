@@ -28,6 +28,8 @@ website:
         menu:
           - href: research/dataset_catalog.qmd
             text: "Dataset Catalog"
+          - href: research/extending.qmd
+            text: "Implement your own method"
       - text: "Examples"
         menu:
           - href: examples/index.qmd
