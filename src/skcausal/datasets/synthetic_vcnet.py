@@ -90,7 +90,7 @@ class SyntheticVCNet(BaseSyntheticDataset):
     def __init__(
         self,
         n: int = 500,
-        seed: int = 42,
+        random_state: int = 42,
         treatment_noise_variance: float = 0.25,
         outcome_noise_variance: float = 0.25,
     ):
@@ -103,7 +103,7 @@ class SyntheticVCNet(BaseSyntheticDataset):
         self.treatment_noise_variance = treatment_noise_variance
         self.outcome_noise_variance = outcome_noise_variance
 
-        super().__init__(n=self.n, seed=seed)
+        super().__init__(n=self.n, random_state=random_state)
         self._prepare(self.n)
 
     def _covariate_frame(self, covariates: np.ndarray) -> pl.DataFrame:
@@ -191,7 +191,7 @@ class SyntheticVCNet(BaseSyntheticDataset):
     def _get_outcomes(self, covariates, treatments) -> pl.DataFrame:
         return self._outcome_frame(self._sample_outcomes(covariates, treatments))
 
-    def _prepare(self, n: int = None, seed=42):
+    def _prepare(self, n: int = None):
         if n is not None:
             self.n = n
 
@@ -213,4 +213,4 @@ class SyntheticVCNet(BaseSyntheticDataset):
 
     @classmethod
     def get_test_params(cls, parameter_set="default"):
-        return [{"n": 128, "seed": 7}]
+        return [{"n": 128, "random_state": 7}]

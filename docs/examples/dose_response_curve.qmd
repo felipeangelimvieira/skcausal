@@ -96,7 +96,7 @@ def make_treatment_spline_regressor(treatment_column: str):
 
 ```{python}
 dataset = SyntheticDataset2(n=2000, n_features=6, random_state=0)
-X, t, y = dataset.retrieve()
+X, t, y = dataset.load()
 
 X = X.rename({col: f"x{i}" for i, col in enumerate(X.columns)})
 y = y.rename({y.columns[0]: "y"})

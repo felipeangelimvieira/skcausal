@@ -65,7 +65,7 @@ use_theme()
 
 ```{python}
 dataset = ExampleCategorical(n=500, random_state=0)
-X, t, y = dataset.retrieve()
+X, t, y = dataset.load()
 
 pl.concat([X.head(5), t.head(5), y.head(5)], how="horizontal")
 ```

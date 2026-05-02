@@ -6,7 +6,7 @@ from skcausal.datasets.nurse_staffing import NurseStaffing
 
 
 def test_nurse_staffing_load_returns_named_polars_frames():
-    dataset = NurseStaffing(n=64, seed=7)
+    dataset = NurseStaffing(n=64, random_state=7)
 
     covariates, treatments, outcomes = dataset.load()
 
@@ -28,7 +28,7 @@ def test_nurse_staffing_load_returns_named_polars_frames():
 
 
 def test_nurse_staffing_predict_y_accepts_polars_pandas_and_numpy():
-    dataset = NurseStaffing(n=32, seed=11)
+    dataset = NurseStaffing(n=32, random_state=11)
     covariates, treatments, _ = dataset.load()
 
     predictions_from_polars = dataset.predict_y(covariates, treatments)
@@ -49,7 +49,7 @@ def test_nurse_staffing_predict_y_accepts_polars_pandas_and_numpy():
 def test_nurse_staffing_outcome_type_switches_observed_scale():
     probability_dataset = NurseStaffing(
         n=24,
-        seed=5,
+        random_state=5,
         outcome_type="probability",
     )
     covariates, treatments, outcomes = probability_dataset.load()
@@ -61,7 +61,7 @@ def test_nurse_staffing_outcome_type_switches_observed_scale():
 
     logit_dataset = NurseStaffing(
         n=24,
-        seed=5,
+        random_state=5,
         outcome_type="logit",
     )
     covariates, treatments, outcomes = logit_dataset.load()
@@ -72,7 +72,7 @@ def test_nurse_staffing_outcome_type_switches_observed_scale():
 
 
 def test_nurse_staffing_predict_curve_matches_predict_alias_on_grid():
-    dataset = NurseStaffing(n=40, seed=3)
+    dataset = NurseStaffing(n=40, random_state=3)
     covariates, _, _ = dataset.load()
     grid = dataset.get_grid(11)
 

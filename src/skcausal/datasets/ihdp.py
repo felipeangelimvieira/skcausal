@@ -123,7 +123,7 @@ class IHDPContinuous(BaseSyntheticDataset):
 
     def __init__(
         self,
-        seed: int = 42,
+        random_state: int = 42,
         source_path: str | Path | None = None,
         minmax_normalize_t: bool = True,
         treatment_noise_variance: float = 0.25,
@@ -140,7 +140,7 @@ class IHDPContinuous(BaseSyntheticDataset):
         self.c1_ = None
         self.c2_ = None
 
-        super().__init__(n=_EXPECTED_RAW_SHAPE[0], seed=seed)
+        super().__init__(n=_EXPECTED_RAW_SHAPE[0], random_state=random_state)
         self._prepare()
 
     def _covariate_frame(self, covariates: np.ndarray) -> pl.DataFrame:
@@ -240,7 +240,7 @@ class IHDPContinuous(BaseSyntheticDataset):
         )
         return self._outcome_frame(outcomes)
 
-    def _prepare(self, n: int = None, seed=42):
+    def _prepare(self, n: int = None):
         covariates, source_path = _load_ihdp_covariates(self.source_path)
         covariates = _standardize_covariates(covariates)
         self.source_path_ = source_path
@@ -266,4 +266,4 @@ class IHDPContinuous(BaseSyntheticDataset):
 
     @classmethod
     def get_test_params(cls, parameter_set="default"):
-        return [{"seed": 7}]
+        return [{"random_state": 7}]

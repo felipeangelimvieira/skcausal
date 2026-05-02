@@ -227,7 +227,7 @@ def _fit_naive_curve(
 
 
 def _build_example(instance_name: str, dataset) -> dict[str, Any]:
-    covariates, treatments, outcomes = dataset.retrieve()
+    covariates, treatments, outcomes = dataset.load()
     plot_treatments = _get_plot_treatments(treatments)
 
     curves = {

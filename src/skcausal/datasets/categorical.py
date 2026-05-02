@@ -113,7 +113,7 @@ class ExampleCategorical(BaseSyntheticDataset):
         self.treated_effect = treated_effect
         self.random_state = random_state
 
-        super().__init__(n=n, seed=random_state)
+        super().__init__(n=n, random_state=random_state)
         self._prepare(self.n)
 
     @property
@@ -130,7 +130,7 @@ class ExampleCategorical(BaseSyntheticDataset):
             schema=self.TREATMENT_SCHEMA,
         ).with_columns(pl.col("treatment").cast(pl.Categorical))
 
-    def _prepare(self, n: int = None, seed=42):
+    def _prepare(self, n: int = None):
         if n is not None:
             self.n = n
 

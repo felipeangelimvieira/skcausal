@@ -106,7 +106,7 @@ class NurseStaffing(BaseSyntheticDataset):
     def __init__(
         self,
         n: int = 1000,
-        seed: int = 42,
+        random_state: int = 42,
         outcome_type: Literal["binary", "probability", "logit"] = "binary",
     ):
         if outcome_type not in _OUTCOME_TYPES:
@@ -117,7 +117,7 @@ class NurseStaffing(BaseSyntheticDataset):
 
         self.outcome_type = outcome_type
 
-        super().__init__(n=n, seed=seed)
+        super().__init__(n=n, random_state=random_state)
         self._prepare(self.n)
 
     def _get_covariates(self) -> pl.DataFrame:
@@ -200,4 +200,4 @@ class NurseStaffing(BaseSyntheticDataset):
 
     @classmethod
     def get_test_params(cls, parameter_set="default"):
-        return [{"n": 2000, "seed": 7}]
+        return [{"n": 2000, "random_state": 7}]

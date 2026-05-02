@@ -107,7 +107,7 @@ class _BaseKangSchafer(BaseSyntheticDataset):
     def __init__(
         self,
         n: int = 1000,
-        seed: int = 42,
+        random_state: int = 42,
         observed_covariates: Literal["correct", "misspecified"] = "correct",
     ):
         if observed_covariates not in {"correct", "misspecified"}:
@@ -115,7 +115,7 @@ class _BaseKangSchafer(BaseSyntheticDataset):
 
         self.observed_covariates = observed_covariates
 
-        super().__init__(n=n, seed=seed)
+        super().__init__(n=n, random_state=random_state)
         self._latent_covariates = None
         self._observed_covariate_array = None
         self._prepare(self.n)
@@ -190,7 +190,7 @@ class _BaseKangSchafer(BaseSyntheticDataset):
             and np.allclose(covariate_array, self._latent_covariates)
         )
 
-    def _prepare(self, n: int = None, seed=42):
+    def _prepare(self, n: int = None):
         if n is not None:
             self.n = n
 
@@ -270,18 +270,22 @@ class KangSchaferBinary(_BaseKangSchafer):
 
     @classmethod
     def get_test_params(cls, parameter_set="default"):
-        return [{"n": 128, "seed": 7}]
+        return [{"n": 128, "random_state": 7}]
 
 
 class KangSchaferBinaryMisspecified(KangSchaferBinary):
     """Misspecified observed-covariate version of :class:`KangSchaferBinary`."""
 
-    def __init__(self, n: int = 1000, seed: int = 42):
-        super().__init__(n=n, seed=seed, observed_covariates="misspecified")
+    def __init__(self, n: int = 1000, random_state: int = 42):
+        super().__init__(
+            n=n,
+            random_state=random_state,
+            observed_covariates="misspecified",
+        )
 
     @classmethod
     def get_test_params(cls, parameter_set="default"):
-        return [{"n": 128, "seed": 7}]
+        return [{"n": 128, "random_state": 7}]
 
 
 class KangSchaferContinuous(_BaseKangSchafer):
@@ -341,15 +345,19 @@ class KangSchaferContinuous(_BaseKangSchafer):
 
     @classmethod
     def get_test_params(cls, parameter_set="default"):
-        return [{"n": 128, "seed": 7}]
+        return [{"n": 128, "random_state": 7}]
 
 
 class KangSchaferContinuousMisspecified(KangSchaferContinuous):
     """Misspecified observed-covariate version of :class:`KangSchaferContinuous`."""
 
-    def __init__(self, n: int = 1000, seed: int = 42):
-        super().__init__(n=n, seed=seed, observed_covariates="misspecified")
+    def __init__(self, n: int = 1000, random_state: int = 42):
+        super().__init__(
+            n=n,
+            random_state=random_state,
+            observed_covariates="misspecified",
+        )
 
     @classmethod
     def get_test_params(cls, parameter_set="default"):
-        return [{"n": 128, "seed": 7}]
+        return [{"n": 128, "random_state": 7}]

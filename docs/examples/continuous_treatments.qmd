@@ -92,7 +92,7 @@ def curve_values(curve):
 
 ```{python}
 dataset = SyntheticDataset2(n=2000, n_features=6, random_state=0)
-X, t, y = dataset.retrieve()
+X, t, y = dataset.load()
 
 X = X.rename({col: f"x{i}" for i, col in enumerate(X.columns)})
 t_col = t.columns[0]

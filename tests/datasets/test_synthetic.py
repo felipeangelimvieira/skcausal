@@ -7,7 +7,7 @@ from skcausal.datasets.synthetic2 import SyntheticDataset2, SyntheticDataset2Dis
 def test_synthetic2_prepare_retrieve():
     dataset = SyntheticDataset2()
     dataset.prepare(n=1000)
-    X, t, y = dataset.retrieve(test=False)
+    X, t, y = dataset.load(test=False)
 
     assert isinstance(X, pl.DataFrame)
     assert isinstance(t, pl.DataFrame)

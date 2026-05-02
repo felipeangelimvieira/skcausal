@@ -54,7 +54,7 @@
     "href": "getting-started.html#minimal-dataset-example",
     "title": "2  Getting Started",
     "section": "2.3 Minimal Dataset Example",
-    "text": "2.3 Minimal Dataset Example\nfrom skcausal.datasets import SimpleLinearDataset\n\ndataset = SimpleLinearDataset(\n    n=250,\n    t_types=(\"continuous\",),\n    n_features=4,\n    random_state=0,\n)\nX, t, y = dataset.retrieve()\nThe built-in synthetic datasets are useful because they also expose predict(...), which is separate from the estimator API and gives you the known target quantity for benchmarking.",
+    "text": "2.3 Minimal Dataset Example\nfrom skcausal.datasets import SimpleLinearDataset\n\ndataset = SimpleLinearDataset(\n    n=250,\n    t_types=(\"continuous\",),\n    n_features=4,\n    random_state=0,\n)\nX, t, y = dataset.load()\nThe built-in synthetic datasets are useful because they also expose predict(...), which is separate from the estimator API and gives you the known target quantity for benchmarking.",
     "crumbs": [
       "<span class='chapter-number'>2</span>  <span class='chapter-title'>Getting Started</span>"
     ]

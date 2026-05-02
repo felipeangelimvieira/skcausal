@@ -5,7 +5,7 @@ from skcausal.datasets.polynomial import PolynomialDataset
 
 
 def test_polynomial_dataset_load_returns_dataframes():
-    dataset = PolynomialDataset(n=32, seed=7)
+    dataset = PolynomialDataset(n=32, random_state=7)
 
     covariates, treatments, outcomes = dataset.load()
 
@@ -19,7 +19,7 @@ def test_polynomial_dataset_load_returns_dataframes():
 
 
 def test_polynomial_dataset_predict_y_accepts_polars_and_numpy():
-    dataset = PolynomialDataset(n=16, seed=11)
+    dataset = PolynomialDataset(n=16, random_state=11)
     covariates, treatments, _ = dataset.load()
 
     predictions_from_polars = dataset.predict_y(covariates, treatments)

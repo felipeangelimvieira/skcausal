@@ -60,17 +60,17 @@ class BaseSyntheticDataset(BaseDataset):
     * pdf_treatments
     """
 
-    def __init__(self, n: int, seed=42):
+    def __init__(self, n: int, random_state: int = 42):
 
         self.n = n
-        self.seed = seed
+        self.random_state = random_state
 
         super().__init__()
 
         self._covariates = None
         self._treatments = None
         self._outcomes = None
-        self._rng = np.random.default_rng(seed)
+        self._rng = np.random.default_rng(random_state)
 
     def _load(self) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
         """
@@ -234,7 +234,6 @@ class BaseSyntheticDataset(BaseDataset):
     def _prepare(
         self,
         n: int = None,
-        seed=42,
     ) -> np.ndarray:
         """
         Precompiles a dataset with the specified number of samples.
@@ -261,8 +260,8 @@ class BaseSyntheticDataset(BaseDataset):
 
         return self
 
-    def prepare(self, n: int = None, seed=42):
-        return self._prepare(n=n, seed=seed)
+    def prepare(self, n: int = None):
+        return self._prepare(n=n)
 
     @property
     def is_prepared(self):
@@ -270,14 +269,6 @@ class BaseSyntheticDataset(BaseDataset):
             dataset is not None
             for dataset in (self._covariates, self._treatments, self._outcomes)
         )
-
-    def retrieve(self, test=False):
-        if test:
-            raise NotImplementedError(
-                "Datasets do not own train/test splits. Use an external split "
-                "object with the frames returned by load() or retrieve()."
-            )
-        return self.load()
 
     def _to_polars(self, treatments) -> pl.DataFrame:
         if isinstance(treatments, pl.DataFrame):

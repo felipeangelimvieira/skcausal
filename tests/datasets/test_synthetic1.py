@@ -6,7 +6,7 @@ from skcausal.datasets.synthetic_vcnet import SyntheticVCNet
 
 
 def test_synthetic_vcnet_load_exposes_single_dataset_sample():
-    dataset = SyntheticVCNet(seed=7)
+    dataset = SyntheticVCNet(random_state=7)
 
     covariates, treatments, outcomes = dataset.load()
 
@@ -27,7 +27,7 @@ def test_synthetic_vcnet_load_exposes_single_dataset_sample():
 
 
 def test_synthetic_vcnet_predict_y_accepts_backends_and_curve_alias():
-    dataset = SyntheticVCNet(n=64, seed=11)
+    dataset = SyntheticVCNet(n=64, random_state=11)
     covariates, treatments, _ = dataset.load()
     grid = dataset.get_grid(9)
 
@@ -49,8 +49,8 @@ def test_synthetic_vcnet_predict_y_accepts_backends_and_curve_alias():
     assert np.all(np.isfinite(curve))
 
 
-def test_synthetic_vcnet_retrieve_rejects_dataset_owned_test_split():
-    dataset = SyntheticVCNet(n=32, seed=5)
+def test_synthetic_vcnet_load_rejects_dataset_owned_test_split_kwarg():
+    dataset = SyntheticVCNet(n=32, random_state=5)
 
-    with pytest.raises(NotImplementedError, match="external split"):
-        dataset.retrieve(test=True)
+    with pytest.raises(TypeError, match="unexpected keyword argument 'test'"):
+        dataset.load(test=True)

@@ -43,7 +43,7 @@ dataset = SimpleLinearDataset(
     n_features=4,
     random_state=0,
 )
-X, t, y = dataset.retrieve()
+X, t, y = dataset.load()
 ```
 
 The built-in synthetic datasets are useful because they also expose `predict(...)`, which is separate from the estimator API and gives you the known target quantity for benchmarking.

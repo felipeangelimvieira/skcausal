@@ -97,7 +97,7 @@ class SyntheticDataset2(BaseSyntheticDataset):
         self.random_state = random_state
         self.n_features = n_features
 
-        super().__init__(n=n, seed=random_state)
+        super().__init__(n=n, random_state=random_state)
         self.projt_ = self._rng.normal(0, 1, size=(n_features, 1))
         self._prepare(self.n)
 

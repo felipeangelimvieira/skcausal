@@ -6,7 +6,7 @@ from skcausal.datasets.ihdp import IHDPContinuous
 
 
 def test_ihdp_continuous_load_uses_validated_hill_covariates():
-    dataset = IHDPContinuous(seed=7)
+    dataset = IHDPContinuous(random_state=7)
 
     covariates, treatments, outcomes = dataset.load()
 
@@ -28,7 +28,7 @@ def test_ihdp_continuous_load_uses_validated_hill_covariates():
 
 
 def test_ihdp_continuous_predict_y_accepts_backends_and_curve_alias():
-    dataset = IHDPContinuous(seed=11)
+    dataset = IHDPContinuous(random_state=11)
     covariates, treatments, _ = dataset.load()
     grid = dataset.get_grid(13)
 
@@ -50,11 +50,11 @@ def test_ihdp_continuous_predict_y_accepts_backends_and_curve_alias():
     assert np.all(np.isfinite(curve))
 
 
-def test_ihdp_continuous_retrieve_rejects_dataset_owned_test_split():
-    dataset = IHDPContinuous(seed=3)
+def test_ihdp_continuous_load_rejects_dataset_owned_test_split_kwarg():
+    dataset = IHDPContinuous(random_state=3)
 
-    with pytest.raises(NotImplementedError, match="external split"):
-        dataset.retrieve(test=True)
+    with pytest.raises(TypeError, match="unexpected keyword argument 'test'"):
+        dataset.load(test=True)
 
 
 def test_ihdp_continuous_rejects_malformed_raw_file(tmp_path):
