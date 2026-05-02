@@ -120,13 +120,13 @@ def test_gps_estimators_support_configured_mtypes(estimator_cls, init_params):
 
     estimator.fit(scenario.X_polars, scenario.t_polars, scenario.y_polars)
 
-    adrf = estimator.predict(scenario.t_grid_polars, X=scenario.X_grid_polars)
+    adrf = estimator.predict(scenario.t_grid_polars)
     adrf_array = np.atleast_1d(np.asarray(adrf, dtype=float))
     assert adrf_array.shape[0] == scenario.t_grid_polars.height
     assert np.all(np.isfinite(adrf_array))
 
 
-def test_gps_predict_curve_supports_categorical_polars_treatments_with_user_pipeline():
+def test_gps_predict_supports_categorical_polars_treatments_with_user_pipeline():
     rng = np.random.default_rng(7)
     n_samples = 24
 
@@ -183,7 +183,7 @@ def test_gps_predict_curve_supports_categorical_polars_treatments_with_user_pipe
 
     assert list(estimator.oof_treatment_gps_.columns) == ["gps", "treatment"]
 
-    adrf = estimator.predict_curve(t_grid)
+    adrf = estimator.predict(t_grid)
 
     adrf_array = np.asarray(adrf, dtype=float).reshape(-1)
     assert adrf_array.shape == (t_grid.height,)
@@ -234,16 +234,16 @@ def test_gps_out_uses_oof_gps_for_training_and_full_fit_for_prediction():
     assert estimator.treatment_regressor_ is estimator.density_regressor_
 
     t_grid = pl.DataFrame({"t": np.array([-0.5, 0.5], dtype=np.float32)})
-    estimator.predict(t_grid, X=X_frame.head(t_grid.height))
+    estimator.predict(t_grid)
 
     expected_predict_gps = n_samples + X[:, :1] * density_regressor.scale
     np.testing.assert_allclose(
         estimator.outcome_regressor_.last_predict_X_[:, :1],
-        expected_predict_gps[: t_grid.height],
+        expected_predict_gps,
     )
 
 
-def test_gps_can_subsample_x_at_predict_time():
+def test_gps_can_subsample_fit_time_x_at_curve_prediction_time():
     n_samples = 12
     X = np.arange(n_samples * 2, dtype=np.float32).reshape(n_samples, 2)
     y = np.linspace(0.0, 1.0, n_samples, dtype=np.float32)
@@ -264,7 +264,7 @@ def test_gps_can_subsample_x_at_predict_time():
     t_grid = pl.DataFrame({"t": np.array([-0.5, 0.5], dtype=np.float32)})
 
     estimator.fit(X_frame, t, y_frame)
-    estimator.predict(t_grid, X=X_frame)
+    estimator.predict(t_grid)
 
     selected = np.sort(
         np.random.default_rng(0).choice(n_samples, size=3, replace=False)

@@ -29,7 +29,6 @@ class BaseAverageCausalResponseEstimator(TreatmentCheckMixin, _BaseEstimator):
         "backend": "polars",
         "capability:t_type": ["continuous", "categorical"],
         "capability:multidimensional_treatment": False,
-        "capability:predicts_for_new_X": False,
     }
 
     def __init__(self):
@@ -96,103 +95,65 @@ class BaseAverageCausalResponseEstimator(TreatmentCheckMixin, _BaseEstimator):
 
     def predict(self, t, X=None):
         """
-        Predict the average response for each treatment value in t.
+        Predict a response curve using backend-native treatment inputs.
 
-        """
-
-        t = self._check_and_transform_t(t, is_fit=False)
-        X = self._resolve_predict_X(X, is_fit=False)
-
-        return np.array(self._predict(t=t, X=X))
-
-    def _predict(self, t, X=None):
-        """
-        Predict using backend-native inputs.
-        """
-
-        raise NotImplementedError("This method must be implemented by subclasses.")
-
-    def predict_curve(self, t, X=None):
-        """
-        Predict a response curve for the requested treatment table.
-
-        This is a convenience alias for `predict` that preserves the historical
-        two-dimensional output shape used by the plotting and docs examples.
-        When the estimator predicts for new covariate samples, omitted `X`
-        defaults to the training covariates stored during `fit`.
+        Average-response estimators evaluate the prediction table over the
+        covariate sample stored during ``fit``. Prediction-time ``X`` is not
+        part of the supported contract.
 
         Parameters
         ----------
         t : DataFrame-like
             Treatment variable.
         X : DataFrame-like, optional
-            Input features over which to average the response. If omitted and
-            the estimator predicts for new covariate samples, the training
-            covariates stored during `fit` are reused.
+            Unsupported. The estimator always averages over the covariates
+            stored during ``fit``.
 
         Returns
         -------
         np.ndarray
-            The predicted average response for each treatment value in t.
+            The predicted average response for each treatment value in ``t``.
         """
-        predicts_for_new_X = self.get_tag("capability:predicts_for_new_X", False)
 
-        if not predicts_for_new_X:
-            predictions = np.asarray(self.predict(t=t, X=None))
-        else:
-            t = self._check_and_transform_t(t, is_fit=False)
-            X = self._resolve_predict_X(X, is_fit=False)
+        if X is not None:
+            raise ValueError(
+                "predict no longer accepts prediction-time X. Average-response "
+                "estimators use the covariates stored during fit."
+            )
 
-            n_x = self._get_n_samples(X)
-            n_t = self._get_n_samples(t)
+        t = self._check_and_transform_t(t, is_fit=False)
 
-            if n_x == 0 or n_t == 0:
-                raise ValueError(
-                    "predict_curve requires X and t to contain at least one sample."
-                )
+        predictions = np.asarray(self._predict(t=t))
+        return self._coerce_predictions(predictions, n_t=self._get_n_samples(t))
 
-            x_indices = np.tile(np.arange(n_x, dtype=int), n_t)
-            t_indices = np.repeat(np.arange(n_t, dtype=int), n_x)
+    def _predict(self, t):
+        """
+        Predict using backend-native treatment inputs.
 
-            expanded_X = self._take_rows(X, x_indices)
-            expanded_t = self._take_rows(t, t_indices)
+        Subclasses should return one prediction per row in ``t``, averaging
+        over the covariate sample stored during ``fit`` when needed.
+        """
 
-            predictions = np.asarray(self.predict(t=expanded_t, X=expanded_X))
-            if predictions.ndim == 0 or predictions.shape[0] != n_x * n_t:
-                raise ValueError(
-                    "predict must return one prediction per expanded X/t row pair."
-                )
+        raise NotImplementedError("This method must be implemented by subclasses.")
 
-            if predictions.ndim == 1:
-                predictions = predictions.reshape(-1, 1)
-            else:
-                predictions = predictions.reshape(predictions.shape[0], -1)
-
-            return predictions.reshape(n_t, n_x, -1).mean(axis=1)
-
+    def _coerce_predictions(self, predictions, n_t):
         if predictions.ndim == 0:
             raise ValueError("predict must return at least one prediction.")
+        if predictions.shape[0] != n_t:
+            raise ValueError(
+                "predict must return one prediction per requested " "treatment row."
+            )
 
         if predictions.ndim == 1:
-            predictions = predictions.reshape(-1, 1)
-        else:
-            predictions = predictions.reshape(predictions.shape[0], -1)
+            return predictions.reshape(-1, 1)
 
-        return predictions
+        return predictions.reshape(predictions.shape[0], -1)
 
-    def _resolve_predict_X(self, X, is_fit=False):
-        if not self.get_tag("capability:predicts_for_new_X", False):
-            return None
+    def _get_fit_X(self):
+        if not hasattr(self, "_X"):
+            raise ValueError("Estimator must be fit before predicting.")
 
-        if X is None:
-            if not hasattr(self, "_X"):
-                raise ValueError(
-                    "X must be provided at predict time unless the estimator has "
-                    "stored training covariates during fit."
-                )
-            X = self._X
-
-        return self._check_and_transform_X(X, is_fit=is_fit)
+        return self._X
 
     def _check_and_transform_y(self, y, is_fit=False):
         y = convert(y, self.get_tag("backend"))

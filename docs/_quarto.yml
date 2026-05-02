@@ -3,7 +3,7 @@ project:
   render:
     - "*.qmd"
     - "*.md"
-    - "datasets/*.qmd"
+    - "research/*.qmd"
     - "density/*.qmd"
     - "examples/*.qmd"
     - "!book/"
@@ -24,6 +24,10 @@ website:
 #        text: "Book"
       - href: learn/learn.qmd
         text: "15-min theory"
+      - text: "For researchers"
+        menu:
+          - href: research/dataset_catalog.qmd
+            text: "Dataset Catalog"
       - text: "Examples"
         menu:
           - href: examples/index.qmd

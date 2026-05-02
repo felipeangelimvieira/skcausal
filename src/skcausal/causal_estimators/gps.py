@@ -54,7 +54,6 @@ class GPS(BaseAverageCausalResponseEstimator):
         "capability:multidimensional_treatment": True,
         "backend": "polars",
         "capability:t_type": ["continuous", "categorical"],
-        "capability:predicts_for_new_X": True,
     }
 
     def __init__(
@@ -225,12 +224,10 @@ class GPS(BaseAverageCausalResponseEstimator):
 
         return self
 
-    def _predict(self, t: pl.DataFrame, X: pl.DataFrame = None) -> list[float]:
+    def _predict(self, t: pl.DataFrame) -> list[float]:
         """Predict the average response for each treatment value in t."""
 
-        if X is None:
-            raise ValueError("GPS requires X to predict average responses.")
-
+        X = self._get_fit_X()
         prediction_indices = self._select_prediction_indices(X.height)
         X = X[prediction_indices]
 

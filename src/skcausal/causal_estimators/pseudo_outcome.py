@@ -416,7 +416,7 @@ class DoublyRobustPseudoOutcome(BaseAverageCausalResponseEstimator):
         )
         return self
 
-    def _predict(self, t: pd.DataFrame, X: pd.DataFrame = None) -> np.ndarray:
+    def _predict(self, t: pd.DataFrame) -> np.ndarray:
         predictions = self.pseudo_outcome_regressor_.predict(t)
 
         if isinstance(predictions, pd.Series):

@@ -1,0 +1,72 @@
+---
+title: "Dataset Catalog"
+toc: false
+freeze: false
+execute:
+  cache: false
+  echo: false
+  warning: false
+---
+
+This page is generated from the dataset registry. It enumerates the classes returned by `all_datasets`, calls `create_test_instances_and_names()`, and renders each returned example with `plot_marginal_curves`.
+
+Datasets expose a single sample. Any train/test or cross-fitting holdout should be created outside the dataset layer with a split object.
+
+Use the dropdown to switch between datasets without leaving the page.
+
+```{python}
+from pathlib import Path
+import sys
+
+
+def find_docs_root() -> Path:
+    for candidate in [Path.cwd(), *Path.cwd().parents]:
+        if (candidate / "research" / "datasets.py").exists():
+            return candidate
+        if (candidate / "docs" / "research" / "datasets.py").exists():
+            return candidate / "docs"
+    raise FileNotFoundError("Unable to locate docs/research/datasets.py")
+
+
+docs_root = find_docs_root()
+repo_root = docs_root.parent
+
+src_root = repo_root / "src"
+if str(src_root) not in sys.path:
+  sys.path.insert(0, str(src_root))
+if str(docs_root) not in sys.path:
+    sys.path.insert(0, str(docs_root))
+
+from skcausal.plotting import use_theme
+from research.datasets import render_dataset_browser_html
+
+use_theme()
+```
+
+```{python}
+#| output: asis
+
+print(render_dataset_browser_html())
+```
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const select = document.getElementById("dataset-browser-select");
+  const panels = Array.from(document.querySelectorAll("[data-dataset-panel]"));
+
+  if (!select || panels.length === 0) {
+    return;
+  }
+
+  const updatePanels = (selectedDataset) => {
+    panels.forEach((panel) => {
+      panel.hidden = panel.dataset.datasetPanel !== selectedDataset;
+    });
+  };
+
+  updatePanels(select.value);
+  select.addEventListener("change", (event) => {
+    updatePanels(event.target.value);
+  });
+});
+</script>

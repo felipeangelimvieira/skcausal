@@ -2,7 +2,6 @@ import numpy as np
 import polars as pl
 import pytest
 
-
 matplotlib = pytest.importorskip("matplotlib")
 matplotlib.use("Agg")
 

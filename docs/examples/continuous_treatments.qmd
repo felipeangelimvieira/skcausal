@@ -167,7 +167,7 @@ grid = make_cartesian_treatment_grid(
 For a single continuous treatment, this builds 10 evenly spaced points spanning the observed treatment range. It keeps the example responsive during preview while still tracing the overall curve shape. Increase the dataset size and grid density once the end-to-end workflow is working.
 
 ::: {.callout-note}
-`predict` now accepts the requested treatment table as its first argument and returns one average response per row in `grid`. If you omit `X`, X-aware estimators reuse the covariate sample stored during `fit`. `predict_curve` remains a convenience alias with the same semantics.
+`predict` accepts the requested treatment table as its first argument and returns one average response per row in `grid`, averaging over the covariate sample stored during `fit`.
 :::
 
 ## Step 4: Compute the truth
@@ -244,7 +244,7 @@ naive.fit(X, t, y)
 ```
 
 ```{python}
-naive_curve = naive.predict_curve(t=grid)
+naive_curve = naive.predict(t=grid)
 ```
 
 ### Direct regressor
@@ -261,7 +261,7 @@ direct.fit(X, t, y)
 ```
 
 ```{python}
-direct_curve = direct.predict_curve(t=grid)
+direct_curve = direct.predict(t=grid)
 ```
 
 This is still outcome regression with covariates, but here the outcome model is a random forest. That gives the example a nonlinear regressor without needing hand-built feature engineering.
@@ -314,7 +314,7 @@ gps.fit(X, t, y)
 ```
 
 ```{python}
-gps_curve = gps.predict_curve(t=grid)
+gps_curve = gps.predict(t=grid)
 ```
 
 Because the score-response relationship is nonlinear here too, the GPS second stage also uses a random forest on the raw `gps` and treatment columns.
@@ -357,7 +357,7 @@ dr.fit(X, t, y)
 ```
 
 ```{python}
-dr_curve = dr.predict_curve(t=grid)
+dr_curve = dr.predict(t=grid)
 ```
 
 The final pseudo-outcome smoother only depends on treatment at prediction time, but the same random-forest regressor API works for that last stage too.

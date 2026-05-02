@@ -3,20 +3,48 @@ from abc import ABC, abstractmethod
 from typing import List, Tuple
 
 import numpy as np
+import pandas as pd
 import polars as pl
 from skbase.base import BaseObject
+from skcausal.datatypes import convert
 
-__all__ = ["BaseDataset", "split_dataset"]
+__all__ = ["BaseDataset"]
 
 
 class BaseDataset(BaseObject):
-    _tags = {"object_type": ["dataset"]}
+    _tags = {"object_type": ["dataset"], "backend": "polars"}
 
     def load(self):
-        return self._load()
+        covariates, treatments, outcomes = self._load()
+        treatment_schema = getattr(self, "TREATMENT_SCHEMA", None)
+        return (
+            self._coerce_backend_frame(covariates),
+            self._coerce_backend_frame(treatments, schema=treatment_schema),
+            self._coerce_backend_frame(outcomes),
+        )
 
     def _load(self):
         raise NotImplementedError("Dataset classes should implement _load")
+
+    def _coerce_backend_frame(self, value, *, schema=None):
+        if isinstance(value, np.ndarray):
+            frame = pl.DataFrame(value, schema=schema)
+        else:
+            if isinstance(value, pd.Series):
+                value = value.to_frame()
+
+            if isinstance(value, pd.DataFrame):
+                frame = value
+            elif isinstance(value, pl.DataFrame):
+                frame = value
+            else:
+                raise TypeError(
+                    "Datasets must expose covariates, treatments, and outcomes as "
+                    "numpy arrays or dataframe-like objects. "
+                    f"Got {type(value).__name__}."
+                )
+
+        return convert(frame, self.get_tag("backend"))
 
 
 class BaseSyntheticDataset(BaseDataset):
@@ -42,8 +70,6 @@ class BaseSyntheticDataset(BaseDataset):
         self._covariates = None
         self._treatments = None
         self._outcomes = None
-        self.train_dataset_ = None
-        self.test_dataset_ = None
         self._rng = np.random.default_rng(seed)
 
     def _load(self) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
@@ -112,6 +138,60 @@ class BaseSyntheticDataset(BaseDataset):
     def _inject_outcome_noise(self, expected_outcomes, covariates, treatments):
         return expected_outcomes + self._rng.normal(size=expected_outcomes.shape)
 
+    def _check_and_transform_X(self, covariates):
+        if isinstance(covariates, np.ndarray):
+            return covariates
+        return self._coerce_backend_frame(covariates)
+
+    def _check_and_transform_t(self, treatments):
+        if isinstance(treatments, np.ndarray):
+            return treatments
+        return self._coerce_backend_frame(
+            treatments,
+            schema=getattr(self, "TREATMENT_SCHEMA", None),
+        )
+
+    def _get_n_samples(self, value) -> int:
+        if isinstance(value, np.ndarray):
+            if value.ndim == 0:
+                raise ValueError(
+                    "Expected array-like input with at least one dimension."
+                )
+            return value.shape[0]
+        if isinstance(value, pd.DataFrame):
+            return len(value)
+        if isinstance(value, pl.DataFrame):
+            return value.height
+        raise TypeError(
+            f"Cannot infer number of samples from object of type {type(value).__name__}."
+        )
+
+    def _coerce_individual_predictions(self, predictions, *, n_samples):
+        predictions = np.asarray(predictions, dtype=float)
+        if predictions.ndim == 0:
+            raise ValueError("predict_y must return at least one prediction.")
+        if predictions.shape[0] != n_samples:
+            raise ValueError("predict_y must return one prediction per treatment row.")
+        if predictions.ndim == 1:
+            return predictions.reshape(-1, 1)
+        return predictions.reshape(n_samples, -1)
+
+    def _coerce_curve_predictions(self, predictions, *, n_rows):
+        predictions = np.asarray(predictions, dtype=float)
+        if predictions.ndim == 0:
+            raise ValueError("predict_curve must return at least one prediction.")
+        if predictions.shape[0] != n_rows:
+            raise ValueError(
+                "predict_curve must return one prediction per requested treatment row."
+            )
+        if predictions.ndim == 1:
+            return predictions
+
+        predictions = predictions.reshape(n_rows, -1)
+        if predictions.shape[1] == 1:
+            return predictions[:, 0]
+        return predictions
+
     def predict_y(self, covariates: np.ndarray, treatments: np.ndarray) -> np.ndarray:
         """
         Generates mean outcomes based on the given covariates and treatment assignments.
@@ -124,7 +204,18 @@ class BaseSyntheticDataset(BaseDataset):
             np.ndarray: Array of shape (n,) containing the mean outcomes.
 
         """
-        return self._predict_y(covariates, treatments)
+        covariates = self._check_and_transform_X(covariates)
+        treatments = self._check_and_transform_t(treatments)
+
+        n_samples = self._get_n_samples(treatments)
+        if self._get_n_samples(covariates) != n_samples:
+            raise ValueError(
+                "predict_y requires covariates and treatments to have the same "
+                "number of rows."
+            )
+
+        predictions = self._predict_y(covariates, treatments)
+        return self._coerce_individual_predictions(predictions, n_samples=n_samples)
 
     def _predict_y(self, covariates: np.ndarray, treatments: np.ndarray) -> np.ndarray:
         """
@@ -183,7 +274,8 @@ class BaseSyntheticDataset(BaseDataset):
     def retrieve(self, test=False):
         if test:
             raise NotImplementedError(
-                "Test split retrieval is not implemented for BaseSyntheticDataset."
+                "Datasets do not own train/test splits. Use an external split "
+                "object with the frames returned by load() or retrieve()."
             )
         return self.load()
 
@@ -197,6 +289,49 @@ class BaseSyntheticDataset(BaseDataset):
 
         return pl.DataFrame(treatments, schema=schema)
 
+    def predict_curve(self, covariates: np.ndarray, treatment_grid: pl.DataFrame):
+        """Compute the average response at each row of a treatment grid.
+
+        For each requested treatment row, this evaluates ``predict_y`` across the
+        full covariate sample and returns the mean response. This is the smooth
+        response curve associated with the dataset's noiseless outcome model.
+        """
+
+        covariates = self._check_and_transform_X(covariates)
+        treatment_grid = self._check_and_transform_t(treatment_grid)
+
+        if isinstance(treatment_grid, pl.DataFrame):
+            treatment_rows = list(treatment_grid.to_numpy())
+        else:
+            treatment_array = np.asarray(treatment_grid, dtype=object)
+            if treatment_array.ndim == 0:
+                treatment_rows = [treatment_array.item()]
+            elif treatment_array.ndim == 1:
+                treatment_rows = list(treatment_array)
+            else:
+                treatment_rows = list(treatment_array)
+
+        covariate_count = (
+            covariates.height
+            if isinstance(covariates, pl.DataFrame)
+            else covariates.shape[0]
+        )
+
+        curve = []
+        for treatment in treatment_rows:
+            treatment_array = np.asarray(treatment, dtype=object)
+            if treatment_array.ndim == 0:
+                tiled_treatments = np.full(covariate_count, treatment_array.item())
+            else:
+                tiled_treatments = np.tile(
+                    treatment_array.reshape(1, -1), (covariate_count, 1)
+                )
+
+            outcomes = self.predict_y(covariates, tiled_treatments)
+            curve.append(np.asarray(outcomes, dtype=float).mean(axis=0))
+
+        return self._coerce_curve_predictions(curve, n_rows=len(treatment_rows))
+
     def predict(self, covariates: np.ndarray, treatment_list: pl.DataFrame):
         """
         Computes the Average Direct Response Function (ADRF) for the given covariates and treatment list.
@@ -209,17 +344,4 @@ class BaseSyntheticDataset(BaseDataset):
             List[float]: List of ADRF values corresponding to each treatment value.
         """
 
-        if isinstance(treatment_list, pl.DataFrame):
-            treatment_list = list(treatment_list.to_numpy())
-
-        adrf = []
-        for treatment in treatment_list:
-            if isinstance(treatment, np.ndarray):
-                treatments = treatment.reshape(1, -1)
-                treatments = np.tile(treatments, (covariates.shape[0], 1))
-            else:
-                treatments = np.full(covariates.shape[0], treatment)
-            outcomes = self.predict_y(covariates, treatments)
-            adrf.append(outcomes.mean())
-
-        return np.array(adrf)
+        return self.predict_curve(covariates=covariates, treatment_grid=treatment_list)

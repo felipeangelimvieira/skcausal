@@ -242,7 +242,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>grid <span class="op">=</span> pl.DataFrame(</span>
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"t0"</span>: np.linspace(<span class="bu">float</span>(t[<span class="st">"t0"</span>].<span class="bu">min</span>()), <span class="bu">float</span>(t[<span class="st">"t0"</span>].<span class="bu">max</span>()), X.height)}</span>
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>The grid can have any row count: <code>predict(t, X=None)</code> returns one average response per requested treatment row. If you omit <code>X</code>, X-aware estimators reuse the covariate sample stored during <code>fit</code>.</p>
+<p>The grid can have any row count: <code>predict(t)</code> returns one average response per requested treatment row and averages over the covariate sample stored during <code>fit</code>.</p>
 </section>
 <section id="step-2-predict-a-curve" class="level2" data-number="4.3">
 <h2 data-number="4.3" class="anchored" data-anchor-id="step-2-predict-a-curve"><span class="header-section-number">4.3</span> Step 2: Predict A Curve</h2>
@@ -251,7 +251,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>estimator <span class="op">=</span> DirectRegressor(outcome_regressor<span class="op">=</span>LinearRegression())</span>
 <span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>estimator.fit(X, t, y)</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>curve <span class="op">=</span> estimator.predict_curve(grid)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>curve <span class="op">=</span> estimator.predict(grid)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>For a direct method, the returned curve is the average of <code>\hat{E}[Y | X, T=t]</code> over the observed covariate sample.</p>
 </section>
 <section id="step-3-compare-methods-carefully" class="level2" data-number="4.4">

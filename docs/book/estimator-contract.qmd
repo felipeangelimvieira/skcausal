@@ -1,6 +1,6 @@
 # Estimator Contract
 
-The package is organized around a small public contract: fit on observed data, then predict at requested treatment levels or treatment grids.
+The package is organized around a small public contract: fit on observed data, then call `predict(...)` at requested treatment levels or treatment grids.
 
 ## One Interface, Different Estimands
 
@@ -21,14 +21,14 @@ The method names stay compact, but the returned quantity depends on the estimato
 
 ## Prediction Requires A Requested Treatment Table
 
-The package does not treat prediction as “just give me `X`”. It treats prediction as “give me the intervention I want to evaluate, and optionally the covariate sample I want to average over”.
+The package does not treat prediction as “just give me `X`”. It treats prediction as “give me the intervention I want to evaluate”, and average-response estimators then average over the covariate sample stored during `fit`.
 
 ```python
 estimator.fit(X, t, y)
-estimated_effect = estimator.predict(requested_treatment, X=X)
+estimated_effect = estimator.predict(requested_treatment)
 ```
 
-That means the *shape* of `requested_treatment` matters, and `X` is optional when you want to reuse the covariate sample stored during `fit`:
+That means the *shape* of `requested_treatment` matters:
 
 1. For binary or categorical problems, it usually contains a small set of treatment levels.
 2. For continuous problems, it usually contains a dense treatment grid.

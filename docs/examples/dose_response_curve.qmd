@@ -166,7 +166,7 @@ direct = DirectRegressor(
     )
 )
 _ = direct.fit(X, t, y)
-direct_curve = np.asarray(direct.predict_curve(t=grid), dtype=float).reshape(-1)
+direct_curve = np.asarray(direct.predict(t=grid), dtype=float).reshape(-1)
 ```
 
 This is a strong baseline when the outcome model is correctly specified. In this walkthrough it ends up as the best-performing estimator.

@@ -40,7 +40,53 @@ def _as_treatment_labels(treatments) -> np.ndarray:
 
 
 class ExampleCategorical(BaseSyntheticDataset):
-    """Three-level categorical treatment dataset with observed confounding."""
+    r"""Three-level categorical treatment dataset with observed confounding.
+
+    The observed covariates satisfy
+
+    .. math::
+
+        X_0, X_1 \stackrel{\mathrm{iid}}{\sim} \mathcal{N}(0, 1).
+
+    A latent treatment score is generated as
+
+    .. math::
+
+        S = X_0 + w_1 X_1 + \varepsilon_T,
+        \qquad
+        \varepsilon_T \sim \mathcal{N}(0, \sigma_T^2),
+
+    where :math:`w_1 =` ``score_x1_weight`` and
+    :math:`\sigma_T =` ``treatment_noise``. The observed treatment is then the
+    three-level threshold rule
+
+    .. math::
+
+        A =
+        \begin{cases}
+        \mathrm{treated}, & S > \tau, \\
+        \mathrm{placebo}, & S < -\tau, \\
+        \mathrm{control}, & \mathrm{otherwise},
+        \end{cases}
+
+    with :math:`\tau =` ``treatment_threshold``.
+
+    The noiseless response surface is
+
+    .. math::
+
+        m(X, A) = \beta X_0 + \alpha(A),
+
+    where :math:`\beta =` ``covariate_effect`` and :math:`\alpha(A)` is the
+    category-specific shift given by ``control_effect``, ``placebo_effect``, and
+    ``treated_effect``. Observed outcomes satisfy
+
+    .. math::
+
+        Y \mid X, A \sim \mathcal{N}(m(X, A), \sigma_Y^2),
+
+    with :math:`\sigma_Y =` ``outcome_noise``.
+    """
 
     TREATMENT_SCHEMA = pl.Schema({"treatment": pl.Utf8})
 
@@ -144,7 +190,7 @@ class ExampleCategorical(BaseSyntheticDataset):
             scale=self.outcome_noise,
             size=expected_outcomes.shape,
         )
-        return pl.DataFrame({"y": noisy_outcomes})
+        return pl.DataFrame({"y": np.asarray(noisy_outcomes, dtype=float).reshape(-1)})
 
     @classmethod
     def get_test_params(cls, parameter_set="default"):

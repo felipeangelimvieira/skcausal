@@ -44,7 +44,7 @@
     "href": "getting-started.html#the-core-data-contract",
     "title": "2  Getting Started",
     "section": "2.2 The Core Data Contract",
-    "text": "2.2 The Core Data Contract\nThe package expects three aligned tables with the same number of rows.\n\n\n\n\n\ngraph LR\n  X[\"X: covariates\"] --&gt; F[\"fit(X, t, y)\"]\n  T[\"t: treatment\"] --&gt; F\n  Y[\"y: outcome\"] --&gt; F\n  F --&gt; P[\"predict(requested treatments, X=None)\"]\n\n\n\n\n\n\nIn the documentation examples, those tables are typically polars.DataFrame objects. The important part is not the library choice, but the semantics:\n\nX contains pre-treatment covariates.\nt contains the intervention variable you want to reason about.\ny contains the observed outcome.",
+    "text": "2.2 The Core Data Contract\nThe package expects three aligned tables with the same number of rows.\n\n\n\n\n\ngraph LR\n  X[\"X: covariates\"] --&gt; F[\"fit(X, t, y)\"]\n  T[\"t: treatment\"] --&gt; F\n  Y[\"y: outcome\"] --&gt; F\n  F --&gt; P[\"predict(requested treatments)\"]\n\n\n\n\n\n\nIn the documentation examples, those tables are typically polars.DataFrame objects. The important part is not the library choice, but the semantics:\n\nX contains pre-treatment covariates.\nt contains the intervention variable you want to reason about.\ny contains the observed outcome.",
     "crumbs": [
       "<span class='chapter-number'>2</span>  <span class='chapter-title'>Getting Started</span>"
     ]
@@ -54,7 +54,7 @@
     "href": "getting-started.html#minimal-dataset-example",
     "title": "2  Getting Started",
     "section": "2.3 Minimal Dataset Example",
-    "text": "2.3 Minimal Dataset Example\nfrom skcausal.datasets import SimpleLinearDataset\n\ndataset = SimpleLinearDataset(\n    n=250,\n    t_types=(\"continuous\",),\n    n_features=4,\n    random_state=0,\n)\nX, t, y = dataset.retrieve()\nThe built-in synthetic datasets are useful because they also expose predict(...), which gives you the known target quantity for benchmarking.",
+    "text": "2.3 Minimal Dataset Example\nfrom skcausal.datasets import SimpleLinearDataset\n\ndataset = SimpleLinearDataset(\n    n=250,\n    t_types=(\"continuous\",),\n    n_features=4,\n    random_state=0,\n)\nX, t, y = dataset.retrieve()\nThe built-in synthetic datasets are useful because they also expose predict(...), which is separate from the estimator API and gives you the known target quantity for benchmarking.",
     "crumbs": [
       "<span class='chapter-number'>2</span>  <span class='chapter-title'>Getting Started</span>"
     ]
@@ -74,7 +74,7 @@
     "href": "estimator-contract.html",
     "title": "3  Estimator Contract",
     "section": "",
-    "text": "3.1 One Interface, Different Estimands\nThe package is organized around a small public contract: fit on observed data, then predict at requested treatment levels or treatment grids.\nflowchart TD\n  A[\"Binary or categorical treatment\"] --&gt; B[\"Average potential outcomes\"]\n  C[\"Continuous treatment\"] --&gt; D[\"Average dose-response function\"]\n  E[\"Density estimator\"] --&gt; F[\"Treatment assignment score\"]\nThe method names stay compact, but the returned quantity depends on the estimator family.",
+    "text": "3.1 One Interface, Different Estimands\nThe package is organized around a small public contract: fit on observed data, then call predict(...) at requested treatment levels or treatment grids.\nflowchart TD\n  A[\"Binary or categorical treatment\"] --&gt; B[\"Average potential outcomes\"]\n  C[\"Continuous treatment\"] --&gt; D[\"Average dose-response function\"]\n  E[\"Density estimator\"] --&gt; F[\"Treatment assignment score\"]\nThe method names stay compact, but the returned quantity depends on the estimator family.",
     "crumbs": [
       "<span class='chapter-number'>3</span>  <span class='chapter-title'>Estimator Contract</span>"
     ]
@@ -94,7 +94,7 @@
     "href": "estimator-contract.html#prediction-requires-a-requested-treatment-table",
     "title": "3  Estimator Contract",
     "section": "3.2 Prediction Requires A Requested Treatment Table",
-    "text": "3.2 Prediction Requires A Requested Treatment Table\nThe package does not treat prediction as “just give me X”. It treats prediction as “give me the intervention I want to evaluate, and optionally the covariate sample I want to average over”.\nestimator.fit(X, t, y)\nestimated_effect = estimator.predict(requested_treatment, X=X)\nThat means the shape of requested_treatment matters, and X is optional when you want to reuse the covariate sample stored during fit:\n\nFor binary or categorical problems, it usually contains a small set of treatment levels.\nFor continuous problems, it usually contains a dense treatment grid.",
+    "text": "3.2 Prediction Requires A Requested Treatment Table\nThe package does not treat prediction as “just give me X”. It treats prediction as “give me the intervention I want to evaluate”, and average-response estimators then average over the covariate sample stored during fit.\nestimator.fit(X, t, y)\nestimated_effect = estimator.predict(requested_treatment)\nThat means the shape of requested_treatment matters:\n\nFor binary or categorical problems, it usually contains a small set of treatment levels.\nFor continuous problems, it usually contains a dense treatment grid.",
     "crumbs": [
       "<span class='chapter-number'>3</span>  <span class='chapter-title'>Estimator Contract</span>"
     ]
@@ -134,7 +134,7 @@
     "href": "continuous-workflows.html#step-1-build-a-grid",
     "title": "4  Continuous Workflows",
     "section": "4.2 Step 1: Build A Grid",
-    "text": "4.2 Step 1: Build A Grid\nimport numpy as np\nimport polars as pl\n\ngrid = pl.DataFrame(\n    {\"t0\": np.linspace(float(t[\"t0\"].min()), float(t[\"t0\"].max()), X.height)}\n)\nThe grid can have any row count: predict(t, X=None) returns one average response per requested treatment row. If you omit X, X-aware estimators reuse the covariate sample stored during fit.",
+    "text": "4.2 Step 1: Build A Grid\nimport numpy as np\nimport polars as pl\n\ngrid = pl.DataFrame(\n    {\"t0\": np.linspace(float(t[\"t0\"].min()), float(t[\"t0\"].max()), X.height)}\n)\nThe grid can have any row count: predict(t) returns one average response per requested treatment row and averages over the covariate sample stored during fit.",
     "crumbs": [
       "<span class='chapter-number'>4</span>  <span class='chapter-title'>Continuous Workflows</span>"
     ]
@@ -144,7 +144,7 @@
     "href": "continuous-workflows.html#step-2-predict-a-curve",
     "title": "4  Continuous Workflows",
     "section": "4.3 Step 2: Predict A Curve",
-    "text": "4.3 Step 2: Predict A Curve\nfrom skcausal.causal_estimators import DirectRegressor\nfrom sklearn.linear_model import LinearRegression\n\nestimator = DirectRegressor(outcome_regressor=LinearRegression())\nestimator.fit(X, t, y)\ncurve = estimator.predict_curve(grid)\nFor a direct method, the returned curve is the average of \\hat{E}[Y | X, T=t] over the observed covariate sample.",
+    "text": "4.3 Step 2: Predict A Curve\nfrom skcausal.causal_estimators import DirectRegressor\nfrom sklearn.linear_model import LinearRegression\n\nestimator = DirectRegressor(outcome_regressor=LinearRegression())\nestimator.fit(X, t, y)\ncurve = estimator.predict(grid)\nFor a direct method, the returned curve is the average of \\hat{E}[Y | X, T=t] over the observed covariate sample.",
     "crumbs": [
       "<span class='chapter-number'>4</span>  <span class='chapter-title'>Continuous Workflows</span>"
     ]

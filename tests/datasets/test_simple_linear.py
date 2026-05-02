@@ -35,6 +35,9 @@ def test_simple_linear_predict_y_matches_exact_linear_formula_for_polars_and_num
     covariates, treatments, _ = dataset.load()
 
     predictions_from_polars = dataset.predict_y(covariates, treatments)
+    predictions_from_pandas = dataset.predict_y(
+        covariates.to_pandas(), treatments.to_pandas()
+    )
     predictions_from_numpy = dataset.predict_y(
         covariates.to_numpy(), treatments.to_numpy()
     )
@@ -43,9 +46,12 @@ def test_simple_linear_predict_y_matches_exact_linear_formula_for_polars_and_num
         + treatments.to_numpy().astype(float) @ dataset.beta_t_
     )
 
+    expected = expected.reshape(-1, 1)
+
     np.testing.assert_allclose(predictions_from_polars, expected)
+    np.testing.assert_allclose(predictions_from_pandas, expected)
     np.testing.assert_allclose(predictions_from_numpy, expected)
-    assert predictions_from_polars.shape == (12,)
+    assert predictions_from_polars.shape == (12, 1)
 
 
 def test_simple_linear_binary_treatment_uses_threshold_rule():

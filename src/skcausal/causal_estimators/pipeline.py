@@ -38,7 +38,7 @@ class _MeanResponseEstimator(BaseAverageCausalResponseEstimator):
         )
         return self
 
-    def _predict(self, t, X=None):
+    def _predict(self, t):
         return np.full(len(t), self.mean_response_, dtype=float)
 
 
@@ -94,10 +94,6 @@ class Pipeline(_MetaObjectMixin, BaseAverageCausalResponseEstimator):
                     "capability:multidimensional_treatment",
                     pipeline_tags.get("capability:multidimensional_treatment"),
                 ),
-                "capability:predicts_for_new_X": estimator_tags.get(
-                    "capability:predicts_for_new_X",
-                    pipeline_tags.get("capability:predicts_for_new_X", False),
-                ),
                 "one_hot_encode_enum_columns": estimator_tags.get(
                     "one_hot_encode_enum_columns",
                     pipeline_tags.get("one_hot_encode_enum_columns", False),
@@ -143,21 +139,15 @@ class Pipeline(_MetaObjectMixin, BaseAverageCausalResponseEstimator):
         ]
         return self
 
-    def predict(self, t, X=None):
+    def _predict(self, t):
         """Apply fitted transformations and delegate response prediction."""
         t = self._check_and_transform_t(t, is_fit=False)
-        X = self._resolve_predict_X(X, is_fit=False)
-        X_transformed, t_transformed = self._transform_inputs(X, t)
-        return np.asarray(self.estimator_.predict(t_transformed, X=X_transformed))
+        _, t_transformed = self._transform_inputs(None, t)
+        return np.asarray(self.estimator_.predict(t_transformed))
 
     def _fit(self, X, t, y):
         raise NotImplementedError(
             "Pipeline overrides fit directly and does not use _fit."
-        )
-
-    def _predict(self, t, X=None):
-        raise NotImplementedError(
-            "Pipeline overrides predict directly and does not use _predict."
         )
 
     def _set_params(self, attr: str, **params):

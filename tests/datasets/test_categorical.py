@@ -16,6 +16,7 @@ def test_confounded_categorical_dataset_load_returns_named_polars_frames():
     assert treatments.columns == ["treatment"]
     assert outcomes.columns == ["y"]
     assert treatments.schema["treatment"] == pl.Categorical
+    assert outcomes.schema["y"] == pl.Float64
 
 
 def test_confounded_categorical_dataset_predict_y_matches_closed_form():
@@ -23,6 +24,9 @@ def test_confounded_categorical_dataset_predict_y_matches_closed_form():
     covariates, treatments, _ = dataset.load()
 
     predictions_from_polars = dataset.predict_y(covariates, treatments)
+    predictions_from_pandas = dataset.predict_y(
+        covariates.to_pandas(), treatments.to_pandas()
+    )
     predictions_from_numpy = dataset.predict_y(
         covariates.to_numpy(), treatments.to_numpy()
     )
@@ -34,7 +38,10 @@ def test_confounded_categorical_dataset_predict_y_matches_closed_form():
         dtype=float,
     )
 
+    expected = expected.reshape(-1, 1)
+
     np.testing.assert_allclose(predictions_from_polars, expected)
+    np.testing.assert_allclose(predictions_from_pandas, expected)
     np.testing.assert_allclose(predictions_from_numpy, expected)
 
 
@@ -59,3 +66,15 @@ def test_confounded_categorical_dataset_levels_and_truth_are_ordered():
         "treated",
     ]
     np.testing.assert_allclose(truth, expected)
+
+
+def test_confounded_categorical_dataset_predict_curve_matches_predict():
+    dataset = ExampleCategorical(n=30, random_state=17)
+    covariates, _, _ = dataset.load()
+    levels = dataset.get_levels()
+
+    curve = dataset.predict_curve(covariates, levels)
+    legacy_curve = dataset.predict(covariates, levels)
+
+    np.testing.assert_allclose(curve, legacy_curve)
+    assert curve.shape == (3,)

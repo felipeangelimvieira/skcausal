@@ -31,9 +31,55 @@ def _sigmoid(values: np.ndarray) -> np.ndarray:
 
 
 class SyntheticDataset2(BaseSyntheticDataset):
-    """
-    Custom synthetic dataset, with variable number of features.
+    r"""Continuous-treatment synthetic benchmark with latent treatment score.
 
+    The covariates satisfy
+
+    .. math::
+
+        X_j \stackrel{\mathrm{iid}}{\sim} \mathcal{N}(0, 1),
+        \qquad j = 1, \ldots, p,
+
+    where :math:`p =` ``n_features``.
+
+    A Gaussian projection vector
+
+    .. math::
+
+        w \sim \mathcal{N}(0, I_p)
+
+    is sampled once per dataset instance and defines the latent treatment mean
+
+    .. math::
+
+        t'(X) = \operatorname{logit}^{-1}\!\left(\frac{X^\top w}{\sqrt{p}}\right).
+
+    The observed treatment is drawn from a two-component mixture that shares the
+    same conditional mean signal:
+
+    .. math::
+
+        T \mid X \sim
+        B \cdot \operatorname{Beta}(t'(X), 1 - t'(X))
+        + (1 - B) \cdot \operatorname{Beta}(99t'(X), 100 - 99t'(X)),
+
+    where :math:`B \sim \operatorname{Bernoulli}(0.5)` independently for each
+    row. The implementation clips :math:`t'(X)` away from 0 and 1 before passing
+    it to the beta distributions.
+
+    The noiseless response surface is
+
+    .. math::
+
+        m(X, T) = -5t'(X) + 5(T - 0.2)^2 - T^3.
+
+    Observed outcomes satisfy
+
+    .. math::
+
+        Y \mid X, T \sim \mathcal{N}(m(X, T), \sigma_Y^2),
+
+    with :math:`\sigma_Y^2 =` ``outcome_noise``.
     """
 
     TREATMENT_SCHEMA = pl.Schema({"t_0": pl.Float64})
@@ -180,7 +226,35 @@ class SyntheticDataset2(BaseSyntheticDataset):
 
 
 class SyntheticDataset2Discrete(SyntheticDataset2):
-    """Binary-treatment version of :class:`SyntheticDataset2`."""
+    r"""Binary-treatment version of :class:`SyntheticDataset2`.
+
+    The covariates and latent score follow the same mechanism as
+    :class:`SyntheticDataset2`:
+
+    .. math::
+
+        X_j \stackrel{\mathrm{iid}}{\sim} \mathcal{N}(0, 1),
+        \qquad
+        t'(X) = \operatorname{logit}^{-1}\!\left(\frac{X^\top w}{\sqrt{p}}\right).
+
+    The treatment becomes binary via
+
+    .. math::
+
+        A \mid X \sim \operatorname{Bernoulli}(t'(X)).
+
+    The structural response is still inherited from the parent dataset and is
+
+    .. math::
+
+        m(X, A) = -5t'(X) + 5(A - 0.2)^2 - A^3,
+
+    with observed outcomes sampled as
+
+    .. math::
+
+        Y \mid X, A \sim \mathcal{N}(m(X, A), \sigma_Y^2).
+    """
 
     TREATMENT_SCHEMA = pl.Schema({"treatment": pl.Boolean})
 

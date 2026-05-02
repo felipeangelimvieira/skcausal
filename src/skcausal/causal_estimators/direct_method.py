@@ -35,7 +35,6 @@ class DirectRegressor(BaseAverageCausalResponseEstimator):
 
     _tags = {
         "backend": "pandas",
-        "capability:predicts_for_new_X": True,
     }
 
     def __init__(
@@ -131,33 +130,43 @@ class DirectRegressor(BaseAverageCausalResponseEstimator):
             axis=1,
         )
 
-    def _predict(self, t: pd.DataFrame, X: pd.DataFrame = None) -> np.ndarray:
-        """Predict the outcome for aligned rows of ``X`` and ``t``.
+    def _predict(self, t: pd.DataFrame) -> np.ndarray:
+        """Predict the average response for each requested treatment row.
 
         Parameters
         ----------
         t : pd.DataFrame
-            Treatment values aligned row-wise with ``X``.
-        X : pd.DataFrame, optional
-            Input data aligned row-wise with ``t``.
+            Treatment values defining the requested response-curve grid.
 
         Returns
         -------
         np.ndarray
-            One prediction per row pair in ``X`` and ``t``.
+            One average response per row in ``t``.
         """
-        if X is None:
-            raise ValueError("DirectRegressor requires X to predict average responses.")
-        if X.shape[0] != t.shape[0]:
+        fit_X = self._get_fit_X().reset_index(drop=True)
+        n_samples = fit_X.shape[0]
+
+        if n_samples == 0:
             raise ValueError(
-                "DirectRegressor.predict requires X and t to contain the same "
-                "number of rows. Use predict_curve when averaging over a "
-                "covariate sample."
+                "DirectRegressor requires at least one fitted covariate row to "
+                "predict a response curve."
             )
 
-        return np.asarray(
-            self.outcome_regressor.predict(self._prepare_input_array(X, t))
-        )
+        effects = []
+        for row_index in range(t.shape[0]):
+            repeated_t = pd.concat(
+                [t.iloc[[row_index]].copy()] * n_samples,
+                ignore_index=True,
+            )
+            predictions = np.asarray(
+                self.outcome_regressor.predict(
+                    self._prepare_input_array(fit_X, repeated_t)
+                ),
+                dtype=float,
+            ).reshape(-1)
+            effects.append(predictions.mean())
+
+        return np.asarray(effects, dtype=float)
 
     @classmethod
     def get_test_params(cls, parameter_set="default"):

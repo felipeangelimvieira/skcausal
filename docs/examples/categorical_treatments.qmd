@@ -147,10 +147,10 @@ levels = (
 
 We create the intervention table explicitly here so the three treatment levels being evaluated are visible in the tutorial.
 
-`predict` now accepts the requested treatment table as its first argument and returns one average response per row in `levels`. If you omit `X`, X-aware estimators reuse the covariate sample stored during `fit`. `predict_curve` remains a convenience alias with the same semantics.
+`predict` accepts the requested treatment table as its first argument and returns one average response per row in `levels`, averaging over the covariate sample stored during `fit`.
 
 ::: {.callout-note}
-This keeps the categorical example aligned with the continuous-treatment API: define a treatment table, call `predict` or `predict_curve`, and then visualize the returned response values.
+This keeps the categorical example aligned with the continuous-treatment API: define a treatment table, call `predict`, and then visualize the returned response values.
 :::
 
 ## Step 4: Compute the truth
@@ -171,7 +171,7 @@ truth = levels.with_columns(pl.Series("truth", truth_curve))
 ```{python}
 direct = CategoricalDirectMethod(outcome_regressor=LinearRegression())
 _ = direct.fit(X, t, y)
-direct_curve = np.asarray(direct.predict_curve(t=levels), dtype=float).reshape(-1)
+direct_curve = np.asarray(direct.predict(t=levels), dtype=float).reshape(-1)
 ```
 
 This is the fastest estimator to set up and a reliable baseline when the outcome model is well specified. On this dataset, where the outcome is a linear function of `x0`, a `LinearRegression` should recover the true effects closely.
@@ -185,7 +185,7 @@ density_estimator = SklearnCategoricalDensity(LogisticRegression(max_iter=1000))
 
 ipw = CategoricalInversePropensityWeighting(density_estimator=density_estimator)
 _ = ipw.fit(X, t, y)
-ipw_curve = np.asarray(ipw.predict_curve(t=levels), dtype=float).reshape(-1)
+ipw_curve = np.asarray(ipw.predict(t=levels), dtype=float).reshape(-1)
 ```
 
 ::: {.callout-warning}
@@ -202,7 +202,7 @@ dr = CategoricalDoublyRobust(
     outcome_regressor=LinearRegression(),
 )
 _ = dr.fit(X, t, y)
-dr_curve = np.asarray(dr.predict_curve(t=levels), dtype=float).reshape(-1)
+dr_curve = np.asarray(dr.predict(t=levels), dtype=float).reshape(-1)
 ```
 
 ::: {.callout-tip}
@@ -348,13 +348,13 @@ continuous_capable_results = {
     "DirectNoCovariates": np.asarray(
         DirectNoCovariates(outcome_regressor=make_linear_pipeline())
         .fit(X, t, y)
-        .predict_curve(t=levels),
+        .predict(t=levels),
         dtype=float,
     ).reshape(-1),
     "DirectRegressor": np.asarray(
         DirectRegressor(outcome_regressor=make_linear_pipeline())
         .fit(X, t, y)
-        .predict_curve(t=levels),
+        .predict(t=levels),
         dtype=float,
     ).reshape(-1),
     "DoublyRobustPseudoOutcome": np.asarray(
@@ -370,7 +370,7 @@ continuous_capable_results = {
             random_state=0,
         )
         .fit(X, t, y)
-        .predict_curve(t=levels),
+        .predict(t=levels),
         dtype=float,
     ).reshape(-1),
     "GPS": np.asarray(
@@ -383,7 +383,7 @@ continuous_capable_results = {
             random_state=0,
         )
         .fit(X, t, y)
-        .predict_curve(t=levels),
+        .predict(t=levels),
         dtype=float,
     ).reshape(-1),
 }

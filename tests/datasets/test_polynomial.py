@@ -23,9 +23,13 @@ def test_polynomial_dataset_predict_y_accepts_polars_and_numpy():
     covariates, treatments, _ = dataset.load()
 
     predictions_from_polars = dataset.predict_y(covariates, treatments)
+    predictions_from_pandas = dataset.predict_y(
+        covariates.to_pandas(), treatments.to_pandas()
+    )
     predictions_from_numpy = dataset.predict_y(
         covariates.to_numpy(), treatments.to_numpy()
     )
 
     np.testing.assert_allclose(predictions_from_polars, predictions_from_numpy)
-    assert predictions_from_polars.shape == (16,)
+    np.testing.assert_allclose(predictions_from_polars, predictions_from_pandas)
+    assert predictions_from_polars.shape == (16, 1)

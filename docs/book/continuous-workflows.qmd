@@ -23,7 +23,7 @@ grid = pl.DataFrame(
 )
 ```
 
-The grid can have any row count: `predict(t, X=None)` returns one average response per requested treatment row. If you omit `X`, X-aware estimators reuse the covariate sample stored during `fit`.
+The grid can have any row count: `predict(t)` returns one average response per requested treatment row and averages over the covariate sample stored during `fit`.
 
 ## Step 2: Predict A Curve
 
@@ -33,7 +33,7 @@ from sklearn.linear_model import LinearRegression
 
 estimator = DirectRegressor(outcome_regressor=LinearRegression())
 estimator.fit(X, t, y)
-curve = estimator.predict_curve(grid)
+curve = estimator.predict(grid)
 ```
 
 For a direct method, the returned curve is the average of `\hat{E}[Y | X, T=t]` over the observed covariate sample.

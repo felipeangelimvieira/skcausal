@@ -47,19 +47,17 @@ class RecordingAverageResponseEstimator(BaseAverageCausalResponseEstimator):
         self.fit_y_ = copy.deepcopy(y)
         return self
 
-    def _predict(self, t, X=None):
-        self.predict_X_ = copy.deepcopy(X)
+    def _predict(self, t):
+        self.predict_X_ = None
         self.predict_t_ = copy.deepcopy(t)
         return np.full(len(t), self.prediction_value, dtype=float)
 
 
 class XAwareRecordingAverageResponseEstimator(RecordingAverageResponseEstimator):
-    _tags = {
-        "backend": "polars",
-        "capability:t_type": ["continuous", "categorical"],
-        "capability:multidimensional_treatment": True,
-        "capability:predicts_for_new_X": True,
-    }
+    def _predict(self, t):
+        self.predict_X_ = copy.deepcopy(self._get_fit_X())
+        self.predict_t_ = copy.deepcopy(t)
+        return np.full(len(t), self.prediction_value, dtype=float)
 
 
 def test_pipeline_is_a_base_average_causal_response_estimator():
@@ -71,24 +69,6 @@ def test_pipeline_is_a_base_average_causal_response_estimator():
     )
 
     assert isinstance(pipeline, BaseAverageCausalResponseEstimator)
-
-
-def test_pipeline_propagates_predicts_for_new_x_tag_from_final_estimator():
-    x_aware_pipeline = Pipeline(
-        steps=[
-            ("transform_X", ShiftAndRenameTransformation(offset=1.0, prefix="x_"), "X"),
-            ("estimator", XAwareRecordingAverageResponseEstimator()),
-        ]
-    )
-    constant_pipeline = Pipeline(
-        steps=[
-            ("transform_X", ShiftAndRenameTransformation(offset=1.0, prefix="x_"), "X"),
-            ("estimator", RecordingAverageResponseEstimator()),
-        ]
-    )
-
-    assert x_aware_pipeline.get_tag("capability:predicts_for_new_X") is True
-    assert constant_pipeline.get_tag("capability:predicts_for_new_X") is False
 
 
 def test_pipeline_applies_transformations_to_requested_arguments():
@@ -131,8 +111,8 @@ def test_pipeline_applies_transformations_to_requested_arguments():
 
     response = pipeline.predict(t)
 
-    assert response.shape == (2,)
-    np.testing.assert_allclose(response, np.array([3.0, 3.0]))
+    assert response.shape == (2, 1)
+    np.testing.assert_allclose(response, np.array([[3.0], [3.0]]))
     assert pipeline.estimator_.predict_X_.equals(expected_fit_X)
     assert pipeline.estimator_.predict_t_.equals(expected_fit_t)
 
@@ -160,13 +140,13 @@ def test_pipeline_omits_x_when_final_estimator_ignores_it():
     pipeline.fit(X, t, y)
     response = pipeline.predict(t)
 
-    assert response.shape == (2,)
-    np.testing.assert_allclose(response, np.array([3.0, 3.0]))
+    assert response.shape == (2, 1)
+    np.testing.assert_allclose(response, np.array([[3.0], [3.0]]))
     assert pipeline.estimator_.predict_X_ is None
     assert pipeline.estimator_.predict_t_.equals(pl.DataFrame({"t_t": [2.0, 3.0]}))
 
 
-def test_pipeline_predict_curve_uses_predict_override_for_x_invariant_estimators():
+def test_pipeline_predict_uses_x_invariant_final_estimator():
     X = pl.DataFrame({"x": [0.0, 1.0], "z": [2.0, 3.0]})
     t = pl.DataFrame({"t": [4.0, 5.0]})
     y = pl.DataFrame({"y": [10.0, 11.0]})
@@ -188,7 +168,7 @@ def test_pipeline_predict_curve_uses_predict_override_for_x_invariant_estimators
     )
 
     pipeline.fit(X, t, y)
-    curve = pipeline.predict_curve(t_query)
+    curve = pipeline.predict(t_query)
 
     assert curve.shape == (2, 1)
     np.testing.assert_allclose(curve, np.array([[3.0], [3.0]]))
@@ -196,7 +176,7 @@ def test_pipeline_predict_curve_uses_predict_override_for_x_invariant_estimators
     assert pipeline.estimator_.predict_t_.equals(pl.DataFrame({"t_t": [5.0, 6.0]}))
 
 
-def test_pipeline_predict_curve_expands_inputs_before_prediction():
+def test_pipeline_predict_uses_fit_time_x_for_final_estimator():
     X = pl.DataFrame({"x": [0.0, 1.0], "z": [2.0, 3.0]})
     t = pl.DataFrame({"t": [4.0, 5.0]})
     y = pl.DataFrame({"y": [10.0, 11.0]})
@@ -221,12 +201,10 @@ def test_pipeline_predict_curve_expands_inputs_before_prediction():
     )
 
     pipeline.fit(X, t, y)
-    curve = pipeline.predict_curve(t_query)
+    curve = pipeline.predict(t_query)
 
-    expected_curve_X = pl.DataFrame(
-        {"x_x": [10.0, 11.0, 10.0, 11.0], "x_z": [12.0, 13.0, 12.0, 13.0]}
-    )
-    expected_curve_t = pl.DataFrame({"t_t": [5.0, 5.0, 6.0, 6.0]})
+    expected_curve_X = pl.DataFrame({"x_x": [10.0, 11.0], "x_z": [12.0, 13.0]})
+    expected_curve_t = pl.DataFrame({"t_t": [5.0, 6.0]})
 
     assert pipeline.estimator_.predict_X_.equals(expected_curve_X)
     assert pipeline.estimator_.predict_t_.equals(expected_curve_t)

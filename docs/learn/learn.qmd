@@ -150,7 +150,7 @@ from skcausal.causal_estimators import DirectRegressor
 
 direct = DirectRegressor(outcome_regressor=LinearRegression())
 direct.fit(X, t, y)
-mu_hat = direct.predict_curve(t)
+mu_hat = direct.predict(t)
 ```
 
 ### 2. Inverse probability weighting — reweight the data
