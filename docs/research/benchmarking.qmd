@@ -1,0 +1,154 @@
+---
+title: "Benchmarking Across Dataset Seeds"
+execute:
+    warning: false
+    freeze: true
+---
+
+Use this guide when you want to compare estimators on a synthetic benchmark where the true average response curve is known.
+
+::: {.callout-note appearance="simple"}
+## What `evaluate_multiple_dataset_seeds` does
+
+This helper answers a specific question: if I keep the estimator definition fixed, how does performance change when I regenerate the synthetic dataset with different random seeds?
+:::
+
+That is useful because a single synthetic dataset draw can be misleading. Some seeds produce easier treatment assignments or cleaner outcome surfaces than others. Running across multiple dataset seeds gives you a more stable view of model quality.
+
+## Setup
+
+We will compare two estimators on `SyntheticDataset2`:
+
+| Model | What it learns |
+|---|---|
+| `DirectNoCovariates` | A naive observational baseline that fits $\mathbb{E}[Y \mid T=t]$ and ignores confounders `X` |
+| `DirectRegressor` | A direct response model that fits $\mathbb{E}[Y \mid X, T=t]$ and averages over the fitted covariate sample |
+
+This is a good teaching example because `SyntheticDataset2` is confounded by construction. Treatment depends on the covariates, and the outcome depends on them too. The naive model therefore mixes confounding with treatment effect, while the direct model has a chance to adjust for it.
+
+::: {.callout-important}
+`evaluate_multiple_dataset_seeds` is designed for synthetic datasets that subclass `BaseSyntheticDataset`, because the metrics compare predicted curves against the dataset's known ground-truth response.
+:::
+
+## Step 1: Imports
+
+```{python}
+import pandas as pd
+
+from sklearn.ensemble import RandomForestRegressor
+
+from skcausal.causal_estimators import DirectNoCovariates, DirectRegressor
+from skcausal.causal_estimators.benchmarking import evaluate_multiple_dataset_seeds
+from skcausal.causal_estimators.benchmarking.metrics import MAE, RMSE
+from skcausal.datasets import SyntheticDataset2
+```
+
+## Step 2: Define one shared regression backbone
+
+To keep the comparison fair, both estimators will use the same regression model family. The only difference is which inputs they see.
+
+```{python}
+def make_regressor(random_state: int = 0):
+	return RandomForestRegressor(
+		n_estimators=60,
+		max_depth=8,
+		min_samples_leaf=10,
+		random_state=random_state,
+	)
+```
+
+## Step 3: Create the synthetic benchmark and metrics
+
+```{python}
+dataset = SyntheticDataset2(
+	n=1500,
+	n_features=6,
+	random_state=0,
+)
+
+metrics = [
+	MAE(n_treatments=128, random_state=0),
+	RMSE(n_treatments=128, random_state=0),
+]
+
+metric_columns = [str(metric) for metric in metrics]
+metric_display_names = {
+	metric_columns[0]: "MAE",
+	metric_columns[1]: "RMSE",
+}
+
+dataset_seeds = [0, 1, 2, 3, 4]
+```
+
+Here:
+
+1. `dataset` defines the data-generating process, not just one observed table.
+2. `metrics` specify how to compare each fitted estimator against the true average response curve.
+3. `dataset_seeds` controls how many independent synthetic dataset draws we evaluate.
+
+## Step 4: Benchmark the two estimators
+
+The helper benchmarks one estimator at a time, so we wrap it in a small function and then concatenate the outputs.
+
+```{python}
+def benchmark_model(model_name, estimator):
+	results = evaluate_multiple_dataset_seeds(
+		dataset=dataset,
+		estimator=estimator,
+		metrics=metrics,
+		random_states=dataset_seeds,
+	)
+	results["model"] = model_name
+	return results
+
+
+naive_results = benchmark_model(
+	"DirectNoCovariates",
+	DirectNoCovariates(outcome_regressor=make_regressor()),
+)
+
+direct_results = benchmark_model(
+	"DirectRegressor",
+	DirectRegressor(outcome_regressor=make_regressor()),
+)
+
+benchmark_results = pd.concat(
+	[naive_results, direct_results],
+	ignore_index=True,
+)
+
+benchmark_results
+```
+
+Each row is one dataset seed. The metric columns are named from the metric objects passed in `metrics`, and `dataset_seed` tells you which regenerated synthetic dataset produced that score.
+
+## Step 5: Summarize the comparison
+
+```{python}
+summary = (
+	benchmark_results
+	.groupby("model")[metric_columns]
+	.agg(["mean", "std"])
+	.rename(columns=metric_display_names, level=0)
+	.round(3)
+)
+
+summary
+```
+
+The main pattern to look for is whether the direct model beats the naive baseline on average and whether that advantage is consistent across seeds.
+
+## A reusable pattern
+
+Once this pattern works, you can swap in:
+
+1. Another synthetic dataset such as a new subclass of `BaseSyntheticDataset`.
+2. Another estimator such as `GPS` or `DoublyRobustPseudoOutcome`.
+3. Another metric, including your own subclass of `AverageResponseMetric`.
+4. A longer list of dataset seeds for a more stable benchmark.
+
+## Where to go next
+
+- See [Continuous Treatments](../examples/continuous_treatments.qmd) for a fuller estimator walkthrough on the same dataset family.
+- See [Implement your own method](extending.qmd) if you want to benchmark a custom estimator or synthetic dataset.
+- See [Dataset Catalog](dataset_catalog.qmd) for other built-in synthetic benchmarks.
