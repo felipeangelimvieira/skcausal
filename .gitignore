@@ -140,3 +140,5 @@ dmypy.json
 
 # Lightning logs (PyTorch Lightning training outputs)
 lightning_logs/
+
+_namespace/
