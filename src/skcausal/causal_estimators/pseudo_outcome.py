@@ -71,7 +71,7 @@ class DoublyRobustPseudoOutcome(BaseAverageCausalResponseEstimator):
     _tags = {
         "backend": "pandas",
         "capability:t_type": ["continuous", "categorical"],
-        "capability:multidimensional_treatment": False,
+        "capability:multidimensional_treatment": True,
     }
 
     def __init__(
@@ -80,7 +80,7 @@ class DoublyRobustPseudoOutcome(BaseAverageCausalResponseEstimator):
         outcome_regressor: BaseEstimator,
         pseudo_outcome_regressor: BaseEstimator,
         cv: Optional[int] = 5,
-        cross_fit: bool = False,
+        cross_fit: bool = True,
         n_pseudo_samples: Optional[int] = None,
         random_state: int = 42,
     ):

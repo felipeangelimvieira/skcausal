@@ -35,6 +35,7 @@ class DirectRegressor(BaseAverageCausalResponseEstimator):
 
     _tags = {
         "backend": "pandas",
+        "capability:multidimensional_treatment": True,
     }
 
     def __init__(

@@ -50,7 +50,7 @@ class PermutationWeighting(BaseDensityEstimator):
     """
 
     _tags = {
-        "capability:multidimensional_treatment": False,
+        "capability:multidimensional_treatment": True,
         "density_kind": "stabilized",
     }
 
