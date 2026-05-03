@@ -56,8 +56,7 @@ class PandasContinuousColumnType(PandasColumnTypeMixin, BaseColumnType):
         import pandas as pd
 
         return isinstance(obj, pd.Series) and (
-            pd.api.types.is_numeric_dtype(obj)
-            and not pd.api.types.is_bool_dtype(obj)
+            pd.api.types.is_numeric_dtype(obj) and not pd.api.types.is_bool_dtype(obj)
         )
 
     @classmethod
@@ -99,7 +98,10 @@ class PandasCategoricalColumnType(PandasColumnTypeMixin, BaseColumnType):
     @classmethod
     def convert_column(cls, col):
         """Convert to category dtype"""
+        import pandas as pd
 
+        if pd.api.types.is_bool_dtype(col):
+            return col.astype(bool)
         return col.astype("category")
 
 
@@ -178,4 +180,6 @@ class PolarsCategoricalColumnType(PolarsColumnTypeMixin, BaseColumnType):
 
         import polars as pl
 
+        if col.dtype == pl.Boolean:
+            return col.cast(pl.Boolean)
         return col.cast(pl.Categorical)
