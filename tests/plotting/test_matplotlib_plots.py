@@ -56,6 +56,82 @@ def test_plot_joint_curves_groups_by_categorical_treatment_columns():
     plt.close(axis.figure)
 
 
+def test_plot_joint_curves_reuses_model_color_across_categorical_groups():
+    t = pl.DataFrame(
+        {
+            "dose": [0.0, 1.0, 0.0, 1.0],
+            "arm": ["a", "a", "b", "b"],
+        }
+    )
+    curves = {
+        "observed": np.array([1.0, 2.0, 4.0, 8.0]),
+        "truth": np.array([1.5, 2.5, 4.5, 8.5]),
+    }
+
+    axis = plot_joint_curves(t, curves)
+
+    line_by_label = {line.get_label(): line for line in axis.lines}
+
+    assert (
+        line_by_label["observed | arm=a"].get_color()
+        == line_by_label["observed | arm=b"].get_color()
+    )
+    assert (
+        line_by_label["truth | arm=a"].get_color()
+        == line_by_label["truth | arm=b"].get_color()
+    )
+    assert (
+        line_by_label["observed | arm=a"].get_color()
+        != line_by_label["truth | arm=a"].get_color()
+    )
+
+    assert line_by_label["observed | arm=a"].get_linestyle() == "-"
+    assert line_by_label["observed | arm=b"].get_linestyle() == "--"
+    assert line_by_label["truth | arm=a"].get_linestyle() == "-"
+    assert line_by_label["truth | arm=b"].get_linestyle() == "--"
+
+    plt.close(axis.figure)
+
+
+def test_plot_joint_curves_can_split_categorical_groups_across_axes():
+    t = pl.DataFrame(
+        {
+            "dose": [0.0, 1.0, 0.0, 1.0],
+            "arm": ["a", "a", "b", "b"],
+        }
+    )
+    curves = {
+        "observed": np.array([1.0, 2.0, 4.0, 8.0]),
+        "truth": np.array([1.5, 2.5, 4.5, 8.5]),
+    }
+
+    axes = plot_joint_curves(t, curves, separate_axes_by_group=True)
+
+    assert len(axes) == 2
+    assert [axis.get_title() for axis in axes] == ["arm=a", "arm=b"]
+
+    first_axis_lines = {line.get_label(): line for line in axes[0].lines}
+    second_axis_lines = {line.get_label(): line for line in axes[1].lines}
+
+    assert (
+        first_axis_lines["observed"].get_color()
+        == second_axis_lines["observed"].get_color()
+    )
+    assert (
+        first_axis_lines["truth"].get_color() == second_axis_lines["truth"].get_color()
+    )
+    assert (
+        first_axis_lines["observed"].get_color()
+        != first_axis_lines["truth"].get_color()
+    )
+
+    np.testing.assert_allclose(
+        second_axis_lines["observed"].get_ydata(), np.array([4.0, 8.0])
+    )
+
+    plt.close(axes[0].figure)
+
+
 def test_plot_joint_curves_rejects_multiple_continuous_treatment_columns():
     t = pl.DataFrame({"dose": [0.0, 1.0], "dose_2": [1.0, 2.0]})
 

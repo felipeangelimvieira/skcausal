@@ -183,15 +183,41 @@ def _groupby_mean(frame, group_columns: list[str], value_column: str):
     )
 
 
-def _plot_series(ax, x, y, *, is_categorical: bool, label: str | None = None):
+def _plot_series(
+    ax,
+    x,
+    y,
+    *,
+    is_categorical: bool,
+    label: str | None = None,
+    **plot_kwargs,
+):
     if is_categorical:
         labels = [str(value) for value in x]
         positions = np.arange(len(labels), dtype=float)
-        ax.plot(positions, y, marker="o", label=label)
+        ax.plot(positions, y, marker="o", label=label, **plot_kwargs)
         ax.set_xticks(positions, labels)
         return
 
-    ax.plot(np.asarray(x, dtype=float), y, marker="o", label=label)
+    ax.plot(np.asarray(x, dtype=float), y, marker="o", label=label, **plot_kwargs)
+
+
+def _joint_group_plot_kwargs(*, base_color: str | None, group_index: int) -> dict:
+    if base_color is None:
+        return {}
+
+    line_styles = ("-", "--", "-.", ":")
+    return {
+        "color": base_color,
+        "linestyle": line_styles[group_index % len(line_styles)],
+    }
+
+
+def _get_model_colors(reference_axis, model_labels: list[str]) -> dict[str, str]:
+    return {
+        model_label: reference_axis._get_lines.get_next_color()
+        for model_label in model_labels
+    }
 
 
 def _format_group_label(group_columns: list[str], group_key) -> str:
@@ -293,13 +319,22 @@ def plot_marginal_curves(t: DataFrameLike, y: dict[str, np.array], ax=None):
     return axes[0] if len(axes) == 1 else axes
 
 
-def plot_joint_curves(t: DataFrameLike, y: dict[str, np.array], ax=None):
+def plot_joint_curves(
+    t: DataFrameLike,
+    y: dict[str, np.array],
+    ax=None,
+    *,
+    separate_axes_by_group: bool = False,
+):
     """
     Plot curves of t vs y on the given matplotlib axis.
 
     This function only supports t's with a single continuous treatment.
     It groups-by every categorical column and plot a single-line for each
     group.
+
+    When ``separate_axes_by_group`` is True, each categorical group is drawn
+    on its own axis while model colors stay aligned across axes.
     """
     t = convert(t, "pandas")
     column_types = collect_column_types(t)
@@ -321,18 +356,65 @@ def plot_joint_curves(t: DataFrameLike, y: dict[str, np.array], ax=None):
         for column, column_type in column_types.items()
         if column_type == "categorical"
     ]
-    axis = _coerce_axes(ax, 1)[0]
+
+    grouped_frames_by_model = {}
+    group_keys: list[object] = []
+    if categorical_columns:
+        group_columns = [*categorical_columns, continuous_column]
+        for model_label, values in curves.items():
+            plot_frame = t.copy()
+            plot_frame["__value__"] = values
+            plot_frame = _groupby_mean(plot_frame, group_columns, "__value__")
+            grouped = [
+                (
+                    group_key,
+                    group_frame.sort_values(continuous_column, kind="stable"),
+                )
+                for group_key, group_frame in plot_frame.groupby(
+                    categorical_columns, observed=True, sort=False
+                )
+            ]
+            if not group_keys:
+                group_keys = [group_key for group_key, _ in grouped]
+            grouped_frames_by_model[model_label] = dict(grouped)
+
+    use_group_axes = separate_axes_by_group and bool(categorical_columns)
+    axes = _coerce_axes(ax, len(group_keys) if use_group_axes else 1)
+    model_colors = _get_model_colors(axes[0], list(curves)) if use_group_axes else None
+
+    if use_group_axes:
+        for group_axis, group_key in zip(axes, group_keys):
+            for model_label in curves:
+                group_frame = grouped_frames_by_model[model_label][group_key]
+                _plot_series(
+                    group_axis,
+                    group_frame[continuous_column].to_numpy(dtype=float),
+                    group_frame["__value__"].to_numpy(dtype=float),
+                    is_categorical=False,
+                    label=model_label if len(curves) > 1 else None,
+                    color=model_colors[model_label],
+                )
+
+            group_axis.set_xlabel(continuous_column)
+            group_axis.set_title(_format_group_label(categorical_columns, group_key))
+
+        axes[0].set_ylabel("Average response")
+        if len(curves) > 1:
+            axes[0].legend()
+
+        return axes[0] if len(axes) == 1 else axes
+
+    axis = axes[0]
 
     for model_label, values in curves.items():
-        plot_frame = t.copy()
-        plot_frame["__value__"] = values
-
         if categorical_columns:
-            group_columns = [*categorical_columns, continuous_column]
-            plot_frame = _groupby_mean(plot_frame, group_columns, "__value__")
-            grouped = plot_frame.groupby(categorical_columns, observed=True, sort=False)
-            for group_key, group_frame in grouped:
-                group_frame = group_frame.sort_values(continuous_column, kind="stable")
+            grouped = [
+                (group_key, grouped_frames_by_model[model_label][group_key])
+                for group_key in group_keys
+            ]
+            base_color = axis._get_lines.get_next_color() if len(curves) > 1 else None
+
+            for group_index, (group_key, group_frame) in enumerate(grouped):
                 _plot_series(
                     axis,
                     group_frame[continuous_column].to_numpy(dtype=float),
@@ -342,8 +424,14 @@ def plot_joint_curves(t: DataFrameLike, y: dict[str, np.array], ax=None):
                         model_label if len(curves) > 1 else None,
                         _format_group_label(categorical_columns, group_key),
                     ),
+                    **_joint_group_plot_kwargs(
+                        base_color=base_color,
+                        group_index=group_index,
+                    ),
                 )
         else:
+            plot_frame = t.copy()
+            plot_frame["__value__"] = values
             plot_frame = _groupby_mean(plot_frame, [continuous_column], "__value__")
             plot_frame = plot_frame.sort_values(continuous_column, kind="stable")
             _plot_series(

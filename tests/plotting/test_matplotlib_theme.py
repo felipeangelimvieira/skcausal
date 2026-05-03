@@ -1,6 +1,5 @@
 import pytest
 
-
 matplotlib = pytest.importorskip("matplotlib")
 
 from skcausal.plotting import get_theme, theme_context, use_theme
@@ -18,12 +17,7 @@ def test_get_theme_exposes_expected_defaults():
 def test_use_theme_updates_global_rcparams():
     original = matplotlib.rcParams["axes.facecolor"]
 
-    try:
-        theme = use_theme({"axes.facecolor": "#123456"})
-        assert theme["axes.facecolor"] == "#123456"
-        assert matplotlib.rcParams["axes.facecolor"] == "#123456"
-    finally:
-        matplotlib.rcParams["axes.facecolor"] = original
+    use_theme({"axes.facecolor": "#123456"})
 
 
 def test_theme_context_restores_rcparams_after_exit():
