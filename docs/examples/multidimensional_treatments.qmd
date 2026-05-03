@@ -12,7 +12,6 @@ Use this guide when treatment is stored in more than one column, such as a numer
 
 Start here if your treatment table has multiple columns and you want one end-to-end example that stays close to the production API.
 
-This version uses strong defaults from the start: forest-based nuisance models for outcome and treatment-score estimation, plus a spline-expanded linear smoother for the final doubly robust stage.
 :::
 
 ## What we're estimating
@@ -60,6 +59,7 @@ All causal interpretations below assume consistency, no unmeasured confounding a
 ## Step 1: Import dependencies
 
 ```{python}
+# | code-fold: true
 import numpy as np
 import polars as pl
 import matplotlib.pyplot as plt
@@ -91,6 +91,7 @@ use_theme()
 ## Step 2: Load a confounded mixed-treatment dataset
 
 ```{python}
+# | code-fold: true
 dataset = Synthetic2MultidimDataset(
     n=2000,
     n_features=5,
@@ -133,6 +134,7 @@ This gives a benchmark where:
 The nuisance models below use the same expressive forest defaults. The only deliberate exception is the final doubly robust smoother, which uses a spline basis over the continuous treatment coordinate and a linear regressor over the expanded treatment features.
 
 ```{python}
+# | code-fold: true
 def make_forest_mixed_treatment_regressor(categorical_column):
     return Pipeline(
         [
@@ -164,6 +166,7 @@ def make_forest_mixed_treatment_regressor(categorical_column):
 ```
 
 ```{python}
+# | code-fold: true
 def make_forest_permutation_weighting():
     return PermutationWeighting(
         classifier=RandomForestClassifier(
@@ -178,6 +181,7 @@ def make_forest_permutation_weighting():
 ```
 
 ```{python}
+# | code-fold: true
 def make_spline_mixed_treatment_regressor(continuous_column, categorical_column):
     return Pipeline(
         [
@@ -222,10 +226,7 @@ def make_spline_mixed_treatment_regressor(continuous_column, categorical_column)
 ```
 
 ```{python}
-def curve_values(curve):
-    return np.asarray(curve, dtype=float).reshape(-1)
-
-
+# | code-fold: true
 def mean_absolute_error(left, right):
     return float(np.mean(np.abs(np.asarray(left) - np.asarray(right))))
 ```
@@ -233,6 +234,7 @@ def mean_absolute_error(left, right):
 ## Step 4: Build the intervention grid
 
 ```{python}
+# | code-fold: true
 grid = make_cartesian_treatment_grid(
     t,
     n_continuous_points=10,
@@ -250,7 +252,7 @@ The prediction contract is unchanged from the single-treatment guides: pass a tr
 ## Step 5: Compute the truth
 
 ```{python}
-truth_curve = curve_values(dataset.predict(X, grid))
+truth_curve = dataset.predict(X, grid).flatten()
 truth = grid.with_columns(pl.Series("truth", truth_curve))
 ```
 
@@ -259,45 +261,12 @@ Because this is a synthetic dataset, we can evaluate the true average potential 
 ## Step 6: Inspect the raw observational surface
 
 ```{python}
-bin_edges = np.linspace(
-    float(t[continuous_col].min()),
-    float(t[continuous_col].max()),
-    13,
+# | code-fold: true
+naive = DirectNoCovariates(
+    outcome_regressor=make_forest_mixed_treatment_regressor(categorical_col)
 )
-bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
-```
-
-```{python}
-observed_frames = []
-category_values = t[categorical_col].cast(pl.Utf8).to_numpy()
-dose_values = t[continuous_col].to_numpy()
-y_values = y["y"].to_numpy()
-
-for level in dataset.levels_:
-    mask = category_values == level
-    level_dose = dose_values[mask]
-    level_y = y_values[mask]
-    bin_ids = np.digitize(level_dose, bin_edges[1:-1])
-
-    observed_frames.append(
-        pl.DataFrame(
-            {
-                continuous_col: bin_centers,
-                categorical_col: [level] * len(bin_centers),
-                "observed": [
-                    level_y[bin_ids == index].mean() if np.any(bin_ids == index) else np.nan
-                    for index in range(len(bin_centers))
-                ],
-            }
-        )
-    )
-
-observed_surface = pl.concat(observed_frames, how="vertical").with_columns(
-    pl.col(categorical_col).cast(t.schema[categorical_col])
-)
-observed_truth_curve = curve_values(
-    dataset.predict(X, observed_surface.select(t.columns))
-)
+naive.fit(X, t, y)
+naive_curve = naive.predict(t=grid).flatten()
 ```
 
 ```{python}
@@ -310,34 +279,22 @@ fig, axes = plt.subplots(
 )
 axes = np.atleast_1d(axes)
 plot_joint_curves(
-    observed_surface.select(t.columns),
+    grid,
     {
-        "Observed mean within bins": observed_surface["observed"].to_numpy(),
-        "Truth": observed_truth_curve,
+        "Raw observational surface": naive_curve,
+        "Truth": truth_curve,
     },
     ax=axes,
     separate_axes_by_group=True,
 )
-fig.suptitle("Observed surface before causal adjustment")
+fig.suptitle("Raw observational surface before causal adjustment")
 axes[0].legend(ncols=2)
 plt.show()
 ```
 
-These raw curves are useful as a baseline, but they are not causal estimates. Even after splitting by `t_0_bin`, the continuous dose remains confounded by `X`.
+`DirectNoCovariates` is a useful observational baseline, but it is not a causal estimate. The model ignores `X`, so even after splitting by `t_0_bin`, the continuous dose remains confounded by the covariates.
 
-## Step 7: Fit DirectNoCovariates
-
-`DirectNoCovariates` is included as a sanity-check baseline. It models the treatment table directly and ignores `X`, so it estimates the observational surface `E[Y | T=t, C=c]` rather than the causal target.
-
-```{python}
-naive = DirectNoCovariates(
-    outcome_regressor=make_forest_mixed_treatment_regressor(categorical_col)
-)
-naive.fit(X, t, y)
-naive_curve = curve_values(naive.predict(t=grid))
-```
-
-## Step 8: Fit DirectRegressor
+## Step 7: Fit DirectRegressor
 
 `DirectRegressor` uses the same mixed-treatment outcome model, but now the model sees both `X` and the treatment table. Prediction averages over the observed covariate sample at each requested treatment row.
 
@@ -346,10 +303,10 @@ direct = DirectRegressor(
     outcome_regressor=make_forest_mixed_treatment_regressor(categorical_col)
 )
 direct.fit(X, t, y)
-direct_curve = curve_values(direct.predict(t=grid))
+direct_curve = direct.predict(t=grid).flatten()
 ```
 
-## Step 9: Fit GPS
+## Step 8: Fit GPS
 
 `GPS` augments the outcome model with a treatment score computed from `predict_density(X, t)`. In this example that score comes from `PermutationWeighting`, which returns a stabilized density-ratio-style quantity. So this is best read as a score-adjustment example, not as a parametric conditional-density example.
 
@@ -362,10 +319,10 @@ gps = GPS(
     random_state=0,
 )
 gps.fit(X, t, y)
-gps_curve = curve_values(gps.predict(t=grid))
+gps_curve = gps.predict(t=grid).flatten()
 ```
 
-## Step 10: Fit DoublyRobustPseudoOutcome
+## Step 9: Fit DoublyRobustPseudoOutcome
 
 `DoublyRobustPseudoOutcome` uses the same forest outcome model and the same stabilized score model, then smooths the pseudo-outcomes over treatment with a spline basis over the continuous coordinate and encoded indicators for the categorical coordinate.
 
@@ -382,11 +339,11 @@ dr = DoublyRobustPseudoOutcome(
     random_state=0,
 )
 dr.fit(X, t, y)
-dr_curve = curve_values(dr.predict(t=grid))
+dr_curve = dr.predict(t=grid).flatten()
 ```
 
 
-## Step 11: Compare estimates
+## Step 10: Compare estimates
 
 ```{python}
 comparison = grid.with_columns(
@@ -401,10 +358,11 @@ comparison.head(8)
 ```
 
 ```{python}
+# | code-fold: true
 fig, axes = plt.subplots(
     1,
     len(dataset.levels_),
-    figsize=(12, 4.8),
+    figsize=(12, 5.2),
     sharey=True,
     constrained_layout=True,
 )
@@ -421,8 +379,18 @@ plot_joint_curves(
     ax=axes,
     separate_axes_by_group=True,
 )
+handles, labels = axes[0].get_legend_handles_labels()
+axis_legend = axes[0].get_legend()
+if axis_legend is not None:
+    axis_legend.remove()
 fig.suptitle("Estimated multidimensional response surface")
-axes[0].legend(ncols=3)
+fig.legend(
+    handles,
+    labels,
+    loc="outside lower center",
+    ncols=3,
+    frameon=False,
+)
 plt.show()
 ```
 
@@ -491,11 +459,3 @@ mixed_treatment_densities = density_catalog[
 
 mixed_treatment_densities
 ```
-
-## What to try next
-
-For the single-dose version of the same base benchmark, continue to the [continuous-treatment guide](continuous_treatments.qmd).
-
-If your treatment has only labels and no numeric dimension, go to the [categorical-treatment guide](categorical_treatments.qmd).
-
-If you want the full examples overview, return to the [examples hub](index.qmd).

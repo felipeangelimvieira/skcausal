@@ -9,19 +9,6 @@ toc: false
 Start from the shape of `t`. The guide changes with the treatment representation, but the estimator contract stays the same.
 :::
 
-
-[`Choose a path`]{.section-kicker}
-
-## Start With The Treatment Shape
-
-| If treatment looks like | Open | Main output |
-| --- | --- | --- |
-| One numeric column such as dose, score, or exposure | [Continuous treatments](continuous_treatments.qmd) | A response curve on a treatment grid. |
-| One discrete column with named levels such as `control`, `placebo`, and `treated` | [Categorical treatments](categorical_treatments.qmd) | Average potential outcomes for requested levels. |
-| Multiple treatment columns such as dose plus regime | [Multidimensional treatments](multidimensional_treatments.qmd) | Joint intervention comparisons across treatment regimes. |
-
-[`Shared workflow`]{.section-kicker}
-
 ## The Core Workflow Does Not Change
 
 The same pattern shows up in every tutorial.
@@ -31,10 +18,17 @@ The same pattern shows up in every tutorial.
 3. Create the requested intervention table or treatment grid.
 4. Predict and compare the returned causal quantity.
 
-::: {.callout-note appearance="simple"}
-## Density-aware continuous workflows
+[`Choose a path`]{.section-kicker}
 
-Use the density guide when a continuous-treatment workflow needs an explicit treatment assignment model, such as GPS-style estimation.
+## Start With The Treatment Shape
 
-[Read the density overview](../density/index.qmd)
-:::
+The examples use synthetic datasets to compare with
+ground truth, but the workflow is the same for real data. 
+
+| If treatment looks like | Open | Main output |
+| --- | --- | --- |
+| One numeric column such as dose, score, or exposure | [Continuous treatments](continuous_treatments.qmd) | A response curve on a treatment grid. |
+| One discrete column with named levels such as `control`, `placebo`, and `treated` | [Categorical treatments](categorical_treatments.qmd) | Average potential outcomes for requested levels. |
+| Multiple treatment columns such as dose plus regime | [Multidimensional treatments](multidimensional_treatments.qmd) | Joint intervention comparisons across treatment regimes. |
+
+[`Shared workflow`]{.section-kicker}

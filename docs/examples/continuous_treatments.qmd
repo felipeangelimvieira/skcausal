@@ -1,5 +1,6 @@
 ---
 title: "Continuous Treatments"
+bibliography: ../references.bib
 execute:
     warning: false
     freeze: true
@@ -35,8 +36,8 @@ This example compares four estimators, including one intentionally naive baselin
 |---|---|
 | `DirectNoCovariates` | Fits $\mathbb{E}_P[Y \mid T=t]$ and ignores `X`; observational baseline only |
 | `DirectRegressor` | Fits $\mathbb{E}_P[Y \mid X, T=t]$ and averages over `X` at each grid point |
-| `GPS` | Fits an outcome model on treatment and an estimated treatment score from `predict_density(X, T)` |
-| `DoublyRobustPseudoOutcome` | Combines an outcome model with a stabilized density model and smooths pseudo-outcomes over treatment |
+| `GPS` | Fits an outcome model on treatment and an estimated treatment score from `predict_density(X, T)` [@hirano2004propensity] |
+| `DoublyRobustPseudoOutcome` | Combines an outcome model with a stabilized density model and smooths pseudo-outcomes over treatment [@kennedy2017non]|
 
 ::: {.callout-note}
 All causal interpretations in this guide assume consistency, no unmeasured confounding after conditioning on `X`, and sufficient overlap across the treatment range you want to evaluate.
@@ -45,6 +46,7 @@ All causal interpretations in this guide assume consistency, no unmeasured confo
 ## Step 1: Import dependencies
 
 ```{python}
+# | code-fold: true
 import numpy as np
 import polars as pl
 import matplotlib.pyplot as plt
@@ -65,7 +67,10 @@ from skcausal.utils.treatment_grid import make_cartesian_treatment_grid
 use_theme()
 ```
 
+We also define some utilities:
+
 ```{python}
+# | code-fold: true
 def make_forest_regressor():
     return RandomForestRegressor(
         n_estimators=50,
@@ -77,6 +82,19 @@ def make_forest_regressor():
 def curve_values(curve):
     """Coerce a single-output curve to a 1D array for tables and metrics."""
     return np.asarray(curve, dtype=float).reshape(-1)
+
+
+def summarize_curve_errors(estimator_curves, truth, metric_name, metric_fn):
+    """Build a sorted error summary table for a dict of estimated curves."""
+    return pl.DataFrame(
+        {
+            "estimator": list(estimator_curves.keys()),
+            metric_name: [
+                float(metric_fn(predicted, truth))
+                for predicted in estimator_curves.values()
+            ],
+        }
+    ).sort(metric_name)
 ```
 
 ## Step 2: Load a confounded nonlinear dataset
@@ -257,7 +275,7 @@ direct_curve = direct.predict(t=grid)
 
 This is still outcome regression with covariates, but here the outcome model is a random forest. That gives the example a nonlinear regressor without needing hand-built feature engineering.
 
-### Generalized propensity score (GPS)
+### Generalized propensity score (GPS) [@hirano2004propensity]
 
 `GPS` in `skcausal` follows a score-adjustment pattern rather than fitting a weighted pseudo-population estimator directly. It first computes a treatment score
 
@@ -271,7 +289,7 @@ $$
 \hat{\mu}_{\mathrm{GPS}}(t) = \frac{1}{n} \sum_{i=1}^{n} \hat{f}_{\mathrm{GPS}}(\hat{g}(x_i, t), t)
 $$
 
-In this example, `PermutationWeighting` supplies the treatment score. Because that density estimator returns a stabilized ratio, the GPS features here are built from a density-ratio estimate rather than a normalized conditional density:
+In this example, `PermutationWeighting` [@arbour2021permutation] supplies the treatment score. Because that density estimator returns a stabilized ratio, the GPS features here are built from a density-ratio estimate rather than a normalized conditional density:
 
 ```{python}
 permutation_weighting = PermutationWeighting(
@@ -356,30 +374,37 @@ The final pseudo-outcome smoother only depends on treatment at prediction time, 
 ## Step 7: Compare to the truth
 
 ```{python}
+# | code-fold: true
+estimator_curves = {
+    "DirectNoCovariates": curve_values(naive_curve),
+    "DirectRegressor": curve_values(direct_curve),
+    "GPS": curve_values(gps_curve),
+    "DoublyRobustPseudoOutcome": curve_values(dr_curve),
+}
+
 comparison = grid.with_columns(
     pl.Series("truth", truth_curve),
-    pl.Series("naive", curve_values(naive_curve)),
-    pl.Series("direct", curve_values(direct_curve)),
-    pl.Series("gps", curve_values(gps_curve)),
-    pl.Series("dr", curve_values(dr_curve)),
+    *[
+        pl.Series(name, values)
+        for name, values in estimator_curves.items()
+    ],
 )
 
-comparison.head(8)
+summarize_curve_errors(
+    estimator_curves,
+    truth_curve,
+    "rmse",
+    lambda predicted, truth: np.sqrt(np.mean((predicted - truth) ** 2)),
+)
 ```
 
-Each row is one treatment-grid point. Values close to `truth` indicate a well-calibrated estimator.
+This table summarizes how closely each estimated curve tracks the true ADRF over the full treatment grid. Lower `rmse` means the fitted curve stays closer to `truth` on average.
 
 ```{python}
 fig, ax = plt.subplots(figsize=(8.5, 5))
 plot_joint_curves(
     grid,
-    {
-        "Truth": truth_curve,
-        "DirectNoCovariates": naive_curve,
-        "DirectRegressor": direct_curve,
-        "GPS": gps_curve,
-        "DoublyRobustPseudoOutcome": dr_curve,
-    },
+    {"Truth": truth_curve, **estimator_curves},
     ax=ax,
 )
 ax.scatter(t[t_col].to_numpy(), y["y"].to_numpy(), s=12, alpha=0.15, label="Observed data")
@@ -392,46 +417,12 @@ plt.show()
 ## Step 8: Compare numerically
 
 ```{python}
-pl.DataFrame(
-    {
-        "estimator": [
-            "DirectNoCovariates",
-            "DirectRegressor",
-            "GPS",
-            "DoublyRobustPseudoOutcome",
-        ],
-        "mean_absolute_error": [
-            float(
-                np.mean(
-                    np.abs(
-                        comparison["naive"].to_numpy() - comparison["truth"].to_numpy()
-                    )
-                )
-            ),
-            float(
-                np.mean(
-                    np.abs(
-                        comparison["direct"].to_numpy() - comparison["truth"].to_numpy()
-                    )
-                )
-            ),
-            float(
-                np.mean(
-                    np.abs(
-                        comparison["gps"].to_numpy() - comparison["truth"].to_numpy()
-                    )
-                )
-            ),
-            float(
-                np.mean(
-                    np.abs(
-                        comparison["dr"].to_numpy() - comparison["truth"].to_numpy()
-                    )
-                )
-            ),
-        ],
-    }
-).sort("mean_absolute_error")
+summarize_curve_errors(
+    estimator_curves,
+    truth_curve,
+    "mean_absolute_error",
+    lambda predicted, truth: np.mean(np.abs(predicted - truth)),
+)
 ```
 
 ::: {.callout-note}

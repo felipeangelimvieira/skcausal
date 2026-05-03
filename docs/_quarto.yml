@@ -28,20 +28,20 @@ website:
         text: "15-min theory"
       - text: "For researchers"
         menu:
-          - href: research/dataset_catalog.qmd
-            text: "Dataset Catalog"
           - href: research/benchmarking.qmd
             text: "Benchmarking"
+          - href: research/dataset_catalog.qmd
+            text: "Dataset Catalog"
           - href: research/extending.qmd
             text: "Implement your own method"
       - text: "Tutorials"
         menu:
           - href: examples/index.qmd
             text: "Overview"
-          - href: examples/continuous_treatments.qmd
-            text: "Continuous Treatments"
           - href: examples/categorical_treatments.qmd
             text: "Categorical Treatments"
+          - href: examples/continuous_treatments.qmd
+            text: "Continuous Treatments"
           - href: examples/multidimensional_treatments.qmd
             text: "Multidimensional Treatments"
       - text: "Density"

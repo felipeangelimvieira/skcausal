@@ -4,7 +4,7 @@ execute:
   warning: false
 ---
 
-Use this guide when treatment has more than two levels — such as `control`, `placebo`, and `treated`.
+Use this guide when treatment is categorical, such as `control`, `placebo`, and `treated`.
 
 ::: {.callout-note appearance="simple"}
 ## When To Use This Guide
@@ -12,9 +12,8 @@ Use this guide when treatment has more than two levels — such as `control`, `p
 Start here if the treatment is a label rather than a numeric dose. Each distinct observed treatment level is treated as a valid intervention level at prediction time.
 :::
 
-## What changes from binary treatments
 
-A categorical treatment is a generalization: instead of two worlds (treated vs. control), there are $k$ worlds — one per treatment level. The question is the same: *what would the average outcome be if everyone received treatment level $j$?*
+Categorical treatments are usually easier to work with than continuous treatments because there is a finite number of treatment levels to predict for. Therefore, some estimators that handle hardest use cases (e.g. continuous treatments) are also able to handle categorical treatments.
 
 To verify available estimators, we can use:
 
@@ -28,14 +27,6 @@ all_causal_average_response_estimators(
 )
 ```
 
-Categorical treatments are usually easier to work with than continuous treatments because there is a finite number of treatment levels to predict for. Therefore, some estimators that handle hardest use cases (e.g. continuous treatments) are also able to handle categorical treatments.
-
-There are, as of now, three estimators designed for categorical treatments in particular:
-
-- `CategoricalDirectMethod`
-- `CategoricalInversePropensityWeighting`
-- `CategoricalDoublyRobust`
-
 We should always give preference doubly robust. But we will see below how to use each of these and how they compare to each other and to the truth on a synthetic dataset.
 
 This example has three levels — `"control"`, `"placebo"`, and `"treated"` — with known true effects we can verify against.
@@ -43,6 +34,7 @@ This example has three levels — `"control"`, `"placebo"`, and `"treated"` — 
 ## Step 1: Import dependencies
 
 ```{python}
+# | code-fold: true
 import numpy as np
 import polars as pl
 import matplotlib.pyplot as plt
@@ -64,6 +56,7 @@ use_theme()
 ## Step 2: Load a confounded categorical dataset
 
 ```{python}
+# | code-fold: true
 dataset = ExampleCategorical(n=500, random_state=0)
 X, t, y = dataset.load()
 
@@ -130,9 +123,6 @@ $$
 This exact data-generating process is implemented in `ExampleCategorical`.
 :::
 
-::: {.callout-important}
-**This is confounding**: people with high `x0` are more likely to receive `"treated"`, *and* `x0` also directly affects the outcome (see step 2d below). An estimator that ignores `X` will incorrectly attribute `x0`'s effect to the treatment label.
-:::
 
 The outcome is a linear function of `x0` plus the treatment constant plus noise. Notice that `x0` drives both treatment assignment (step 2b) and the outcome — this is the confounding the estimators must remove.
 
@@ -148,10 +138,6 @@ levels = (
 We create the intervention table explicitly here so the three treatment levels being evaluated are visible in the tutorial.
 
 `predict` accepts the requested treatment table as its first argument and returns one average response per row in `levels`, averaging over the covariate sample stored during `fit`.
-
-::: {.callout-note}
-This keeps the categorical example aligned with the continuous-treatment API: define a treatment table, call `predict`, and then visualize the returned response values.
-:::
 
 ## Step 4: Compute the truth
 
@@ -170,8 +156,11 @@ truth = levels.with_columns(pl.Series("truth", truth_curve))
 
 ```{python}
 direct = CategoricalDirectMethod(outcome_regressor=LinearRegression())
-_ = direct.fit(X, t, y)
-direct_curve = np.asarray(direct.predict(t=levels), dtype=float).reshape(-1)
+direct.fit(X, t, y)
+```
+
+```{python}
+direct_curve = direct.predict(t=levels)
 ```
 
 This is the fastest estimator to set up and a reliable baseline when the outcome model is well specified. On this dataset, where the outcome is a linear function of `x0`, a `LinearRegression` should recover the true effects closely.
@@ -184,13 +173,12 @@ This is the fastest estimator to set up and a reliable baseline when the outcome
 density_estimator = SklearnCategoricalDensity(LogisticRegression(max_iter=1000))
 
 ipw = CategoricalInversePropensityWeighting(density_estimator=density_estimator)
-_ = ipw.fit(X, t, y)
-ipw_curve = np.asarray(ipw.predict(t=levels), dtype=float).reshape(-1)
+ipw.fit(X, t, y)
 ```
 
-::: {.callout-warning}
-IPW can become numerically unstable when some observations have near-zero propensity scores. If the three treatment groups barely overlap in covariate space, the weights can be very large for a handful of observations and dominate the estimate. Prefer doubly robust in those cases.
-:::
+```{python}
+ipw_curve = ipw.predict(t=levels)
+```
 
 ### Doubly robust
 
@@ -201,8 +189,11 @@ dr = CategoricalDoublyRobust(
     density_estimator=density_estimator,
     outcome_regressor=LinearRegression(),
 )
-_ = dr.fit(X, t, y)
-dr_curve = np.asarray(dr.predict(t=levels), dtype=float).reshape(-1)
+dr.fit(X, t, y)
+```
+
+```{python}
+dr_curve = dr.predict(t=levels)
 ```
 
 ::: {.callout-tip}
@@ -225,10 +216,10 @@ observed_means = (
 comparison = (
     observed_means
     .with_columns(
-        pl.Series("truth", truth_curve),
-        pl.Series("direct", direct_curve),
-        pl.Series("ipw", ipw_curve),
-        pl.Series("dr", dr_curve),
+        pl.Series("truth", truth_curve.flatten()),
+        pl.Series("direct", direct_curve.flatten()),
+        pl.Series("ipw", ipw_curve.flatten()),
+        pl.Series("dr", dr_curve.flatten()),
     )
 )
 
@@ -256,7 +247,7 @@ ax.legend(ncols=3)
 plt.show()
 ```
 
-The `Observed` bars are the naive means within each treatment group. Their mismatch with `Truth` is the confounding signal created in step 2; the estimator bars show how much of that bias each method removes.
+The `Observed` bars are the naive means within each treatment group. Their mismatch with `Truth` is the confounding signal; the estimator bars show how much of that bias each method removes.
 
 ::: {.callout-tip}
 The **average treatment effect** of switching from one level to another is simply the difference between the corresponding rows. For example, subtracting the `"control"` row from the `"treated"` row gives the average effect of the intervention.
@@ -264,18 +255,17 @@ The **average treatment effect** of switching from one level to another is simpl
 
 ## What to try next
 
-If you only have two treatment levels, the [binary treatments guide](binary_treatments.qmd) is the shortest version of the same API.
-
 If your treatment is numeric and you want a dose-response curve instead, continue to the [continuous treatments guide](continuous_treatments.qmd).
 
 ::: {.callout-note collapse="true"}
 ## Optional: Benchmark the estimators that also handle continuous treatments
 
-The package also exposes general-purpose estimators that can work with categorical treatments here and with continuous treatments in other workflows: `DirectNoCovariates`, `DirectRegressor`, `DoublyRobustPseudoOutcome`, and `GPS`. We do not benchmark `Pipeline` here because it is a wrapper for composing preprocessing with one of those estimators rather than a distinct estimation strategy.
+The package also exposes general-purpose estimators that can work with categorical treatments here and with continuous treatments in other workflows: `DirectRegressor`, `DoublyRobustPseudoOutcome`, and `GPS`. 
 
-For this categorical example, the nuisance models still need to match the observed treatment type, so we keep using a categorical density estimator inside the broader estimators below. `GPS` now passes the raw treatment column into its outcome model, so the preprocessing pipeline explicitly handles the categorical encoding, expands the `gps` feature with a spline basis, and adds low-order interactions before fitting a linear model.
+Below, we benchmark those estimators on this categorical dataset to show how they compare to the categorical-specific estimators above. 
 
 ```{python}
+# | code-fold: true
 from sklearn.compose import ColumnTransformer, make_column_selector
 from sklearn.neighbors import KernelDensity
 from sklearn.pipeline import make_pipeline
@@ -425,4 +415,12 @@ ax.set_title("Categorical-specific and general-purpose estimators")
 ax.legend(ncols=3)
 plt.show()
 ```
+
+```{python}
+table_comparison = pl.DataFrame({k : np.sqrt(np.mean((v.flatten() - all_estimator_plot_results["Truth"].flatten())**2)) for k,v in all_estimator_plot_results.items() if k != "Truth"}).transpose(include_header=True).rename({"column_0": "RMSE"})
+table_comparison = table_comparison.sort("RMSE")
+table_comparison
+
+```
+
 :::

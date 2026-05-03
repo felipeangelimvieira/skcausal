@@ -42,13 +42,6 @@ curve = estimator.predict(t)</code></pre>
 [Choose your path]{.section-kicker}
 
 ::: {.home-intent-grid}
-::: {.docs-card}
-### Binary treatments
-
-Treatment is a treated-vs-control flag and the target is average potential outcomes under each level.
-
-[Open binary guide](examples/binary_treatments.html){.card-link}
-:::
 
 ::: {.docs-card}
 ### Continuous treatments
@@ -65,4 +58,13 @@ Treatment has more than two named levels such as `control`, `placebo`, and `trea
 
 [Open categorical guide](examples/categorical_treatments.html){.card-link}
 :::
+
+::: {.docs-card}
+### Multi-dimensional treatments
+
+Treatment has multiple dimensions (e.g. dose plus regime).
+
+[Open multi-dimensional guide](examples/multidimensional_treatments.html){.card-link}
+:::
+
 :::
