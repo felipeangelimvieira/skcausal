@@ -1,6 +1,6 @@
 [project]
 name = "skcausal"
-version = "0.0.2"
+version = "0.1.0"
 description = ""
 authors = [{ name = "Felipe Lourenço Angelim Vieira", email = "felipeangelim@gmail.com" }]
 license = { text = "MIT" }
