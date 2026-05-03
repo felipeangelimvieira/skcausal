@@ -29,15 +29,6 @@ This is a curve, not a single number.
 **Analogy**: think of a pharmacological dose-response curve. Different doses of a drug produce different average patient responses. We want to estimate that curve from observational data where the dose was not randomized — people received different doses for reasons that also affect the outcome.
 :::
 
-```{mermaid}
-graph LR
-  X["Covariates X"] --> T["Treatment T (numeric)"]
-  X --> Y["Outcome Y"]
-  T --> Y
-  G["Treatment grid"] --> P["Predicted curve"]
-  X --> P
-```
-
 This example compares four estimators, including one intentionally naive baseline:
 
 | Estimator | Approach |

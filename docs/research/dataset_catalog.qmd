@@ -2,6 +2,9 @@
 title: "Dataset Catalog"
 toc: false
 freeze: false
+format:
+  html:
+    html-math-method: mathjax
 execute:
   cache: false
   echo: false
@@ -14,9 +17,50 @@ Datasets expose a single sample. Any train/test or cross-fitting holdout should 
 
 Use the dropdown to switch between datasets without leaving the page.
 
+::: {.dataset-catalog-math-sentinel style="display:none" aria-hidden="true"}
+$$
+0
+$$
+:::
+
+<script>
+window.MathJax = window.MathJax || {
+  tex: {
+    inlineMath: [['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  options: {
+    skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+  }
+};
+
+window.datasetCatalogMathJaxReady = window.datasetCatalogMathJaxReady || new Promise((resolve, reject) => {
+  if (window.MathJax?.typesetPromise) {
+    resolve(window.MathJax);
+    return;
+  }
+
+  const script = document.createElement("script");
+  script.src = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js";
+  script.async = true;
+  script.dataset.datasetCatalogMathjax = "true";
+  script.onload = () => {
+    const startup = window.MathJax?.startup?.promise;
+    if (startup) {
+      startup.then(() => resolve(window.MathJax)).catch(reject);
+      return;
+    }
+    resolve(window.MathJax);
+  };
+  script.onerror = reject;
+  document.head.appendChild(script);
+});
+</script>
+
 ```{python}
 from pathlib import Path
 import sys
+from IPython.display import HTML, display
 
 
 def find_docs_root() -> Path:
@@ -44,15 +88,33 @@ use_theme()
 ```
 
 ```{python}
-#| output: asis
-
-print(render_dataset_browser_html())
+display(HTML(render_dataset_browser_html()))
 ```
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
   const select = document.getElementById("dataset-browser-select");
   const panels = Array.from(document.querySelectorAll("[data-dataset-panel]"));
+
+  const typesetPanel = (panel) => {
+    if (!panel || !window.datasetCatalogMathJaxReady) {
+      return;
+    }
+
+    window.datasetCatalogMathJaxReady
+      .then((MathJax) => {
+        if (!MathJax?.typesetPromise) {
+          return;
+        }
+        if (MathJax.typesetClear) {
+          MathJax.typesetClear([panel]);
+        }
+        return MathJax.typesetPromise([panel]);
+      })
+      .catch((error) => {
+        console.error("Failed to typeset dataset catalog math", error);
+      });
+  };
 
   if (!select || panels.length === 0) {
     return;
@@ -61,6 +123,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const updatePanels = (selectedDataset) => {
     panels.forEach((panel) => {
       panel.hidden = panel.dataset.datasetPanel !== selectedDataset;
+      if (!panel.hidden) {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(panel);
+        }
+        typesetPanel(panel);
+      }
     });
   };
 

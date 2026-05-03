@@ -26,6 +26,11 @@ _INLINE_RST_PATTERN = re.compile(
     r":(?P<role>math|class|meth):`(?P<role_content>[^`]+)`|``(?P<literal>[^`]+)``"
 )
 _SECTION_UNDERLINE_PATTERN = re.compile(r"^[-=~`:#\"'^*]{3,}$")
+_COLON_FIELD_PATTERN = re.compile(
+    r"^\s*(?P<name>[^:\n][^:\n]*?)\s*:\s*(?P<annotation>.+?)\s*$"
+)
+_COLON_FIELD_SECTIONS = {"Parameters", "Other Parameters", "Attributes"}
+_TYPE_ONLY_FIELD_SECTIONS = {"Returns", "Yields", "Raises"}
 
 
 def _coerce_curve(values: Any) -> np.ndarray:
@@ -65,6 +70,10 @@ def _normalize_rst_role_label(content: str) -> str:
     return label.rsplit(".", maxsplit=1)[-1]
 
 
+def _leading_indent(line: str) -> int:
+    return len(line) - len(line.lstrip(" \t"))
+
+
 def _render_inline_rst(text: str) -> str:
     rendered: list[str] = []
     last_end = 0
@@ -91,6 +100,180 @@ def _render_inline_rst(text: str) -> str:
     return "".join(rendered)
 
 
+def _looks_like_type_only_field_header(lines: list[str], index: int) -> bool:
+    stripped = lines[index].strip()
+    if not stripped or ":" in stripped:
+        return False
+
+    header_indent = _leading_indent(lines[index])
+    probe = index + 1
+    while probe < len(lines) and not lines[probe].strip():
+        probe += 1
+
+    if probe >= len(lines):
+        return False
+    if _is_section_heading(lines, probe) or lines[probe].strip() == ".. math::":
+        return False
+
+    return _leading_indent(lines[probe]) > header_indent
+
+
+def _looks_like_colon_field_header(lines: list[str], index: int) -> bool:
+    if _COLON_FIELD_PATTERN.match(lines[index]) is None:
+        return False
+
+    header_indent = _leading_indent(lines[index])
+    probe = index + 1
+    while probe < len(lines) and not lines[probe].strip():
+        probe += 1
+
+    if probe >= len(lines):
+        return True
+    if _is_section_heading(lines, probe) or lines[probe].strip() == ".. math::":
+        return True
+
+    return _leading_indent(lines[probe]) > header_indent
+
+
+def _split_paragraphs(lines: list[str]) -> list[str]:
+    paragraphs: list[str] = []
+    current: list[str] = []
+
+    for line in lines:
+        if not line:
+            if current:
+                paragraphs.append(" ".join(current))
+                current = []
+            continue
+        current.append(line)
+
+    if current:
+        paragraphs.append(" ".join(current))
+
+    return paragraphs
+
+
+def _render_field_list_html(section_title: str, items: list[dict[str, Any]]) -> str:
+    section_slug = _slugify(section_title)
+    blocks = [
+        '<dl class="dataset-docstring__fields '
+        f'dataset-docstring__fields--{section_slug}">'
+    ]
+
+    for item in items:
+        term_parts: list[str] = []
+        if item["name"]:
+            term_parts.append(
+                '<code class="dataset-docstring__field-name">'
+                f'{html.escape(item["name"])}'
+                "</code>"
+            )
+        if item["annotation"]:
+            if item["name"]:
+                term_parts.append(
+                    '<span class="dataset-docstring__field-separator">:</span>'
+                )
+            term_parts.append(
+                '<span class="dataset-docstring__field-type">'
+                f'{_render_inline_rst(item["annotation"])}'
+                "</span>"
+            )
+
+        blocks.append(
+            '<dt class="dataset-docstring__field-term">'
+            f'{"".join(term_parts)}'
+            "</dt>"
+        )
+
+        description_html = "".join(
+            '<p class="dataset-docstring__field-paragraph">'
+            f"{_render_inline_rst(paragraph)}"
+            "</p>"
+            for paragraph in _split_paragraphs(item["description_lines"])
+        )
+        blocks.append(
+            '<dd class="dataset-docstring__field-body">' f"{description_html}" "</dd>"
+        )
+
+    blocks.append("</dl>")
+    return "\n".join(blocks)
+
+
+def _parse_field_list(
+    lines: list[str],
+    index: int,
+    *,
+    section_title: str,
+    allow_type_only: bool,
+) -> tuple[str, int] | None:
+    items: list[dict[str, Any]] = []
+    cursor = index
+
+    while cursor < len(lines):
+        while cursor < len(lines) and not lines[cursor].strip():
+            cursor += 1
+
+        if cursor >= len(lines):
+            break
+        if _is_section_heading(lines, cursor) or lines[cursor].strip() == ".. math::":
+            break
+
+        header_line = lines[cursor]
+        header_indent = _leading_indent(header_line)
+        field_match = _COLON_FIELD_PATTERN.match(header_line)
+
+        if field_match is not None and _looks_like_colon_field_header(lines, cursor):
+            field_name = field_match.group("name").strip()
+            field_annotation = field_match.group("annotation").strip()
+        elif allow_type_only and _looks_like_type_only_field_header(lines, cursor):
+            field_name = None
+            field_annotation = header_line.strip()
+        else:
+            return None if not items else ("", index)
+
+        cursor += 1
+        description_lines: list[str] = []
+
+        while cursor < len(lines):
+            raw_line = lines[cursor]
+            stripped = raw_line.strip()
+
+            if not stripped:
+                if description_lines and description_lines[-1] != "":
+                    description_lines.append("")
+                cursor += 1
+                continue
+
+            if _is_section_heading(lines, cursor) or stripped == ".. math::":
+                break
+
+            if _looks_like_colon_field_header(lines, cursor):
+                break
+
+            if (
+                allow_type_only
+                and _looks_like_type_only_field_header(lines, cursor)
+                and _leading_indent(raw_line) <= header_indent
+            ):
+                break
+
+            description_lines.append(stripped)
+            cursor += 1
+
+        items.append(
+            {
+                "name": field_name,
+                "annotation": field_annotation,
+                "description_lines": description_lines,
+            }
+        )
+
+    if not items:
+        return None
+
+    return _render_field_list_html(section_title, items), cursor
+
+
 def _render_docstring_html(doc: str) -> str:
     if not doc:
         return ""
@@ -98,6 +281,7 @@ def _render_docstring_html(doc: str) -> str:
     blocks: list[str] = []
     lines = doc.splitlines()
     index = 0
+    current_section: str | None = None
 
     while index < len(lines):
         stripped = lines[index].strip()
@@ -111,21 +295,25 @@ def _render_docstring_html(doc: str) -> str:
                 index += 1
 
             math_lines: list[str] = []
+            math_indent: int | None = None
             while index < len(lines):
                 raw_line = lines[index]
                 if not raw_line.strip():
-                    math_lines.append("")
+                    if math_indent is not None:
+                        math_lines.append("")
                     index += 1
                     continue
-                if raw_line.startswith("    "):
-                    math_lines.append(raw_line[4:])
-                    index += 1
-                    continue
-                if raw_line.startswith("\t"):
-                    math_lines.append(raw_line[1:])
-                    index += 1
-                    continue
-                break
+
+                current_indent = _leading_indent(raw_line)
+                if current_indent == 0:
+                    break
+                if math_indent is None:
+                    math_indent = current_indent
+                if current_indent < math_indent:
+                    break
+
+                math_lines.append(raw_line[math_indent:])
+                index += 1
 
             math_body = "\n".join(math_lines).strip()
             if math_body:
@@ -134,6 +322,7 @@ def _render_docstring_html(doc: str) -> str:
                     f"{math_body}\n"
                     "$$</div>"
                 )
+            current_section = None
             continue
 
         if _is_section_heading(lines, index):
@@ -142,8 +331,35 @@ def _render_docstring_html(doc: str) -> str:
                 f"{html.escape(stripped)}"
                 "</h4>"
             )
+            current_section = stripped
             index += 2
             continue
+
+        if current_section in _COLON_FIELD_SECTIONS:
+            parsed_field_list = _parse_field_list(
+                lines,
+                index,
+                section_title=current_section,
+                allow_type_only=False,
+            )
+            if parsed_field_list is not None:
+                field_list_html, next_index = parsed_field_list
+                blocks.append(field_list_html)
+                index = next_index
+                continue
+
+        if current_section in _TYPE_ONLY_FIELD_SECTIONS:
+            parsed_field_list = _parse_field_list(
+                lines,
+                index,
+                section_title=current_section,
+                allow_type_only=True,
+            )
+            if parsed_field_list is not None:
+                field_list_html, next_index = parsed_field_list
+                blocks.append(field_list_html)
+                index = next_index
+                continue
 
         paragraph_lines = [stripped]
         index += 1

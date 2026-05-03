@@ -1137,17 +1137,70 @@ blockquote {
     border-radius: 10px;
 }
 
+.dataset-docstring__fields {
+    margin: 0.85rem 0;
+    padding: 0.85rem 1rem;
+    max-width: 82ch;
+    display: grid;
+    grid-template-columns: minmax(0, 18rem) minmax(0, 1fr);
+    gap: 0.35rem 1rem;
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(16, 36, 54, 0.08);
+    border-radius: 10px;
+}
+
+.dataset-docstring__field-term,
+.dataset-docstring__field-body {
+    margin: 0;
+}
+
+.dataset-docstring__field-term {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem;
+    color: var(--ink);
+    font-weight: 600;
+}
+
+.dataset-docstring__field-name {
+    padding: 0.1rem 0.35rem;
+    border-radius: 6px;
+    background: rgba(21, 101, 192, 0.08);
+    border: 1px solid rgba(21, 101, 192, 0.12);
+}
+
+.dataset-docstring__field-separator,
+.dataset-docstring__field-type {
+    color: var(--ink-soft);
+    font-weight: 500;
+}
+
+.dataset-docstring__field-body {
+    color: var(--ink);
+}
+
+.dataset-docstring__field-paragraph {
+    margin: 0 0 0.45rem;
+}
+
+.dataset-docstring__field-paragraph:last-child {
+    margin-bottom: 0;
+}
+
 .dataset-panel__description .dataset-docstring__paragraph:first-child,
 .dataset-example__docstring .dataset-docstring__paragraph:first-child,
 .dataset-example__docstring .dataset-docstring__heading:first-child,
-.dataset-example__docstring .dataset-docstring__math:first-child {
+.dataset-example__docstring .dataset-docstring__math:first-child,
+.dataset-example__docstring .dataset-docstring__fields:first-child {
     margin-top: 0;
 }
 
 .dataset-panel__description .dataset-docstring__paragraph:last-child,
 .dataset-example__docstring .dataset-docstring__paragraph:last-child,
 .dataset-example__docstring .dataset-docstring__heading:last-child,
-.dataset-example__docstring .dataset-docstring__math:last-child {
+.dataset-example__docstring .dataset-docstring__math:last-child,
+.dataset-example__docstring .dataset-docstring__fields:last-child {
     margin-bottom: 0;
 }
 
@@ -1160,5 +1213,9 @@ blockquote {
     .dataset-browser__select {
         min-width: 0;
         width: 100%;
+    }
+
+    .dataset-docstring__fields {
+        grid-template-columns: 1fr;
     }
 }

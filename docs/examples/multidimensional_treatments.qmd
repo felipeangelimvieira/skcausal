@@ -1,0 +1,501 @@
+---
+title: "Multidimensional Treatments"
+execute:
+    warning: false
+    freeze: true
+---
+
+Use this guide when treatment is stored in more than one column, such as a numeric dose together with a categorical regime.
+
+::: {.callout-note appearance="simple"}
+## When To Use This Guide
+
+Start here if your treatment table has multiple columns and you want one end-to-end example that stays close to the production API.
+
+This version uses strong defaults from the start: forest-based nuisance models for outcome and treatment-score estimation, plus a spline-expanded linear smoother for the final doubly robust stage.
+:::
+
+## What we're estimating
+
+With multiple treatment coordinates, the target is an **Average Response Surface** rather than a single curve:
+
+$$
+\mu(t_1, \ldots, t_k) = \mathbb{E}_P[Y^*(t_1, \ldots, t_k)]
+$$
+
+In this example the treatment table has two columns:
+
+- `t_0`: one continuous dose
+- `t_0_bin`: one categorical regime label
+
+So the estimand is
+
+$$
+\mu(t, c) = \mathbb{E}_P[Y^*(t, c)]
+$$
+
+The output is one average response per requested row of a treatment grid. Here we will visualize that surface as one dose-response line per categorical level.
+
+::: {.callout-tip}
+Think in terms of a treatment table, not a special-case estimator API:
+
+- `fit(X, t, y)` takes covariates `X`, a multi-column treatment table `t`, and outcomes `y`
+- `grid` is another treatment table with the same columns and compatible dtypes
+- `predict(t=grid)` returns one estimated average response per row in `grid`
+:::
+
+This page compares four estimators that accept the same mixed treatment table:
+
+| Estimator | Role in this tutorial |
+|---|---|
+| `DirectNoCovariates` | Observational baseline: regress `Y` on the treatment table only |
+| `DirectRegressor` | Outcome regression: model `E[Y | X, T]` and average over `X` |
+| `GPS` | Score-adjustment method: add a stabilized treatment score to the outcome model features |
+| `DoublyRobustPseudoOutcome` | Outcome regression plus score correction, followed by a final smoother over treatment |
+
+::: {.callout-note}
+All causal interpretations below assume consistency, no unmeasured confounding after conditioning on `X`, and overlap across the treatment combinations you want to evaluate.
+:::
+
+## Step 1: Import dependencies
+
+```{python}
+import numpy as np
+import polars as pl
+import matplotlib.pyplot as plt
+
+from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, PolynomialFeatures, SplineTransformer
+
+from skcausal.causal_estimators import (
+    DirectNoCovariates,
+    DirectRegressor,
+    DoublyRobustPseudoOutcome,
+    GPS,
+)
+from skcausal.datasets import Synthetic2MultidimDataset
+from skcausal.density.permutation_weighting import PermutationWeighting
+from skcausal.plotting import plot_joint_curves, use_theme
+from skcausal.utils.lookup import (
+    all_causal_average_response_estimators,
+    all_density_estimators,
+)
+from skcausal.utils.treatment_grid import make_cartesian_treatment_grid
+
+use_theme()
+```
+
+## Step 2: Load a confounded mixed-treatment dataset
+
+```{python}
+dataset = Synthetic2MultidimDataset(
+    n=2000,
+    n_features=5,
+    n_categorical_treatments=2,
+    mutual_info=0.7,
+    categorical_effect_scale=1.0,
+    random_state=0,
+)
+X, t, y = dataset.load()
+
+X = X.rename({column: f"x{index}" for index, column in enumerate(X.columns)})
+continuous_col, categorical_col = t.columns
+y = y.rename({y.columns[0]: "y"})
+
+pl.concat([X.head(5), t.head(5), y.head(5)], how="horizontal")
+```
+
+The table has five observed covariates, one continuous treatment column, one categorical treatment column, and one outcome column.
+
+::: {.callout-note collapse="true"}
+## Optional: How this synthetic dataset is constructed
+
+`Synthetic2MultidimDataset` starts from the confounded continuous-treatment benchmark `SyntheticDataset2`, then adds a categorical treatment coordinate by binning the continuous treatment into `n_categorical_treatments` levels.
+
+The parameter `mutual_info=0.7` weakens the link between the two treatment coordinates without removing it completely, and `categorical_effect_scale=0.2` makes the categorical coordinate change the response surface directly.
+
+This gives a benchmark where:
+
+- the continuous dose matters
+- the categorical label matters
+- treatment assignment is still confounded through `X`
+:::
+
+::: {.callout-important}
+`DirectNoCovariates` accepts the mixed treatment table, but it does not adjust for confounding. In this dataset, any method that ignores `X` is still observational.
+:::
+
+## Step 3: Define practical model builders
+
+The nuisance models below use the same expressive forest defaults. The only deliberate exception is the final doubly robust smoother, which uses a spline basis over the continuous treatment coordinate and a linear regressor over the expanded treatment features.
+
+```{python}
+def make_forest_mixed_treatment_regressor(categorical_column):
+    return Pipeline(
+        [
+            (
+                "encode_categorical_treatment",
+                ColumnTransformer(
+                    [
+                        (
+                            "categorical_treatment",
+                            OneHotEncoder(handle_unknown="ignore", sparse_output=False),
+                            [categorical_column],
+                        )
+                    ],
+                    remainder="passthrough",
+                    verbose_feature_names_out=False,
+                ),
+            ),
+            (
+                "regressor",
+                RandomForestRegressor(
+                    n_estimators=50,
+                    min_samples_leaf=10,
+                    random_state=0,
+                    n_jobs=-1,
+                ),
+            ),
+        ]
+    )
+```
+
+```{python}
+def make_forest_permutation_weighting():
+    return PermutationWeighting(
+        classifier=RandomForestClassifier(
+            n_estimators=50,
+            min_samples_leaf=10,
+            random_state=0,
+            n_jobs=-1,
+        ),
+        max_trials=50,
+        random_state=0,
+    )
+```
+
+```{python}
+def make_spline_mixed_treatment_regressor(continuous_column, categorical_column):
+    return Pipeline(
+        [
+            (
+                "expand_mixed_treatment",
+                ColumnTransformer(
+                    [
+                        (
+                            "expand_continuous_treatment",
+                            SplineTransformer(
+                                n_knots=8,
+                                degree=3,
+                                include_bias=False,
+                            ),
+                            [continuous_column],
+                        ),
+                        (
+                            "encode_categorical_treatment",
+                            OneHotEncoder(
+                                drop="first",
+                                handle_unknown="ignore",
+                                sparse_output=False,
+                            ),
+                            [categorical_column],
+                        ),
+                    ],
+                    remainder="drop",
+                    verbose_feature_names_out=False,
+                ),
+            ),
+            (
+                "interaction_terms",
+                PolynomialFeatures(
+                    degree=2,
+                    interaction_only=True,
+                    include_bias=False,
+                ),
+            ),
+            ("regressor", LinearRegression()),
+        ]
+    )
+```
+
+```{python}
+def curve_values(curve):
+    return np.asarray(curve, dtype=float).reshape(-1)
+
+
+def mean_absolute_error(left, right):
+    return float(np.mean(np.abs(np.asarray(left) - np.asarray(right))))
+```
+
+## Step 4: Build the intervention grid
+
+```{python}
+grid = make_cartesian_treatment_grid(
+    t,
+    n_continuous_points=10,
+)
+
+grid.head(8)
+```
+
+`make_cartesian_treatment_grid` replaces each continuous treatment column with evenly spaced points, keeps the observed categorical levels, and returns the Cartesian product. In this example that means 10 dose values times 2 categorical levels.
+
+::: {.callout-note}
+The prediction contract is unchanged from the single-treatment guides: pass a treatment table to `predict`, and get back one average response per row of that table.
+:::
+
+## Step 5: Compute the truth
+
+```{python}
+truth_curve = curve_values(dataset.predict(X, grid))
+truth = grid.with_columns(pl.Series("truth", truth_curve))
+```
+
+Because this is a synthetic dataset, we can evaluate the true average potential outcome surface exactly for every row in `grid`. That makes the rest of the tutorial a benchmarking exercise, not just an API example.
+
+## Step 6: Inspect the raw observational surface
+
+```{python}
+bin_edges = np.linspace(
+    float(t[continuous_col].min()),
+    float(t[continuous_col].max()),
+    13,
+)
+bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+```
+
+```{python}
+observed_frames = []
+category_values = t[categorical_col].cast(pl.Utf8).to_numpy()
+dose_values = t[continuous_col].to_numpy()
+y_values = y["y"].to_numpy()
+
+for level in dataset.levels_:
+    mask = category_values == level
+    level_dose = dose_values[mask]
+    level_y = y_values[mask]
+    bin_ids = np.digitize(level_dose, bin_edges[1:-1])
+
+    observed_frames.append(
+        pl.DataFrame(
+            {
+                continuous_col: bin_centers,
+                categorical_col: [level] * len(bin_centers),
+                "observed": [
+                    level_y[bin_ids == index].mean() if np.any(bin_ids == index) else np.nan
+                    for index in range(len(bin_centers))
+                ],
+            }
+        )
+    )
+
+observed_surface = pl.concat(observed_frames, how="vertical").with_columns(
+    pl.col(categorical_col).cast(t.schema[categorical_col])
+)
+observed_truth_curve = curve_values(
+    dataset.predict(X, observed_surface.select(t.columns))
+)
+```
+
+```{python}
+fig, axes = plt.subplots(
+    1,
+    len(dataset.levels_),
+    figsize=(11, 4.5),
+    sharey=True,
+    constrained_layout=True,
+)
+axes = np.atleast_1d(axes)
+plot_joint_curves(
+    observed_surface.select(t.columns),
+    {
+        "Observed mean within bins": observed_surface["observed"].to_numpy(),
+        "Truth": observed_truth_curve,
+    },
+    ax=axes,
+    separate_axes_by_group=True,
+)
+fig.suptitle("Observed surface before causal adjustment")
+axes[0].legend(ncols=2)
+plt.show()
+```
+
+These raw curves are useful as a baseline, but they are not causal estimates. Even after splitting by `t_0_bin`, the continuous dose remains confounded by `X`.
+
+## Step 7: Fit DirectNoCovariates
+
+`DirectNoCovariates` is included as a sanity-check baseline. It models the treatment table directly and ignores `X`, so it estimates the observational surface `E[Y | T=t, C=c]` rather than the causal target.
+
+```{python}
+naive = DirectNoCovariates(
+    outcome_regressor=make_forest_mixed_treatment_regressor(categorical_col)
+)
+naive.fit(X, t, y)
+naive_curve = curve_values(naive.predict(t=grid))
+```
+
+## Step 8: Fit DirectRegressor
+
+`DirectRegressor` uses the same mixed-treatment outcome model, but now the model sees both `X` and the treatment table. Prediction averages over the observed covariate sample at each requested treatment row.
+
+```{python}
+direct = DirectRegressor(
+    outcome_regressor=make_forest_mixed_treatment_regressor(categorical_col)
+)
+direct.fit(X, t, y)
+direct_curve = curve_values(direct.predict(t=grid))
+```
+
+## Step 9: Fit GPS
+
+`GPS` augments the outcome model with a treatment score computed from `predict_density(X, t)`. In this example that score comes from `PermutationWeighting`, which returns a stabilized density-ratio-style quantity. So this is best read as a score-adjustment example, not as a parametric conditional-density example.
+
+```{python}
+gps = GPS(
+    density_regressor=make_forest_permutation_weighting(),
+    outcome_regressor=make_forest_mixed_treatment_regressor(categorical_col),
+    cv=2,
+    max_samples_predict=500,
+    random_state=0,
+)
+gps.fit(X, t, y)
+gps_curve = curve_values(gps.predict(t=grid))
+```
+
+## Step 10: Fit DoublyRobustPseudoOutcome
+
+`DoublyRobustPseudoOutcome` uses the same forest outcome model and the same stabilized score model, then smooths the pseudo-outcomes over treatment with a spline basis over the continuous coordinate and encoded indicators for the categorical coordinate.
+
+```{python}
+dr = DoublyRobustPseudoOutcome(
+    density_estimator=make_forest_permutation_weighting(),
+    outcome_regressor=make_forest_mixed_treatment_regressor(categorical_col),
+    pseudo_outcome_regressor=make_spline_mixed_treatment_regressor(
+        continuous_col,
+        categorical_col,
+    ),
+    cv=2,
+    cross_fit=True,
+    random_state=0,
+)
+dr.fit(X, t, y)
+dr_curve = curve_values(dr.predict(t=grid))
+```
+
+
+## Step 11: Compare estimates
+
+```{python}
+comparison = grid.with_columns(
+    pl.Series("truth", truth_curve),
+    pl.Series("DirectNoCovariates", naive_curve),
+    pl.Series("DirectRegressor", direct_curve),
+    pl.Series("GPS", gps_curve),
+    pl.Series("DoublyRobustPseudoOutcome", dr_curve),
+)
+
+comparison.head(8)
+```
+
+```{python}
+fig, axes = plt.subplots(
+    1,
+    len(dataset.levels_),
+    figsize=(12, 4.8),
+    sharey=True,
+    constrained_layout=True,
+)
+axes = np.atleast_1d(axes)
+plot_joint_curves(
+    grid,
+    {
+        "Truth": truth_curve,
+        "DirectNoCovariates": naive_curve,
+        "DirectRegressor": direct_curve,
+        "GPS": gps_curve,
+        "DoublyRobustPseudoOutcome": dr_curve,
+    },
+    ax=axes,
+    separate_axes_by_group=True,
+)
+fig.suptitle("Estimated multidimensional response surface")
+axes[0].legend(ncols=3)
+plt.show()
+```
+
+```{python}
+pl.DataFrame(
+    {
+        "estimator": [
+            "DirectNoCovariates",
+            "DirectRegressor",
+            "GPS",
+            "DoublyRobustPseudoOutcome",
+        ],
+        "mean_absolute_error": [
+            mean_absolute_error(naive_curve, truth_curve),
+            mean_absolute_error(direct_curve, truth_curve),
+            mean_absolute_error(gps_curve, truth_curve),
+            mean_absolute_error(dr_curve, truth_curve),
+        ],
+    }
+).sort("mean_absolute_error")
+```
+
+Treat the MAE table as a compact summary, not the whole story. The faceted plot is still the best place to see whether an estimator misses one categorical level or only part of the dose range.
+
+::: {.callout-note}
+With shared forest nuisance models in place, the remaining differences are more about estimator structure and stochastic variation than about an obviously underpowered outcome or score model. The doubly robust estimator still uses a different final smoother by design.
+:::
+
+## Optional: Verify discovered support with lookup
+
+The main tutorial above uses four estimators because those are the current average-response estimators tagged as supporting both multidimensional treatments and mixed continuous/categorical treatment types.
+
+```{python}
+estimator_catalog = all_causal_average_response_estimators(
+    as_dataframe=True,
+    filter_tags={"capability:multidimensional_treatment": True},
+    return_tags=["capability:t_type", "capability:multidimensional_treatment"],
+)
+
+mixed_treatment_estimators = estimator_catalog[
+    estimator_catalog["capability:t_type"].apply(
+        lambda values: {"continuous", "categorical"}.issubset(set(values))
+    )
+][["name", "capability:t_type", "capability:multidimensional_treatment"]].reset_index(
+    drop=True
+)
+
+mixed_treatment_estimators
+```
+
+```{python}
+density_catalog = all_density_estimators(
+    as_dataframe=True,
+    filter_tags={"capability:multidimensional_treatment": True},
+    return_tags=["capability:t_type", "capability:multidimensional_treatment"],
+)
+
+mixed_treatment_densities = density_catalog[
+    (density_catalog["name"] != "Pipeline")
+    & density_catalog["capability:t_type"].apply(
+        lambda values: {"continuous", "categorical"}.issubset(set(values))
+    )
+][["name", "capability:t_type", "capability:multidimensional_treatment"]].reset_index(
+    drop=True
+)
+
+mixed_treatment_densities
+```
+
+## What to try next
+
+For the single-dose version of the same base benchmark, continue to the [continuous-treatment guide](continuous_treatments.qmd).
+
+If your treatment has only labels and no numeric dimension, go to the [categorical-treatment guide](categorical_treatments.qmd).
+
+If you want the full examples overview, return to the [examples hub](index.qmd).
