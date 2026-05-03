@@ -88,7 +88,7 @@ class ExampleCategorical(BaseSyntheticDataset):
     with :math:`\sigma_Y =` ``outcome_noise``.
     """
 
-    TREATMENT_SCHEMA = pl.Schema({"treatment": pl.Utf8})
+    column_types = {"treatment": "categorical"}
 
     def __init__(
         self,
@@ -125,10 +125,9 @@ class ExampleCategorical(BaseSyntheticDataset):
         }
 
     def get_levels(self) -> pl.DataFrame:
-        return pl.DataFrame(
-            {"treatment": ["control", "placebo", "treated"]},
-            schema=self.TREATMENT_SCHEMA,
-        ).with_columns(pl.col("treatment").cast(pl.Categorical))
+        return self._coerce_treatment_frame(
+            pl.DataFrame({"treatment": ["control", "placebo", "treated"]})
+        )
 
     def _prepare(self, n: int = None):
         if n is not None:
@@ -170,9 +169,7 @@ class ExampleCategorical(BaseSyntheticDataset):
             "treated",
             np.where(score < -self.treatment_threshold, "placebo", "control"),
         )
-        return pl.DataFrame(
-            {"treatment": labels}, schema=self.TREATMENT_SCHEMA
-        ).with_columns(pl.col("treatment").cast(pl.Categorical))
+        return self._to_polars(pl.DataFrame({"treatment": labels}))
 
     def _predict_y(self, covariates, treatments) -> np.ndarray:
         covariate_frame = _as_covariate_frame(covariates)

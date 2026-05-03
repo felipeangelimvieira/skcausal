@@ -242,14 +242,14 @@ class KangSchaferBinary(_BaseKangSchafer):
     The true average treatment effect is exactly 1.
     """
 
-    TREATMENT_SCHEMA = pl.Schema({"a": pl.Boolean})
+    column_types = {"a": "categorical"}
     TRUE_EFFECT = 1.0
 
     def _get_treatments(self, covariates) -> pl.DataFrame:
         latent_covariates = self._resolve_latent_covariates(covariates)
         propensity = _sigmoid(latent_covariates @ _PROPENSITY_WEIGHTS)
         treatments = self._rng.binomial(1, propensity).astype(bool)
-        return pl.DataFrame({"a": treatments}, schema=self.TREATMENT_SCHEMA)
+        return self._to_polars(pl.DataFrame({"a": treatments}))
 
     def _predict_y(self, covariates, treatments) -> np.ndarray:
         latent_covariates = self._resolve_latent_covariates(covariates)
@@ -266,7 +266,7 @@ class KangSchaferBinary(_BaseKangSchafer):
         return pl.DataFrame({"y": observed.reshape(-1)})
 
     def get_grid(self) -> pl.DataFrame:
-        return pl.DataFrame({"a": [False, True]}, schema=self.TREATMENT_SCHEMA)
+        return self._coerce_treatment_frame(pl.DataFrame({"a": [False, True]}))
 
     @classmethod
     def get_test_params(cls, parameter_set="default"):
@@ -308,13 +308,13 @@ class KangSchaferContinuous(_BaseKangSchafer):
         + 27.4X_1 + 13.7X_2 + 13.7X_3 + 13.7X_4, 1).
     """
 
-    TREATMENT_SCHEMA = pl.Schema({"a": pl.Float64})
+    column_types = {"a": "continuous"}
 
     def _get_treatments(self, covariates) -> pl.DataFrame:
         latent_covariates = self._resolve_latent_covariates(covariates)
         treatment_mean = latent_covariates @ _PROPENSITY_WEIGHTS
         treatments = treatment_mean + self._rng.normal(size=treatment_mean.shape[0])
-        return pl.DataFrame({"a": treatments}, schema=self.TREATMENT_SCHEMA)
+        return self._to_polars(pl.DataFrame({"a": treatments}))
 
     def _predict_y(self, covariates, treatments) -> np.ndarray:
         latent_covariates = self._resolve_latent_covariates(covariates)
@@ -338,9 +338,8 @@ class KangSchaferContinuous(_BaseKangSchafer):
         else:
             lower, upper = -4.0, 4.0
 
-        return pl.DataFrame(
-            {"a": np.linspace(lower, upper, n)},
-            schema=self.TREATMENT_SCHEMA,
+        return self._coerce_treatment_frame(
+            pl.DataFrame({"a": np.linspace(lower, upper, n)})
         )
 
     @classmethod

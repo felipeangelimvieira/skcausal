@@ -100,7 +100,7 @@ class NurseStaffing(BaseSyntheticDataset):
     (Statistical Methodology), 79(4):1229-1245, 2017.
     """
 
-    TREATMENT_SCHEMA = pl.Schema({"a": pl.Float64})
+    column_types = {"a": "continuous"}
     TREATMENT_MAX = 20.0
 
     def __init__(
@@ -147,7 +147,7 @@ class NurseStaffing(BaseSyntheticDataset):
             1.0 - treatment_mean,
             size=treatment_mean.shape,
         )
-        return pl.DataFrame({"a": treatments}, schema=self.TREATMENT_SCHEMA)
+        return self._to_polars(pl.DataFrame({"a": treatments}))
 
     def _outcome_logit(self, covariates, treatments) -> np.ndarray:
         covariate_array = _as_covariate_array(covariates)
@@ -193,9 +193,8 @@ class NurseStaffing(BaseSyntheticDataset):
         return pl.DataFrame({"y": np.asarray(outcomes).reshape(-1)})
 
     def get_grid(self, n: int = 100) -> pl.DataFrame:
-        return pl.DataFrame(
-            {"a": np.linspace(0.0, self.TREATMENT_MAX, n)},
-            schema=self.TREATMENT_SCHEMA,
+        return self._coerce_treatment_frame(
+            pl.DataFrame({"a": np.linspace(0.0, self.TREATMENT_MAX, n)})
         )
 
     @classmethod

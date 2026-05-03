@@ -150,7 +150,7 @@ class SemiSyntheticClassifier(BaseSyntheticDataset):
     must implement both ``predict`` and ``predict_proba``.
     """
 
-    TREATMENT_SCHEMA = pl.Schema({"t": pl.Utf8})
+    column_types = {"t": "categorical"}
 
     def __init__(
         self,
@@ -377,10 +377,9 @@ class SemiSyntheticClassifier(BaseSyntheticDataset):
         )
 
     def _treatment_frame(self, treatments: np.ndarray) -> pl.DataFrame:
-        return pl.DataFrame(
-            {"t": _as_string_labels(treatments).reshape(-1)},
-            schema=self.TREATMENT_SCHEMA,
-        ).with_columns(pl.col("t").cast(pl.Categorical))
+        return self._to_polars(
+            pl.DataFrame({"t": _as_string_labels(treatments).reshape(-1)})
+        )
 
     def _outcome_frame(self, outcomes: np.ndarray) -> pl.DataFrame:
         return pl.DataFrame({"y": np.asarray(outcomes, dtype=float).reshape(-1)})
@@ -409,10 +408,7 @@ class SemiSyntheticClassifier(BaseSyntheticDataset):
                 "The dataset must be prepared before requesting treatment levels."
             )
 
-        return pl.DataFrame(
-            {"t": self.treatment_levels_},
-            schema=self.TREATMENT_SCHEMA,
-        ).with_columns(pl.col("t").cast(pl.Categorical))
+        return self._coerce_treatment_frame(pl.DataFrame({"t": self.treatment_levels_}))
 
     @classmethod
     def get_test_params(cls, parameter_set: str = "default"):

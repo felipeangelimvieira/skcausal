@@ -85,7 +85,7 @@ class SyntheticVCNet(BaseSyntheticDataset):
 
     """
 
-    TREATMENT_SCHEMA = pl.Schema({"t": pl.Float64})
+    column_types = {"t": "continuous"}
 
     def __init__(
         self,
@@ -115,9 +115,8 @@ class SyntheticVCNet(BaseSyntheticDataset):
         )
 
     def _treatment_frame(self, treatments: np.ndarray) -> pl.DataFrame:
-        return pl.DataFrame(
-            {"t": np.asarray(treatments, dtype=float).reshape(-1)},
-            schema=self.TREATMENT_SCHEMA,
+        return self._to_polars(
+            pl.DataFrame({"t": np.asarray(treatments, dtype=float).reshape(-1)})
         )
 
     def _outcome_frame(self, outcomes: np.ndarray) -> pl.DataFrame:
@@ -206,9 +205,8 @@ class SyntheticVCNet(BaseSyntheticDataset):
         return self
 
     def get_grid(self, n: int = 100) -> pl.DataFrame:
-        return pl.DataFrame(
-            {"t": np.linspace(0.0, 1.0, n)},
-            schema=self.TREATMENT_SCHEMA,
+        return self._coerce_treatment_frame(
+            pl.DataFrame({"t": np.linspace(0.0, 1.0, n)})
         )
 
     @classmethod

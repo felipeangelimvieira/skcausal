@@ -1,37 +1,66 @@
 import functools
 from abc import ABC, abstractmethod
-from typing import List, Tuple
+from typing import Literal
 
 import numpy as np
 import pandas as pd
 import polars as pl
 from skbase.base import BaseObject
-from skcausal.datatypes import convert
+from skcausal import config
+from skcausal.datatypes import convert, enforce_dtypes
 
 __all__ = ["BaseDataset"]
+
+ColumnTypeName = Literal["continuous", "categorical"]
 
 
 class BaseDataset(BaseObject):
     _tags = {"object_type": ["dataset"], "backend": "polars"}
+    column_types: dict[str, ColumnTypeName] = {}
 
     def load(self):
         covariates, treatments, outcomes = self._load()
-        treatment_schema = getattr(self, "TREATMENT_SCHEMA", None)
         return (
             self._coerce_backend_frame(covariates),
-            self._coerce_backend_frame(treatments, schema=treatment_schema),
+            self._coerce_backend_frame(
+                treatments,
+                column_types=self._get_treatment_column_types(),
+            ),
             self._coerce_backend_frame(outcomes),
         )
 
     def _load(self):
         raise NotImplementedError("Dataset classes should implement _load")
 
-    def _coerce_backend_frame(self, value, *, schema=None):
+    def _coerce_backend_frame(self, value, *, column_types=None, backend=None):
+        column_names = list(column_types) if column_types else None
         if isinstance(value, np.ndarray):
-            frame = pl.DataFrame(value, schema=schema)
+            frame = self._frame_from_array(value, column_names=column_names)
         else:
             if isinstance(value, pd.Series):
+                if column_names is not None:
+                    if len(column_names) != 1:
+                        raise ValueError(
+                            "Series inputs can only be coerced when exactly one "
+                            "column name is configured."
+                        )
+                    value = value.rename(column_names[0])
                 value = value.to_frame()
+
+            if isinstance(value, pl.Series):
+                if column_names is not None:
+                    if len(column_names) != 1:
+                        raise ValueError(
+                            "Series inputs can only be coerced when exactly one "
+                            "column name is configured."
+                        )
+                    value = value.alias(column_names[0])
+                frame = value.to_frame()
+                return self._finalize_output_frame(
+                    frame,
+                    column_types=column_types,
+                    backend=backend,
+                )
 
             if isinstance(value, pd.DataFrame):
                 frame = value
@@ -44,7 +73,76 @@ class BaseDataset(BaseObject):
                     f"Got {type(value).__name__}."
                 )
 
-        return convert(frame, self.get_tag("backend"))
+        frame = self._ensure_column_names(frame, column_names=column_names)
+        return self._finalize_output_frame(
+            frame,
+            column_types=column_types,
+            backend=backend,
+        )
+
+    def _finalize_output_frame(self, frame, *, column_types=None, backend=None):
+        target_backend = self._get_output_backend() if backend is None else backend
+        frame = convert(frame, target_backend)
+        if column_types:
+            frame = enforce_dtypes(frame, column_types=column_types)
+        return frame
+
+    def _get_output_backend(self) -> str:
+        return config.get_default_backend(fallback=self.get_tag("backend"))
+
+    def _coerce_treatment_frame(self, value, *, backend=None):
+        return self._coerce_backend_frame(
+            value,
+            column_types=self._get_treatment_column_types(),
+            backend=backend,
+        )
+
+    def _get_treatment_column_types(self) -> dict[str, ColumnTypeName]:
+        return dict(self.column_types)
+
+    def _frame_from_array(self, value, *, column_names=None):
+        array = np.asarray(value)
+        if array.ndim == 0:
+            raise ValueError("Expected array-like input with at least one dimension.")
+        if array.ndim == 1:
+            array = array.reshape(-1, 1)
+        if array.ndim != 2:
+            raise ValueError(
+                "Expected array-like input that can be coerced to a 2D frame, "
+                f"but got shape {array.shape}."
+            )
+
+        if column_names is None:
+            return pl.DataFrame(array)
+
+        if array.shape[1] != len(column_names):
+            raise ValueError(
+                "Configured column names do not match the array width: "
+                f"expected {len(column_names)} columns but got {array.shape[1]}."
+            )
+
+        return pl.DataFrame(
+            {column: array[:, idx] for idx, column in enumerate(column_names)}
+        )
+
+    def _ensure_column_names(self, frame, *, column_names=None):
+        if column_names is None:
+            return frame
+
+        current_columns = list(frame.columns)
+        if current_columns == column_names:
+            return frame
+
+        if len(current_columns) != len(column_names):
+            raise ValueError(
+                "Configured column names do not match the dataframe width: "
+                f"expected {len(column_names)} columns but got {len(current_columns)}."
+            )
+
+        rename_map = dict(zip(current_columns, column_names))
+        if isinstance(frame, pd.DataFrame):
+            return frame.rename(columns=rename_map)
+        return frame.rename(rename_map)
 
 
 class BaseSyntheticDataset(BaseDataset):
@@ -141,14 +239,17 @@ class BaseSyntheticDataset(BaseDataset):
     def _check_and_transform_X(self, covariates):
         if isinstance(covariates, np.ndarray):
             return covariates
-        return self._coerce_backend_frame(covariates)
+        return self._coerce_backend_frame(
+            covariates,
+            backend=self.get_tag("backend"),
+        )
 
     def _check_and_transform_t(self, treatments):
         if isinstance(treatments, np.ndarray):
             return treatments
-        return self._coerce_backend_frame(
+        return self._coerce_treatment_frame(
             treatments,
-            schema=getattr(self, "TREATMENT_SCHEMA", None),
+            backend=self.get_tag("backend"),
         )
 
     def _get_n_samples(self, value) -> int:
@@ -272,13 +373,22 @@ class BaseSyntheticDataset(BaseDataset):
 
     def _to_polars(self, treatments) -> pl.DataFrame:
         if isinstance(treatments, pl.DataFrame):
-            return treatments
+            return enforce_dtypes(
+                self._ensure_column_names(
+                    treatments,
+                    column_names=list(self._get_treatment_column_types()) or None,
+                ),
+                column_types=self._get_treatment_column_types() or None,
+            )
 
-        schema = getattr(self, "TREATMENT_SCHEMA", None)
-        if schema is None:
-            return pl.DataFrame(treatments)
-
-        return pl.DataFrame(treatments, schema=schema)
+        frame = self._coerce_treatment_frame(treatments, backend="polars")
+        polars_frame = convert(frame, "polars")
+        if self._get_treatment_column_types():
+            return enforce_dtypes(
+                polars_frame,
+                column_types=self._get_treatment_column_types(),
+            )
+        return polars_frame
 
     def predict_curve(self, covariates: np.ndarray, treatment_grid: pl.DataFrame):
         """Compute the average response at each row of a treatment grid.

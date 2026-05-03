@@ -165,7 +165,7 @@ class SemiSyntheticRegressor(BaseSyntheticDataset):
     deviation used in the implementation.
     """
 
-    TREATMENT_SCHEMA = pl.Schema({"t": pl.Float64})
+    column_types = {"t": "continuous"}
 
     def __init__(
         self,
@@ -350,9 +350,8 @@ class SemiSyntheticRegressor(BaseSyntheticDataset):
         )
 
     def _treatment_frame(self, treatments: np.ndarray) -> pl.DataFrame:
-        return pl.DataFrame(
-            {"t": np.asarray(treatments, dtype=float).reshape(-1)},
-            schema=self.TREATMENT_SCHEMA,
+        return self._to_polars(
+            pl.DataFrame({"t": np.asarray(treatments, dtype=float).reshape(-1)})
         )
 
     def _outcome_frame(self, outcomes: np.ndarray) -> pl.DataFrame:
@@ -386,7 +385,7 @@ class SemiSyntheticRegressor(BaseSyntheticDataset):
         else:
             grid = np.linspace(lower, upper, n)
 
-        return pl.DataFrame({"t": grid}, schema=self.TREATMENT_SCHEMA)
+        return self._coerce_treatment_frame(pl.DataFrame({"t": grid}))
 
     @classmethod
     def get_test_params(cls, parameter_set: str = "default"):

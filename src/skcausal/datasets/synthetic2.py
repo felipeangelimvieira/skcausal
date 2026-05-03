@@ -82,7 +82,7 @@ class SyntheticDataset2(BaseSyntheticDataset):
     with :math:`\sigma_Y^2 =` ``outcome_noise``.
     """
 
-    TREATMENT_SCHEMA = pl.Schema({"t_0": pl.Float64})
+    column_types = {"t_0": "continuous"}
 
     def __init__(
         self,
@@ -215,10 +215,7 @@ class SyntheticDataset2(BaseSyntheticDataset):
         return y
 
     def get_grid(self, n: int = 100):
-        return pl.DataFrame(
-            {"t_0": np.linspace(0, 1, n)},
-            schema=self.TREATMENT_SCHEMA,
-        )
+        return self._coerce_treatment_frame(pl.DataFrame({"t_0": np.linspace(0, 1, n)}))
 
     @classmethod
     def get_test_params(cls, parameter_set="default"):
@@ -256,14 +253,11 @@ class SyntheticDataset2Discrete(SyntheticDataset2):
         Y \mid X, A \sim \mathcal{N}(m(X, A), \sigma_Y^2).
     """
 
-    TREATMENT_SCHEMA = pl.Schema({"treatment": pl.Boolean})
+    column_types = {"treatment": "categorical"}
 
     def _get_treatments(self, covariates: np.ndarray) -> np.ndarray:
         prob = np.clip(self._get_tprime(covariates=covariates), 1e-6, 1 - 1e-6)
         return self._rng.binomial(1, prob, size=prob.shape).astype(bool)
 
     def get_grid(self, n: int = 100):
-        return pl.DataFrame(
-            {"treatment": [True, False]},
-            schema=self.TREATMENT_SCHEMA,
-        )
+        return self._coerce_treatment_frame(pl.DataFrame({"treatment": [True, False]}))
