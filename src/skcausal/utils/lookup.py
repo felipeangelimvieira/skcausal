@@ -24,13 +24,13 @@ def all_datasets(
 ):
     """Return a dictionary with all datasets."""
     return all_objects(
-        BaseDataset,
-        filter_tags,
-        exclude_objects,
-        return_names,
-        as_dataframe,
-        return_tags,
-        suppress_import_stdout,
+        object_types=BaseDataset,
+        filter_tags=filter_tags,
+        exclude_objects=exclude_objects,
+        return_names=return_names,
+        as_dataframe=as_dataframe,
+        return_tags=return_tags,
+        suppress_import_stdout=suppress_import_stdout,
         package_name="skcausal.datasets",
         path=path,
         modules_to_ignore=modules_to_ignore,
@@ -51,13 +51,13 @@ def all_density_estimators(
 ):
     """Return a dictionary with all density estimators."""
     return all_objects(
-        BaseDensityEstimator,
-        filter_tags,
-        exclude_objects,
-        return_names,
-        as_dataframe,
-        return_tags,
-        suppress_import_stdout,
+        object_types=BaseDensityEstimator,
+        filter_tags=filter_tags,
+        exclude_objects=exclude_objects,
+        return_names=return_names,
+        as_dataframe=as_dataframe,
+        return_tags=return_tags,
+        suppress_import_stdout=suppress_import_stdout,
         package_name="skcausal.density",
         path=path,
         modules_to_ignore=modules_to_ignore,
@@ -78,13 +78,13 @@ def all_causal_average_response_estimators(
 ):
     """Return a dictionary with all average causal response estimators."""
     return all_objects(
-        BaseAverageCausalResponseEstimator,
-        filter_tags,
-        exclude_objects,
-        return_names,
-        as_dataframe,
-        return_tags,
-        suppress_import_stdout,
+        object_types=BaseAverageCausalResponseEstimator,
+        filter_tags=filter_tags,
+        exclude_objects=exclude_objects,
+        return_names=return_names,
+        as_dataframe=as_dataframe,
+        return_tags=return_tags,
+        suppress_import_stdout=suppress_import_stdout,
         package_name="skcausal.causal_estimators",
         path=path,
         modules_to_ignore=modules_to_ignore,
