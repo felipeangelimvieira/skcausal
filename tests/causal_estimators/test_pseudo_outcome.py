@@ -4,10 +4,16 @@ import numpy as np
 import pandas as pd
 import pytest
 from sklearn.base import BaseEstimator, RegressorMixin
+from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.model_selection import KFold
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder
 
 from skcausal.causal_estimators.pseudo_outcome import DoublyRobustPseudoOutcome
+from skcausal.datasets import Synthetic2MultidimDataset
 from skcausal.density.base import BaseDensityEstimator
+from skcausal.density.permutation_weighting import PermutationWeighting
 
 
 class TrainingMeanOutcomeRegressor(BaseEstimator, RegressorMixin):
@@ -49,6 +55,38 @@ class TrainingMeanDensityEstimator(BaseDensityEstimator):
         self.predict_X_ = copy.deepcopy(X)
         self.predict_t_ = copy.deepcopy(t)
         return np.full((len(X), 1), self.density_, dtype=float)
+
+
+def _make_mixed_treatment_regressor(categorical_column):
+    return Pipeline(
+        [
+            (
+                "encode_categorical",
+                ColumnTransformer(
+                    [
+                        (
+                            "categorical_treatment",
+                            OneHotEncoder(
+                                handle_unknown="ignore",
+                                sparse_output=False,
+                            ),
+                            [categorical_column],
+                        )
+                    ],
+                    remainder="passthrough",
+                    verbose_feature_names_out=False,
+                ),
+            ),
+            (
+                "regressor",
+                RandomForestRegressor(
+                    n_estimators=25,
+                    min_samples_leaf=4,
+                    random_state=0,
+                ),
+            ),
+        ]
+    )
 
 
 def _make_training_data():
@@ -275,3 +313,42 @@ def test_cross_fit_without_cv_requires_two_samples():
         match="cross_fit=True requires at least 2 samples in each nuisance-training split.",
     ):
         _make_estimator(cv=0, cross_fit=True).fit(X, t, y)
+
+
+def test_pseudo_outcome_supports_mixed_treatment_with_permutation_weighting():
+    dataset = Synthetic2MultidimDataset(
+        n=96,
+        n_features=4,
+        n_categorical_treatments=2,
+        mutual_info=0.7,
+        categorical_effect_scale=0.2,
+        random_state=0,
+    )
+    X, t, y = dataset.load()
+    _, categorical_column = t.columns
+
+    estimator = DoublyRobustPseudoOutcome(
+        density_estimator=PermutationWeighting(
+            classifier=RandomForestClassifier(
+                n_estimators=25,
+                min_samples_leaf=4,
+                random_state=0,
+            ),
+            max_trials=5,
+            random_state=0,
+        ),
+        outcome_regressor=_make_mixed_treatment_regressor(categorical_column),
+        pseudo_outcome_regressor=_make_mixed_treatment_regressor(categorical_column),
+        cv=2,
+        cross_fit=True,
+        n_pseudo_samples=48,
+        random_state=0,
+    )
+
+    estimator.fit(X, t, y)
+    response = np.asarray(estimator.predict(dataset.get_grid(4)), dtype=float).reshape(
+        -1
+    )
+
+    assert response.shape == (8,)
+    assert np.isfinite(response).all()

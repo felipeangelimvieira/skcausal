@@ -289,6 +289,7 @@ class TestAllDensityEstimators(TestAllObjects):
 
     package_name = "skcausal.density"
     valid_tags = [
+        "object_type",
         "backend",
         "capability:t_type",
         "capability:multidimensional_treatment",

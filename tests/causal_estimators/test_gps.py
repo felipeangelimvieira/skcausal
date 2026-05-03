@@ -3,13 +3,16 @@ import polars as pl
 import pytest
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.compose import ColumnTransformer, make_column_selector
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.model_selection import KFold
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.tree import DecisionTreeRegressor
 
 from skcausal.causal_estimators.gps import GPS
+from skcausal.datasets import Synthetic2MultidimDataset
 from skcausal.density.base import BaseDensityEstimator
+from skcausal.density.permutation_weighting import PermutationWeighting
 
 
 class ContinuousScenario:
@@ -307,3 +310,55 @@ def test_gps_preserves_public_max_samples_predict_argument():
 
     assert estimator.max_samples_predict is max_samples_predict
     assert estimator._max_samples_predict == 3
+
+
+def test_gps_supports_mixed_treatment_with_permutation_weighting():
+    dataset = Synthetic2MultidimDataset(
+        n=96,
+        n_features=4,
+        n_categorical_treatments=2,
+        mutual_info=0.7,
+        categorical_effect_scale=0.2,
+        random_state=0,
+    )
+    X, t, y = dataset.load()
+    _, categorical_column = t.columns
+
+    outcome_regressor = make_pipeline(
+        ColumnTransformer(
+            transformers=[
+                (
+                    "encode_categorical",
+                    OneHotEncoder(handle_unknown="ignore", sparse_output=False),
+                    [categorical_column],
+                )
+            ],
+            remainder="passthrough",
+            verbose_feature_names_out=False,
+        ),
+        RandomForestRegressor(n_estimators=25, min_samples_leaf=4, random_state=0),
+    )
+
+    estimator = GPS(
+        density_regressor=PermutationWeighting(
+            classifier=RandomForestClassifier(
+                n_estimators=25,
+                min_samples_leaf=4,
+                random_state=0,
+            ),
+            max_trials=5,
+            random_state=0,
+        ),
+        outcome_regressor=outcome_regressor,
+        cv=2,
+        max_samples_predict=48,
+        random_state=0,
+    )
+
+    estimator.fit(X, t, y)
+    response = np.asarray(estimator.predict(dataset.get_grid(4)), dtype=float).reshape(
+        -1
+    )
+
+    assert response.shape == (8,)
+    assert np.isfinite(response).all()

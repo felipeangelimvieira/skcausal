@@ -6,6 +6,7 @@ import pytest
 from skbase.testing.test_all_objects import BaseFixtureGenerator, QuickTester
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.compose import ColumnTransformer, make_column_selector
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KernelDensity
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import OneHotEncoder
@@ -22,6 +23,7 @@ from skcausal.causal_estimators.ignore_covariates import DirectNoCovariates
 from skcausal.causal_estimators.pipeline import Pipeline
 from skcausal.causal_estimators.pseudo_outcome import DoublyRobustPseudoOutcome
 from skcausal.datatypes import collect_column_types
+from skcausal.datasets import Synthetic2MultidimDataset
 from skcausal.density.naive import NaiveDensityEstimator
 from skcausal.density.stabilized_from_conditional import (
     KernelMarginalAndConditional,
@@ -602,6 +604,46 @@ def test_direct_regressor_predict_averages_over_fit_x():
     prediction = estimator.predict(t_query)
 
     np.testing.assert_allclose(prediction, np.array([[20.5], [50.5]]))
+
+
+def test_direct_regressor_supports_mixed_treatment_with_tree_pipeline():
+    dataset = Synthetic2MultidimDataset(
+        n=96,
+        n_features=4,
+        n_categorical_treatments=2,
+        mutual_info=0.7,
+        categorical_effect_scale=0.2,
+        random_state=0,
+    )
+    X, t, y = dataset.load()
+
+    outcome_regressor = make_pipeline(
+        ColumnTransformer(
+            transformers=[
+                (
+                    "encode_categorical",
+                    OneHotEncoder(handle_unknown="ignore", sparse_output=False),
+                    make_column_selector(
+                        dtype_include=["category", "object", "string"]
+                    ),
+                )
+            ],
+            remainder="passthrough",
+            verbose_feature_names_out=False,
+        ),
+        RandomForestRegressor(n_estimators=25, min_samples_leaf=4, random_state=0),
+    )
+
+    estimator = DirectRegressor(outcome_regressor=outcome_regressor)
+
+    estimator.fit(X, t, y)
+    response = np.asarray(estimator.predict(dataset.get_grid(4)), dtype=float).reshape(
+        -1
+    )
+
+    assert estimator.get_tag("capability:multidimensional_treatment") is True
+    assert response.shape == (8,)
+    assert np.isfinite(response).all()
 
 
 def test_predict_rejects_prediction_time_x():
