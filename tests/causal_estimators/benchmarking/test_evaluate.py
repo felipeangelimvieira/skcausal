@@ -30,9 +30,10 @@ class _LinearSyntheticDataset(BaseSyntheticDataset):
             treatment_values = treatment_values.reshape(-1, 1)
 
         self._treatment_values = treatment_values
-        self.TREATMENT_SCHEMA = [
-            f"t{i}" for i in range(self._treatment_values.shape[1])
-        ]
+        self.column_types = {
+            column: "continuous"
+            for column in [f"t{i}" for i in range(self._treatment_values.shape[1])]
+        }
 
         super().__init__(n=self._treatment_values.shape[0], random_state=random_state)
         self.prepare()

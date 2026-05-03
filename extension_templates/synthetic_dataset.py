@@ -10,8 +10,8 @@ How to use this template
 1. Copy the file to a module with a descriptive name.
 2. Rename ``MySyntheticDataset``.
 3. Update the module and class docstrings.
-4. Define ``TREATMENT_SCHEMA`` so treatment tables are emitted with the types
-   your downstream estimators expect.
+4. Define ``column_types`` for the treatment table using ``"continuous"`` or
+    ``"categorical"`` values.
 5. Implement ``_get_covariates``, ``_get_treatments``, and ``_predict_y``.
 6. Call ``self._prepare(self.n)`` in ``__init__`` if ``load()`` should work
    immediately after construction.
@@ -54,7 +54,7 @@ class MySyntheticDataset(BaseSyntheticDataset):
             Seed forwarded to the dataset RNG.
     """
 
-    TREATMENT_SCHEMA = pl.Schema({"t_0": pl.Float64})
+    column_types = {"t_0": "continuous"}
 
     def __init__(
         self,
@@ -97,7 +97,7 @@ class MySyntheticDataset(BaseSyntheticDataset):
         -------
         np.ndarray or pl.DataFrame
                 Treatment assignments. If you return a numpy array, make sure it is
-                compatible with ``TREATMENT_SCHEMA``.
+            compatible with ``column_types``.
         """
 
         # TODO: sample or deterministically generate treatments from the
@@ -151,9 +151,8 @@ class MySyntheticDataset(BaseSyntheticDataset):
         such as ``get_levels`` when the treatment is categorical.
         """
 
-        return pl.DataFrame(
-            {"t_0": np.linspace(0.0, 1.0, n)},
-            schema=self.TREATMENT_SCHEMA,
+        return self._coerce_treatment_frame(
+            pl.DataFrame({"t_0": np.linspace(0.0, 1.0, n)})
         )
 
     @classmethod

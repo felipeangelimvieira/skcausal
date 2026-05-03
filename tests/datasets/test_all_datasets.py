@@ -1,7 +1,11 @@
 import inspect
 
+import pandas as pd
+
 from skbase.testing.test_all_objects import QuickTester, BaseFixtureGenerator
 
+from skcausal import config
+from skcausal.datatypes import collect_column_types
 from skcausal.datasets.base import BaseSyntheticDataset
 
 
@@ -13,6 +17,22 @@ class TestAllDatasets(QuickTester, BaseFixtureGenerator):
     def test_load_returns_three_dataframes(self, object_instance):
         out = object_instance.load()
         assert len(out) == 3
+
+    def test_load_respects_configured_default_backend(
+        self, object_instance, monkeypatch
+    ):
+        monkeypatch.setattr(config, "default_backend", "pandas")
+
+        covariates, treatments, outcomes = object_instance.load()
+
+        assert isinstance(covariates, pd.DataFrame)
+        assert isinstance(treatments, pd.DataFrame)
+        assert isinstance(outcomes, pd.DataFrame)
+
+    def test_treatments_follow_declared_column_types(self, object_instance):
+        _, treatments, _ = object_instance.load()
+
+        assert collect_column_types(treatments) == object_instance.column_types
 
 
 class TestAllSyntheticDatasets(QuickTester, BaseFixtureGenerator):
