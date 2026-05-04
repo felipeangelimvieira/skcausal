@@ -92,30 +92,49 @@ ul.task-list li input[type="checkbox"] {
 </button>
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./learn/learn.html"> 
+<span class="menu-text">15-min theory</span></a>
+  </li>  
   <li class="nav-item dropdown ">
-    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-examples" role="link" data-bs-toggle="dropdown" aria-expanded="false">
- <span class="menu-text">Examples</span>
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-for-researchers" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">For researchers</span>
     </a>
-    <ul class="dropdown-menu" aria-labelledby="nav-menu-examples">    
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-for-researchers">    
+        <li>
+    <a class="dropdown-item" href="./research/benchmarking.html">
+ <span class="dropdown-text">Benchmarking</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./research/dataset_catalog.html">
+ <span class="dropdown-text">Dataset Catalog</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./research/extending.html">
+ <span class="dropdown-text">Implement your own method</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-tutorials" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Tutorials</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-tutorials">    
         <li>
     <a class="dropdown-item" href="./examples/index.html">
  <span class="dropdown-text">Overview</span></a>
-  </li>  
-        <li>
-    <a class="dropdown-item" href="./examples/binary_treatments.html">
- <span class="dropdown-text">Binary Treatments</span></a>
-  </li>  
-        <li>
-    <a class="dropdown-item" href="./examples/continuous_treatments.html">
- <span class="dropdown-text">Continuous Treatments</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="./examples/categorical_treatments.html">
  <span class="dropdown-text">Categorical Treatments</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./examples/dose_response_curve.html">
- <span class="dropdown-text">SyntheticDataset2 Walkthrough</span></a>
+    <a class="dropdown-item" href="./examples/continuous_treatments.html">
+ <span class="dropdown-text">Continuous Treatments</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./examples/multidimensional_treatments.html">
+ <span class="dropdown-text">Multidimensional Treatments</span></a>
   </li>  
     </ul>
   </li>
@@ -384,7 +403,7 @@ ul.task-list li input[type="checkbox"] {
 <p>The old <code>dose_response_curve.qmd</code> page is outdated. The rewrite should explicitly fix these issues:</p>
 <ul>
 <li>Replace stale internal imports with imports from current public modules that exist in the repo.</li>
-<li>Replace <code>prepare(n=..., split_seed=..., preparation_seed=...)</code> with the current dataset API.</li>
+<li>Replace <code>prepare(...)</code> calls that embed dataset-owned split parameters with the current dataset API, and show train/test or cross-fitting splits as a separate split-object step outside the dataset layer.</li>
 <li>Replace the nonexistent <code>get_adrf(...)</code> call with <code>dataset.predict(X, treatment_grid)</code>.</li>
 <li>Replace plots built from sorted observed treatments with plots over an explicit treatment grid when the goal is to show a smooth response curve.</li>
 <li>Remove references to modules that no longer exist, such as the old continuous estimator import paths.</li>

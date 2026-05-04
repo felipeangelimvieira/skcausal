@@ -92,30 +92,49 @@ ul.task-list li input[type="checkbox"] {
 </button>
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../learn/learn.html"> 
+<span class="menu-text">15-min theory</span></a>
+  </li>  
   <li class="nav-item dropdown ">
-    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-examples" role="link" data-bs-toggle="dropdown" aria-expanded="false">
- <span class="menu-text">Examples</span>
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-for-researchers" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">For researchers</span>
     </a>
-    <ul class="dropdown-menu" aria-labelledby="nav-menu-examples">    
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-for-researchers">    
+        <li>
+    <a class="dropdown-item" href="../research/benchmarking.html">
+ <span class="dropdown-text">Benchmarking</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/dataset_catalog.html">
+ <span class="dropdown-text">Dataset Catalog</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/extending.html">
+ <span class="dropdown-text">Implement your own method</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-tutorials" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Tutorials</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-tutorials">    
         <li>
     <a class="dropdown-item" href="../examples/index.html">
  <span class="dropdown-text">Overview</span></a>
-  </li>  
-        <li>
-    <a class="dropdown-item" href="../examples/binary_treatments.html">
- <span class="dropdown-text">Binary Treatments</span></a>
-  </li>  
-        <li>
-    <a class="dropdown-item" href="../examples/continuous_treatments.html">
- <span class="dropdown-text">Continuous Treatments</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="../examples/categorical_treatments.html">
  <span class="dropdown-text">Categorical Treatments</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="../examples/dose_response_curve.html">
- <span class="dropdown-text">SyntheticDataset2 Walkthrough</span></a>
+    <a class="dropdown-item" href="../examples/continuous_treatments.html">
+ <span class="dropdown-text">Continuous Treatments</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/multidimensional_treatments.html">
+ <span class="dropdown-text">Multidimensional Treatments</span></a>
   </li>  
     </ul>
   </li>
@@ -157,7 +176,7 @@ ul.task-list li input[type="checkbox"] {
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-page">
       <h1 class="title">Examples</h1>
-            <p class="subtitle lead">Pick the treatment regime, then reuse the same fit, predict, and compare workflow.</p>
+            <p class="subtitle lead">Pick the guide that matches how treatment is represented in your data.</p>
                       </div>
   </div>
     
@@ -182,71 +201,52 @@ ul.task-list li input[type="checkbox"] {
 
 
 <div class="surface-section">
-<p>The examples are organized by treatment semantics first, because the intervention type determines both the estimator family and the quantity you should interpret.</p>
+<p>Start from the shape of <code>t</code>. The guide changes with the treatment representation, but the estimator contract stays the same.</p>
 </div>
-<p><span class="section-kicker"><code>Treatment map</code></span> ## Pick The Right Example</p>
-<div class="docs-card-grid">
-<section id="binary-treatments" class="level3 docs-card">
-<h3 class="anchored" data-anchor-id="binary-treatments">Binary treatments</h3>
-<p>Use this guide when treatment is a treated-vs-control flag such as <code>True</code> and <code>False</code>.</p>
-<p><a href="../examples/binary_treatments.html" class="card-link">Open binary guide</a></p>
+<section id="the-core-workflow-does-not-change" class="level2">
+<h2 class="anchored" data-anchor-id="the-core-workflow-does-not-change">The Core Workflow Does Not Change</h2>
+<p>The same pattern shows up in every tutorial.</p>
+<ol type="1">
+<li>Build <code>X</code>, <code>t</code>, and <code>y</code> from observed covariates, treatments, and outcomes.</li>
+<li>Fit one estimator that matches the treatment type and estimand.</li>
+<li>Create the requested intervention table or treatment grid.</li>
+<li>Predict and compare the returned causal quantity.</li>
+</ol>
+<p><span class="section-kicker"><code>Choose a path</code></span></p>
 </section>
-<section id="continuous-treatments" class="level3 docs-card">
-<h3 class="anchored" data-anchor-id="continuous-treatments">Continuous treatments</h3>
-<p>Use this guide when treatment is a numeric exposure such as a dose, score, or intensity.</p>
-<p><a href="../examples/continuous_treatments.html" class="card-link">Open continuous guide</a></p>
-</section>
-<section id="categorical-treatments" class="level3 docs-card">
-<h3 class="anchored" data-anchor-id="categorical-treatments">Categorical treatments</h3>
-<p>Use this guide when treatment has more than two levels such as <code>control</code>, <code>placebo</code>, and <code>treated</code>.</p>
-<p><a href="../examples/categorical_treatments.html" class="card-link">Open categorical guide</a></p>
-</section>
-<section id="full-syntheticdataset2-walkthrough" class="level3 docs-card">
-<h3 class="anchored" data-anchor-id="full-syntheticdataset2-walkthrough">Full SyntheticDataset2 walkthrough</h3>
-<p>Use this guide when you want one end-to-end benchmark example with a known ground-truth dose-response curve.</p>
-<p><a href="../examples/dose_response_curve.html" class="card-link">Open benchmark</a></p>
-</section>
-</div>
-<p><span class="section-kicker"><code>Shared workflow</code></span> ## The Examples Reuse One Contract</p>
-<div class="workflow-grid">
-<section id="build-x-t-and-y" class="level3 workflow-step">
-<h3 class="anchored" data-anchor-id="build-x-t-and-y">1. Build <code>X</code>, <code>t</code>, and <code>y</code></h3>
-<p>Start from observed covariates, treatment assignments, and outcomes.</p>
-</section>
-<section id="fit-one-estimator" class="level3 workflow-step">
-<h3 class="anchored" data-anchor-id="fit-one-estimator">2. Fit one estimator</h3>
-<p>Choose direct, weighting, or doubly robust estimators depending on the treatment type and estimand.</p>
-</section>
-<section id="build-requested-interventions" class="level3 workflow-step">
-<h3 class="anchored" data-anchor-id="build-requested-interventions">3. Build requested interventions</h3>
-<p>Create the treatment table that represents the treatment levels or treatment grid you want to evaluate.</p>
-</section>
-<section id="predict-and-compare" class="level3 workflow-step">
-<h3 class="anchored" data-anchor-id="predict-and-compare">4. Predict and compare</h3>
-<p>Interpret average potential outcomes, response curves, or benchmark error against known truth where available.</p>
-</section>
-</div>
-<p><span class="section-kicker"><code>What changes across guides</code></span> ## What Varies By Treatment Type</p>
-<div class="feature-grid">
-<section id="binary-and-categorical-guides" class="level3 feature-card">
-<h3 class="anchored" data-anchor-id="binary-and-categorical-guides">Binary and categorical guides</h3>
-<p>These guides focus on requested treatment levels and return average potential outcomes for those levels.</p>
-</section>
-<section id="continuous-guides" class="level3 feature-card">
-<h3 class="anchored" data-anchor-id="continuous-guides">Continuous guides</h3>
-<p>These guides build a treatment grid and visualize the resulting dose-response curve.</p>
-</section>
-<section id="density-aware-workflows" class="level3 feature-card">
-<h3 class="anchored" data-anchor-id="density-aware-workflows">Density-aware workflows</h3>
-<p>Continuous examples can plug treatment-density estimators into GPS-style estimators when the assignment model matters.</p>
-</section>
-<section id="synthetic-benchmark-pages" class="level3 feature-card">
-<h3 class="anchored" data-anchor-id="synthetic-benchmark-pages">Synthetic benchmark pages</h3>
-<p>Benchmark examples add known ground truth so you can evaluate the shape and error of the estimated curve directly.</p>
-</section>
-</div>
+<section id="start-with-the-treatment-shape" class="level2">
+<h2 class="anchored" data-anchor-id="start-with-the-treatment-shape">Start With The Treatment Shape</h2>
+<p>The examples use synthetic datasets to compare with ground truth, but the workflow is the same for real data.</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>If treatment looks like</th>
+<th>Open</th>
+<th>Main output</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>One numeric column such as dose, score, or exposure</td>
+<td><a href="../examples/continuous_treatments.html">Continuous treatments</a></td>
+<td>A response curve on a treatment grid.</td>
+</tr>
+<tr class="even">
+<td>One discrete column with named levels such as <code>control</code>, <code>placebo</code>, and <code>treated</code></td>
+<td><a href="../examples/categorical_treatments.html">Categorical treatments</a></td>
+<td>Average potential outcomes for requested levels.</td>
+</tr>
+<tr class="odd">
+<td>Multiple treatment columns such as dose plus regime</td>
+<td><a href="../examples/multidimensional_treatments.html">Multidimensional treatments</a></td>
+<td>Joint intervention comparisons across treatment regimes.</td>
+</tr>
+</tbody>
+</table>
+<p><span class="section-kicker"><code>Shared workflow</code></span></p>
 
 
+</section>
 
 </main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">

@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>Continuous Treatment Densities – skcausal</title>
+<title>Benchmarking Across Dataset Seeds – skcausal</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -242,7 +242,7 @@ window.Quarto = {
 <header id="title-block-header" class="quarto-title-block default page-columns page-full">
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-body">
-      <h1 class="title">Continuous Treatment Densities</h1>
+      <h1 class="title">Benchmarking Across Dataset Seeds</h1>
                       </div>
   </div>
     
@@ -263,12 +263,14 @@ window.Quarto = {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#choose-an-estimator" id="toc-choose-an-estimator" class="nav-link active" data-scroll-target="#choose-an-estimator">Choose an estimator</a></li>
-  <li><a href="#example-data" id="toc-example-data" class="nav-link" data-scroll-target="#example-data">Example data</a></li>
-  <li><a href="#skprodensityestimator" id="toc-skprodensityestimator" class="nav-link" data-scroll-target="#skprodensityestimator"><code>SkproDensityEstimator</code></a></li>
-  <li><a href="#permutationweighting" id="toc-permutationweighting" class="nav-link" data-scroll-target="#permutationweighting"><code>PermutationWeighting</code></a></li>
-  <li><a href="#evaluation" id="toc-evaluation" class="nav-link" data-scroll-target="#evaluation">Evaluation</a></li>
-  <li><a href="#multi-column-treatments" id="toc-multi-column-treatments" class="nav-link" data-scroll-target="#multi-column-treatments">Multi-column treatments</a></li>
+  <li><a href="#setup" id="toc-setup" class="nav-link active" data-scroll-target="#setup">Setup</a></li>
+  <li><a href="#step-1-imports" id="toc-step-1-imports" class="nav-link" data-scroll-target="#step-1-imports">Step 1: Imports</a></li>
+  <li><a href="#step-2-define-one-shared-regression-backbone" id="toc-step-2-define-one-shared-regression-backbone" class="nav-link" data-scroll-target="#step-2-define-one-shared-regression-backbone">Step 2: Define one shared regression backbone</a></li>
+  <li><a href="#step-3-create-the-synthetic-benchmark-and-metrics" id="toc-step-3-create-the-synthetic-benchmark-and-metrics" class="nav-link" data-scroll-target="#step-3-create-the-synthetic-benchmark-and-metrics">Step 3: Create the synthetic benchmark and metrics</a></li>
+  <li><a href="#step-4-benchmark-the-two-estimators" id="toc-step-4-benchmark-the-two-estimators" class="nav-link" data-scroll-target="#step-4-benchmark-the-two-estimators">Step 4: Benchmark the two estimators</a></li>
+  <li><a href="#step-5-summarize-the-comparison" id="toc-step-5-summarize-the-comparison" class="nav-link" data-scroll-target="#step-5-summarize-the-comparison">Step 5: Summarize the comparison</a></li>
+  <li><a href="#a-reusable-pattern" id="toc-a-reusable-pattern" class="nav-link" data-scroll-target="#a-reusable-pattern">A reusable pattern</a></li>
+  <li><a href="#where-to-go-next" id="toc-where-to-go-next" class="nav-link" data-scroll-target="#where-to-go-next">Where to go next</a></li>
   </ul>
 </nav>
     </div>
@@ -279,21 +281,148 @@ window.Quarto = {
 
 
 
-<p>Use this guide when the treatment is numeric and you need either a conditional density <span class="math inline">\(p(t \mid x)\)</span> or a stabilized density ratio <span class="math inline">\(p(t \mid x) / p(t)\)</span>.</p>
-<section id="choose-an-estimator" class="level2">
-<h2 class="anchored" data-anchor-id="choose-an-estimator">Choose an estimator</h2>
-<div id="bda6da91" class="cell" data-execution_count="1">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skcausal.utils.lookup <span class="im">import</span> all_density_estimators</span>
+<p>Use this guide when you want to compare estimators on a synthetic benchmark where the true average response curve is known.</p>
+<div class="callout callout-style-simple callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>What <code>evaluate_multiple_dataset_seeds</code> does
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>This helper answers a specific question: if I keep the estimator definition fixed, how does performance change when I regenerate the synthetic dataset with different random seeds?</p>
+</div>
+</div>
+<p>That is useful because a single synthetic dataset draw can be misleading. Some seeds produce easier treatment assignments or cleaner outcome surfaces than others. Running across multiple dataset seeds gives you a more stable view of model quality.</p>
+<section id="setup" class="level2">
+<h2 class="anchored" data-anchor-id="setup">Setup</h2>
+<p>We will compare two estimators on <code>SyntheticDataset2</code>:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Model</th>
+<th>What it learns</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>DirectNoCovariates</code></td>
+<td>A naive observational baseline that fits <span class="math inline">\(\mathbb{E}[Y \mid T=t]\)</span> and ignores confounders <code>X</code></td>
+</tr>
+<tr class="even">
+<td><code>DirectRegressor</code></td>
+<td>A direct response model that fits <span class="math inline">\(\mathbb{E}[Y \mid X, T=t]\)</span> and averages over the fitted covariate sample</td>
+</tr>
+</tbody>
+</table>
+<p>This is a good teaching example because <code>SyntheticDataset2</code> is confounded by construction. Treatment depends on the covariates, and the outcome depends on them too. The naive model therefore mixes confounding with treatment effect, while the direct model has a chance to adjust for it.</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>evaluate_multiple_dataset_seeds</code> is designed for synthetic datasets that subclass <code>BaseSyntheticDataset</code>, because the metrics compare predicted curves against the dataset’s known ground-truth response.</p>
+</div>
+</div>
+</section>
+<section id="step-1-imports" class="level2">
+<h2 class="anchored" data-anchor-id="step-1-imports">Step 1: Imports</h2>
+<div id="2d8fd987" class="cell" data-execution_count="1">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>all_density_estimators(</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    as_dataframe<span class="op">=</span><span class="va">True</span>,</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    return_tags<span class="op">=</span>[</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>        <span class="st">"density_kind"</span>,</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"capability:t_type"</span>,</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>        <span class="st">"supports_multidimensional_treatment"</span>,</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    ],</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-display" data-execution_count="1">
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.ensemble <span class="im">import</span> RandomForestRegressor</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skcausal.causal_estimators <span class="im">import</span> DirectNoCovariates, DirectRegressor</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skcausal.causal_estimators.benchmarking <span class="im">import</span> evaluate_multiple_dataset_seeds</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skcausal.causal_estimators.benchmarking.metrics <span class="im">import</span> MAE, RMSE</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skcausal.datasets <span class="im">import</span> SyntheticDataset2</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="step-2-define-one-shared-regression-backbone" class="level2">
+<h2 class="anchored" data-anchor-id="step-2-define-one-shared-regression-backbone">Step 2: Define one shared regression backbone</h2>
+<p>To keep the comparison fair, both estimators will use the same regression model family. The only difference is which inputs they see.</p>
+<div id="137113cf" class="cell" data-execution_count="2">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> make_regressor(random_state: <span class="bu">int</span> <span class="op">=</span> <span class="dv">0</span>):</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> RandomForestRegressor(</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>        n_estimators<span class="op">=</span><span class="dv">60</span>,</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>        max_depth<span class="op">=</span><span class="dv">8</span>,</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>        min_samples_leaf<span class="op">=</span><span class="dv">10</span>,</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>        random_state<span class="op">=</span>random_state,</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="step-3-create-the-synthetic-benchmark-and-metrics" class="level2">
+<h2 class="anchored" data-anchor-id="step-3-create-the-synthetic-benchmark-and-metrics">Step 3: Create the synthetic benchmark and metrics</h2>
+<div id="d98dde50" class="cell" data-execution_count="3">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>dataset <span class="op">=</span> SyntheticDataset2(</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    n<span class="op">=</span><span class="dv">1500</span>,</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    n_features<span class="op">=</span><span class="dv">6</span>,</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    random_state<span class="op">=</span><span class="dv">0</span>,</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>metrics <span class="op">=</span> [</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    MAE(n_treatments<span class="op">=</span><span class="dv">128</span>, random_state<span class="op">=</span><span class="dv">0</span>),</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    RMSE(n_treatments<span class="op">=</span><span class="dv">128</span>, random_state<span class="op">=</span><span class="dv">0</span>),</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>metric_columns <span class="op">=</span> [<span class="bu">str</span>(metric) <span class="cf">for</span> metric <span class="kw">in</span> metrics]</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>metric_display_names <span class="op">=</span> {</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>    metric_columns[<span class="dv">0</span>]: <span class="st">"MAE"</span>,</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>    metric_columns[<span class="dv">1</span>]: <span class="st">"RMSE"</span>,</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>dataset_seeds <span class="op">=</span> [<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>Here:</p>
+<ol type="1">
+<li><code>dataset</code> defines the data-generating process, not just one observed table.</li>
+<li><code>metrics</code> specify how to compare each fitted estimator against the true average response curve.</li>
+<li><code>dataset_seeds</code> controls how many independent synthetic dataset draws we evaluate.</li>
+</ol>
+</section>
+<section id="step-4-benchmark-the-two-estimators" class="level2">
+<h2 class="anchored" data-anchor-id="step-4-benchmark-the-two-estimators">Step 4: Benchmark the two estimators</h2>
+<p>The helper benchmarks one estimator at a time, so we wrap it in a small function and then concatenate the outputs.</p>
+<div id="bee9c3ae" class="cell" data-execution_count="4">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> benchmark_model(model_name, estimator):</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    results <span class="op">=</span> evaluate_multiple_dataset_seeds(</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>        dataset<span class="op">=</span>dataset,</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>        estimator<span class="op">=</span>estimator,</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>        metrics<span class="op">=</span>metrics,</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>        random_states<span class="op">=</span>dataset_seeds,</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    results[<span class="st">"model"</span>] <span class="op">=</span> model_name</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> results</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>naive_results <span class="op">=</span> benchmark_model(</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>    <span class="st">"DirectNoCovariates"</span>,</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>    DirectNoCovariates(outcome_regressor<span class="op">=</span>make_regressor()),</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>direct_results <span class="op">=</span> benchmark_model(</span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>    <span class="st">"DirectRegressor"</span>,</span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>    DirectRegressor(outcome_regressor<span class="op">=</span>make_regressor()),</span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>benchmark_results <span class="op">=</span> pd.concat(</span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>    [naive_results, direct_results],</span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>    ignore_index<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a>benchmark_results</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="4">
 <div>
 
 
@@ -301,85 +430,82 @@ window.Quarto = {
 <thead>
 <tr class="header">
 <th data-quarto-table-cell-role="th"></th>
-<th data-quarto-table-cell-role="th">name</th>
-<th data-quarto-table-cell-role="th">object</th>
-<th data-quarto-table-cell-role="th">density_kind</th>
-<th data-quarto-table-cell-role="th">capability:t_type</th>
-<th data-quarto-table-cell-role="th">supports_multidimensional_treatment</th>
+<th data-quarto-table-cell-role="th">MAE(n_treatments=128, random_state=0)</th>
+<th data-quarto-table-cell-role="th">RMSE(n_treatments=128, random_state=0)</th>
+<th data-quarto-table-cell-role="th">dataset_seed</th>
+<th data-quarto-table-cell-role="th">model</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">0</th>
-<td>CompositeFactorizedDensityEstimator</td>
-<td>&lt;class 'skcausal.density.compose.CompositeFact...</td>
-<td>conditional</td>
-<td>[continuous, categorical]</td>
-<td>None</td>
+<td>0.298278</td>
+<td>0.377048</td>
+<td>0</td>
+<td>DirectNoCovariates</td>
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">1</th>
-<td>IntegratedMarginalAndConditional</td>
-<td>&lt;class 'skcausal.density.stabilized_from_condi...</td>
-<td>stabilized</td>
-<td>[continuous, categorical]</td>
-<td>None</td>
+<td>0.469495</td>
+<td>0.564435</td>
+<td>1</td>
+<td>DirectNoCovariates</td>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">2</th>
-<td>KernelMarginalAndConditional</td>
-<td>&lt;class 'skcausal.density.stabilized_from_condi...</td>
-<td>stabilized</td>
-<td>[continuous, categorical]</td>
-<td>None</td>
+<td>0.820632</td>
+<td>0.957171</td>
+<td>2</td>
+<td>DirectNoCovariates</td>
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">3</th>
-<td>NaiveDensityEstimator</td>
-<td>&lt;class 'skcausal.density.naive.NaiveDensityEst...</td>
-<td>conditional</td>
-<td>[continuous, categorical]</td>
-<td>None</td>
+<td>0.900588</td>
+<td>1.016855</td>
+<td>3</td>
+<td>DirectNoCovariates</td>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">4</th>
-<td>OptunaSearchDensityEstimator</td>
-<td>&lt;class 'skcausal.density.optuna.OptunaSearchDe...</td>
-<td>conditional</td>
-<td>[continuous, categorical]</td>
-<td>None</td>
+<td>0.733818</td>
+<td>0.845488</td>
+<td>4</td>
+<td>DirectNoCovariates</td>
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">5</th>
-<td>PermutationWeighting</td>
-<td>&lt;class 'skcausal.density.permutation_weighting...</td>
-<td>stabilized</td>
-<td>[continuous, categorical]</td>
-<td>None</td>
+<td>0.125409</td>
+<td>0.157969</td>
+<td>0</td>
+<td>DirectRegressor</td>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">6</th>
-<td>Pipeline</td>
-<td>&lt;class 'skcausal.density.pipeline.Pipeline'&gt;</td>
-<td>conditional</td>
-<td>[continuous, categorical]</td>
-<td>None</td>
+<td>0.185232</td>
+<td>0.216804</td>
+<td>1</td>
+<td>DirectRegressor</td>
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">7</th>
-<td>SklearnCategoricalDensity</td>
-<td>&lt;class 'skcausal.density.sklearn.SklearnCatego...</td>
-<td>conditional</td>
-<td>[categorical]</td>
-<td>None</td>
+<td>0.353658</td>
+<td>0.403821</td>
+<td>2</td>
+<td>DirectRegressor</td>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">8</th>
-<td>SkproDensityEstimator</td>
-<td>&lt;class 'skcausal.density.skpro.SkproDensityEst...</td>
-<td>conditional</td>
-<td>[continuous]</td>
-<td>None</td>
+<td>0.365656</td>
+<td>0.399559</td>
+<td>3</td>
+<td>DirectRegressor</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">9</th>
+<td>0.301836</td>
+<td>0.327065</td>
+<td>4</td>
+<td>DirectRegressor</td>
 </tr>
 </tbody>
 </table>
@@ -387,124 +513,20 @@ window.Quarto = {
 </div>
 </div>
 </div>
+<p>Each row is one dataset seed. The metric columns are named from the metric objects passed in <code>metrics</code>, and <code>dataset_seed</code> tells you which regenerated synthetic dataset produced that score.</p>
 </section>
-<section id="example-data" class="level2">
-<h2 class="anchored" data-anchor-id="example-data">Example data</h2>
-<p>The examples below use a single continuous treatment column stored in a <code>polars.DataFrame</code>.</p>
-<div id="7303414b" class="cell" data-execution_count="2">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> polars <span class="im">as</span> pl</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>rng <span class="op">=</span> np.random.default_rng(<span class="dv">0</span>)</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>n <span class="op">=</span> <span class="dv">400</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>x0 <span class="op">=</span> rng.normal(size<span class="op">=</span>n)</span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>x1 <span class="op">=</span> rng.normal(size<span class="op">=</span>n)</span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>noise_scale <span class="op">=</span> <span class="fl">0.2</span> <span class="op">+</span> <span class="fl">0.5</span> <span class="op">*</span> np.<span class="bu">abs</span>(x1)</span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>t_values <span class="op">=</span> <span class="fl">1.5</span> <span class="op">*</span> x0 <span class="op">-</span> <span class="fl">0.8</span> <span class="op">*</span> x1 <span class="op">+</span> rng.normal(scale<span class="op">=</span>noise_scale, size<span class="op">=</span>n)</span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>X <span class="op">=</span> pl.DataFrame({<span class="st">"x0"</span>: x0, <span class="st">"x1"</span>: x1})</span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>t <span class="op">=</span> pl.DataFrame({<span class="st">"t"</span>: t_values})</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</div>
-</section>
-<section id="skprodensityestimator" class="level2">
-<h2 class="anchored" data-anchor-id="skprodensityestimator"><code>SkproDensityEstimator</code></h2>
-<p><code>SkproDensityEstimator</code> is an adapter around a skpro probabilistic regressor. It fits the wrapped regressor on <code>X</code> and <code>t</code>, calls <code>predict_proba(X)</code>, and evaluates the resulting predictive distribution at the supplied treatment values.</p>
-<p>The current implementation supports floating-point treatment columns (<code>pl.Float32</code> and <code>pl.Float64</code>).</p>
-<div id="5c81cefc" class="cell" data-execution_count="3">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.ensemble <span class="im">import</span> RandomForestRegressor</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.linear_model <span class="im">import</span> LinearRegression</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skpro.regression.residual <span class="im">import</span> ResidualDouble</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skcausal.density.skpro <span class="im">import</span> SkproDensityEstimator</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>regressor <span class="op">=</span> ResidualDouble(</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    estimator<span class="op">=</span>LinearRegression(),</span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    estimator_resid<span class="op">=</span>RandomForestRegressor(n_estimators<span class="op">=</span><span class="dv">25</span>, random_state<span class="op">=</span><span class="dv">0</span>),</span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>density_estimator <span class="op">=</span> SkproDensityEstimator(estimator<span class="op">=</span>regressor)</span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>density_estimator.fit(X, t)</span>
-<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>conditional_density <span class="op">=</span> density_estimator.predict_density(X, t)</span>
-<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>conditional_density[:<span class="dv">5</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-display" data-execution_count="3">
-<pre><code>array([[0.92599426],
-       [0.67714325],
-       [3.80554233],
-       [0.42835012],
-       [1.07535137]])</code></pre>
-</div>
-</div>
-<p>In the test suite, the adapter matches the density obtained by calling the wrapped skpro regressor directly and then evaluating its <code>pdf</code> on the same rows.</p>
-</section>
-<section id="permutationweighting" class="level2">
-<h2 class="anchored" data-anchor-id="permutationweighting"><code>PermutationWeighting</code></h2>
-<p><code>PermutationWeighting</code> solves a different problem. It creates a binary classification dataset in which observed <code>(X, t)</code> pairs are labeled <code>1</code> and pairs built from observed <code>X</code> with permuted treatment values are labeled <code>0</code>. The estimator then returns posterior-odds scores from that classifier, which are used as a stabilized density-ratio estimate.</p>
-<div id="0cb5a812" class="cell" data-execution_count="4">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.linear_model <span class="im">import</span> LogisticRegression</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skcausal.density.permutation_weighting <span class="im">import</span> PermutationWeighting</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>ratio_estimator <span class="op">=</span> PermutationWeighting(</span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    classifier<span class="op">=</span>LogisticRegression(max_iter<span class="op">=</span><span class="dv">1000</span>),</span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    max_trials<span class="op">=</span><span class="dv">3</span>,</span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    random_state<span class="op">=</span><span class="dv">0</span>,</span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>ratio_estimator.fit(X, t)</span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>stabilized_ratio <span class="op">=</span> ratio_estimator.predict_density(X, t)</span>
-<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>stabilized_ratio[:<span class="dv">5</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-display" data-execution_count="4">
-<pre><code>array([[1.],
-       [1.],
-       [1.],
-       [1.],
-       [1.]])</code></pre>
-</div>
-</div>
-<p>The key parameters control how the internal classifier trains and aggregates:</p>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Parameter</th>
-<th>Default</th>
-<th>What it does</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><code>max_trials</code></td>
-<td><code>5</code></td>
-<td>Controls how many trial classifiers are fit in <code>"ensemble"</code> or <code>"convergence"</code> mode</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="evaluation" class="level2">
-<h2 class="anchored" data-anchor-id="evaluation">Evaluation</h2>
-<p>For conditional density estimators, <code>skcausal.density.performance_evaluation.evaluate.evaluate</code> runs cross-validation and uses <code>LogLikelihoodMetric()</code> by default.</p>
-<div id="32a12495" class="cell" data-execution_count="5">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.model_selection <span class="im">import</span> KFold</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skcausal.density.performance_evaluation.evaluate <span class="im">import</span> evaluate</span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skcausal.density.performance_evaluation.metrics <span class="im">import</span> LogLikelihoodMetric</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> evaluate(</span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    estimator<span class="op">=</span>density_estimator,</span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    cv<span class="op">=</span>KFold(n_splits<span class="op">=</span><span class="dv">3</span>),</span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    X<span class="op">=</span>X,</span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    t<span class="op">=</span>t,</span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    scoring<span class="op">=</span>LogLikelihoodMetric(),</span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>results[[<span class="st">"test_LogLikelihoodMetric"</span>, <span class="st">"fit_time"</span>, <span class="st">"score_time"</span>]]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<section id="step-5-summarize-the-comparison" class="level2">
+<h2 class="anchored" data-anchor-id="step-5-summarize-the-comparison">Step 5: Summarize the comparison</h2>
+<div id="f0167f31" class="cell" data-execution_count="5">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>summary <span class="op">=</span> (</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    benchmark_results</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    .groupby(<span class="st">"model"</span>)[metric_columns]</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    .agg([<span class="st">"mean"</span>, <span class="st">"std"</span>])</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    .rename(columns<span class="op">=</span>metric_display_names, level<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    .<span class="bu">round</span>(<span class="dv">3</span>)</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>summary</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-display" data-execution_count="5">
 <div>
 
@@ -513,29 +535,38 @@ window.Quarto = {
 <thead>
 <tr class="header">
 <th data-quarto-table-cell-role="th"></th>
-<th data-quarto-table-cell-role="th">test_LogLikelihoodMetric</th>
-<th data-quarto-table-cell-role="th">fit_time</th>
-<th data-quarto-table-cell-role="th">score_time</th>
+<th colspan="2" data-quarto-table-cell-role="th" data-halign="left">MAE</th>
+<th colspan="2" data-quarto-table-cell-role="th" data-halign="left">RMSE</th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">mean</th>
+<th data-quarto-table-cell-role="th">std</th>
+<th data-quarto-table-cell-role="th">mean</th>
+<th data-quarto-table-cell-role="th">std</th>
+</tr>
+<tr class="header">
+<th data-quarto-table-cell-role="th">model</th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<th data-quarto-table-cell-role="th">0</th>
-<td>-0.672842</td>
-<td>0.027992</td>
-<td>0.005208</td>
+<th data-quarto-table-cell-role="th">DirectNoCovariates</th>
+<td>0.645</td>
+<td>0.253</td>
+<td>0.752</td>
+<td>0.272</td>
 </tr>
 <tr class="even">
-<th data-quarto-table-cell-role="th">1</th>
-<td>-1.983167</td>
-<td>0.027577</td>
-<td>0.004855</td>
-</tr>
-<tr class="odd">
-<th data-quarto-table-cell-role="th">2</th>
-<td>-1.325541</td>
-<td>0.026821</td>
-<td>0.004791</td>
+<th data-quarto-table-cell-role="th">DirectRegressor</th>
+<td>0.266</td>
+<td>0.106</td>
+<td>0.301</td>
+<td>0.110</td>
 </tr>
 </tbody>
 </table>
@@ -543,11 +574,25 @@ window.Quarto = {
 </div>
 </div>
 </div>
-<p><code>LogLikelihoodMetric()</code> computes the mean of <code>log(predict_density(X, t))</code> after clipping values below <code>epsilon</code>. That interpretation is natural for <code>SkproDensityEstimator</code>. If you evaluate <code>PermutationWeighting</code>, the metric is still well defined numerically, but it is scoring a stabilized ratio rather than a normalized treatment density.</p>
+<p>The main pattern to look for is whether the direct model beats the naive baseline on average and whether that advantage is consistent across seeds.</p>
 </section>
-<section id="multi-column-treatments" class="level2">
-<h2 class="anchored" data-anchor-id="multi-column-treatments">Multi-column treatments</h2>
-<p>The continuous estimators in this guide work with a single treatment column. If <code>t</code> contains multiple treatment columns, use <code>CompositeFactorizedDensityEstimator</code> to combine per-column models instead.</p>
+<section id="a-reusable-pattern" class="level2">
+<h2 class="anchored" data-anchor-id="a-reusable-pattern">A reusable pattern</h2>
+<p>Once this pattern works, you can swap in:</p>
+<ol type="1">
+<li>Another synthetic dataset such as a new subclass of <code>BaseSyntheticDataset</code>.</li>
+<li>Another estimator such as <code>GPS</code> or <code>DoublyRobustPseudoOutcome</code>.</li>
+<li>Another metric, including your own subclass of <code>AverageResponseMetric</code>.</li>
+<li>A longer list of dataset seeds for a more stable benchmark.</li>
+</ol>
+</section>
+<section id="where-to-go-next" class="level2">
+<h2 class="anchored" data-anchor-id="where-to-go-next">Where to go next</h2>
+<ul>
+<li>See <a href="../examples/continuous_treatments.html">Continuous Treatments</a> for a fuller estimator walkthrough on the same dataset family.</li>
+<li>See <a href="../research/extending.html">Implement your own method</a> if you want to benchmark a custom estimator or synthetic dataset.</li>
+<li>See <a href="../research/dataset_catalog.html">Dataset Catalog</a> for other built-in synthetic benchmarks.</li>
+</ul>
 
 
 </section>

@@ -156,30 +156,49 @@ window.Quarto = {
 </button>
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../learn/learn.html"> 
+<span class="menu-text">15-min theory</span></a>
+  </li>  
   <li class="nav-item dropdown ">
-    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-examples" role="link" data-bs-toggle="dropdown" aria-expanded="false">
- <span class="menu-text">Examples</span>
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-for-researchers" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">For researchers</span>
     </a>
-    <ul class="dropdown-menu" aria-labelledby="nav-menu-examples">    
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-for-researchers">    
+        <li>
+    <a class="dropdown-item" href="../research/benchmarking.html">
+ <span class="dropdown-text">Benchmarking</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/dataset_catalog.html">
+ <span class="dropdown-text">Dataset Catalog</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/extending.html">
+ <span class="dropdown-text">Implement your own method</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-tutorials" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Tutorials</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-tutorials">    
         <li>
     <a class="dropdown-item" href="../examples/index.html">
  <span class="dropdown-text">Overview</span></a>
-  </li>  
-        <li>
-    <a class="dropdown-item" href="../examples/binary_treatments.html">
- <span class="dropdown-text">Binary Treatments</span></a>
-  </li>  
-        <li>
-    <a class="dropdown-item" href="../examples/continuous_treatments.html">
- <span class="dropdown-text">Continuous Treatments</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="../examples/categorical_treatments.html">
  <span class="dropdown-text">Categorical Treatments</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="../examples/dose_response_curve.html">
- <span class="dropdown-text">SyntheticDataset2 Walkthrough</span></a>
+    <a class="dropdown-item" href="../examples/continuous_treatments.html">
+ <span class="dropdown-text">Continuous Treatments</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/multidimensional_treatments.html">
+ <span class="dropdown-text">Multidimensional Treatments</span></a>
   </li>  
     </ul>
   </li>
@@ -251,7 +270,8 @@ window.Quarto = {
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>scores <span class="op">=</span> estimator.predict_density(X, t)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>The documented density estimators take <code>polars.DataFrame</code> inputs for both covariates <code>X</code> and treatment <code>t</code>.</p>
 </div>
-<p><span class="section-kicker"><code>Returned quantity</code></span> ## What <code>predict_density</code> Means</p>
+<section id="what-predict_density-means" class="level2">
+<h2 class="anchored" data-anchor-id="what-predict_density-means">What <code>predict_density</code> Means</h2>
 <p><code>skcausal</code> currently exposes two density-like output kinds.</p>
 <table class="caption-top table">
 <colgroup>
@@ -280,7 +300,10 @@ window.Quarto = {
 </tbody>
 </table>
 <p>Inspect <code>estimator.get_tag("density_kind")</code> before comparing estimators or choosing an evaluation metric.</p>
-<p><span class="section-kicker"><code>Estimator map</code></span> ## Documented Density Components</p>
+</section>
+<section id="documented-density-components" class="level2">
+<h2 class="anchored" data-anchor-id="documented-density-components">Documented Density Components</h2>
+<p>We support Skpro probabilistic regressors for continuous treatments and scikit-learn classifiers for categorical treatments. Permutation Weighting is the most flexible one for both types of treatments.</p>
 <div class="docs-card-grid">
 <section id="skprodensityestimator" class="level3 docs-card">
 <h3 class="anchored" data-anchor-id="skprodensityestimator">SkproDensityEstimator</h3>
@@ -288,7 +311,7 @@ window.Quarto = {
 </section>
 <section id="permutationweighting" class="level3 docs-card">
 <h3 class="anchored" data-anchor-id="permutationweighting">PermutationWeighting</h3>
-<p>Use this when you need a classifier-based stabilized density ratio for single-column continuous treatments.</p>
+<p>Use this when you need a classifier-based stabilized density ratio for any treatment structure.</p>
 </section>
 <section id="compositefactorizeddensityestimator" class="level3 docs-card">
 <h3 class="anchored" data-anchor-id="compositefactorizeddensityestimator">CompositeFactorizedDensityEstimator</h3>
@@ -299,7 +322,9 @@ window.Quarto = {
 <p>Use this when you want cross-validated density scoring with <code>LogLikelihoodMetric()</code> or another explicit metric.</p>
 </section>
 </div>
-<p><span class="section-kicker"><code>Interpretation</code></span> ## Continuous Estimators In This Guide</p>
+</section>
+<section id="continuous-estimators-in-this-guide" class="level2">
+<h2 class="anchored" data-anchor-id="continuous-estimators-in-this-guide">Continuous Estimators In This Guide</h2>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 33%">
@@ -326,12 +351,12 @@ window.Quarto = {
 </tr>
 </tbody>
 </table>
-<p>Because <code>LogLikelihoodMetric()</code> applies <code>log</code> to the output of <code>predict_density</code>, it is directly interpretable as a log-likelihood when <code>density_kind</code> is <code>"conditional"</code>. For <code>"stabilized"</code> estimators, it becomes a log-score on the returned ratio scale instead.</p>
 <div class="button-row">
-<p><a href="../density/continuous.html" class="hero-button hero-button-primary">Continue to the continuous density guide</a> <a href="../examples/index.html" class="hero-button hero-button-secondary">Open example workflows</a></p>
+<p><a href="../density/continuous.html" class="hero-button hero-button-primary">Continue to the continuous density guide</a></p>
 </div>
 
 
+</section>
 
 </main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">

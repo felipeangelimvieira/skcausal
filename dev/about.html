@@ -23,6 +23,41 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
 </style>
 
 
@@ -92,30 +127,49 @@ ul.task-list li input[type="checkbox"] {
 </button>
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./learn/learn.html"> 
+<span class="menu-text">15-min theory</span></a>
+  </li>  
   <li class="nav-item dropdown ">
-    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-examples" role="link" data-bs-toggle="dropdown" aria-expanded="false">
- <span class="menu-text">Examples</span>
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-for-researchers" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">For researchers</span>
     </a>
-    <ul class="dropdown-menu" aria-labelledby="nav-menu-examples">    
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-for-researchers">    
+        <li>
+    <a class="dropdown-item" href="./research/benchmarking.html">
+ <span class="dropdown-text">Benchmarking</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./research/dataset_catalog.html">
+ <span class="dropdown-text">Dataset Catalog</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./research/extending.html">
+ <span class="dropdown-text">Implement your own method</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-tutorials" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Tutorials</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-tutorials">    
         <li>
     <a class="dropdown-item" href="./examples/index.html">
  <span class="dropdown-text">Overview</span></a>
-  </li>  
-        <li>
-    <a class="dropdown-item" href="./examples/binary_treatments.html">
- <span class="dropdown-text">Binary Treatments</span></a>
-  </li>  
-        <li>
-    <a class="dropdown-item" href="./examples/continuous_treatments.html">
- <span class="dropdown-text">Continuous Treatments</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="./examples/categorical_treatments.html">
  <span class="dropdown-text">Categorical Treatments</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./examples/dose_response_curve.html">
- <span class="dropdown-text">SyntheticDataset2 Walkthrough</span></a>
+    <a class="dropdown-item" href="./examples/continuous_treatments.html">
+ <span class="dropdown-text">Continuous Treatments</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./examples/multidimensional_treatments.html">
+ <span class="dropdown-text">Multidimensional Treatments</span></a>
   </li>  
     </ul>
   </li>
@@ -181,37 +235,24 @@ ul.task-list li input[type="checkbox"] {
 
 
 
-<div class="surface-section">
-<p><code>skcausal</code> is a Python library for causal inference workflows that tries to keep three things explicit: the treatment type, the estimator contract, and the quantity returned by the model. The documentation follows the same structure so users can move from binary effects to density-based continuous treatments without relearning the whole interface.</p>
-</div>
-<p><span class="section-kicker"><code>Design principles</code></span> ## Why The Docs Are Structured This Way</p>
-<div class="feature-grid">
-<section id="treatment-type-comes-first" class="level3 feature-card">
-<h3 class="anchored" data-anchor-id="treatment-type-comes-first">Treatment type comes first</h3>
-<p>Binary, categorical, and continuous treatments correspond to different estimator families and different prediction semantics.</p>
+<section id="from-personal-research-to-open-source-package" class="level2">
+<h2 class="anchored" data-anchor-id="from-personal-research-to-open-source-package">From personal research to open-source package</h2>
+<p>This package was built for research purposes. While doing my own research, I often had to develop my own API for causal inference and implement state-of-the-art methods from scratch. I’ve decided to share the resulting codebase as an open-source package in case it can be useful to other researchers and practitioners. The package is organized around one consistent estimator contract that covers binary, categorical, and continuous treatments. More to come soon.</p>
 </section>
-<section id="returned-quantities-stay-explicit" class="level3 feature-card">
-<h3 class="anchored" data-anchor-id="returned-quantities-stay-explicit">Returned quantities stay explicit</h3>
-<p>The docs call out whether a model returns an average potential outcome, a response curve, a conditional density, or a stabilized ratio.</p>
-</section>
-<section id="estimators-are-composable" class="level3 feature-card">
-<h3 class="anchored" data-anchor-id="estimators-are-composable">Estimators are composable</h3>
-<p>Outcome models, treatment models, and density estimators are documented as separate pieces so users can see how the full workflow is assembled.</p>
-</section>
-<section id="examples-stay-practical" class="level3 feature-card">
-<h3 class="anchored" data-anchor-id="examples-stay-practical">Examples stay practical</h3>
-<p>The guides use example-ready <code>polars.DataFrame</code> inputs and familiar <code>scikit-learn</code> components so the examples are easy to adapt.</p>
-</section>
-</div>
-<p><span class="section-kicker"><code>Explore the project</code></span> ## Useful Starting Points</p>
-<div class="button-row">
-<p><a href="https://github.com/felipeangelimvieira/skcausal" class="hero-button hero-button-primary">View the repository</a> <a href="./examples/index.html" class="hero-button hero-button-secondary">Browse the examples hub</a> <a href="./density/index.html" class="hero-button hero-button-secondary">Read the density overview</a></p>
-</div>
-<div class="surface-section">
-<p>The goal is not just to expose more estimators. It is to make the causal question, the treatment representation, and the model output easy to understand before you trust the result.</p>
-</div>
+<section id="citation" class="level2">
+<h2 class="anchored" data-anchor-id="citation">Citation</h2>
+<p>Please cite this package, if you use it, as:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bib code-with-copy"><code class="sourceCode bibtex"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">@software{angelim_skcausal,</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="co">  author = {Angelim, Felipe},</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co">  title = {skcausal: A Python package for causal inference},</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co">  url = {https://github.com/felipeangelimvieira/skcausal},</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co">  note = {Open-source Python package},</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co">  year = {n.d.}</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Contributions are welcome. Please open issues for requesting new features or reporting bugs, and open pull requests for code contributions. For questions about usage, please check the documentation and examples, and feel free to reach out.</p>
 
 
+</section>
 
 </main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
