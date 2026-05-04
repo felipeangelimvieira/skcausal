@@ -338,7 +338,7 @@ Important
 </section>
 <section id="step-1-imports" class="level2">
 <h2 class="anchored" data-anchor-id="step-1-imports">Step 1: Imports</h2>
-<div id="2d8fd987" class="cell" data-execution_count="1">
+<div id="54c31feb" class="cell" data-execution_count="1">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.ensemble <span class="im">import</span> RandomForestRegressor</span>
@@ -352,7 +352,7 @@ Important
 <section id="step-2-define-one-shared-regression-backbone" class="level2">
 <h2 class="anchored" data-anchor-id="step-2-define-one-shared-regression-backbone">Step 2: Define one shared regression backbone</h2>
 <p>To keep the comparison fair, both estimators will use the same regression model family. The only difference is which inputs they see.</p>
-<div id="137113cf" class="cell" data-execution_count="2">
+<div id="9d1aa50d" class="cell" data-execution_count="2">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> make_regressor(random_state: <span class="bu">int</span> <span class="op">=</span> <span class="dv">0</span>):</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> RandomForestRegressor(</span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>        n_estimators<span class="op">=</span><span class="dv">60</span>,</span>
@@ -364,7 +364,7 @@ Important
 </section>
 <section id="step-3-create-the-synthetic-benchmark-and-metrics" class="level2">
 <h2 class="anchored" data-anchor-id="step-3-create-the-synthetic-benchmark-and-metrics">Step 3: Create the synthetic benchmark and metrics</h2>
-<div id="d98dde50" class="cell" data-execution_count="3">
+<div id="8fa799d3" class="cell" data-execution_count="3">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>dataset <span class="op">=</span> SyntheticDataset2(</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    n<span class="op">=</span><span class="dv">1500</span>,</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    n_features<span class="op">=</span><span class="dv">6</span>,</span>
@@ -394,7 +394,7 @@ Important
 <section id="step-4-benchmark-the-two-estimators" class="level2">
 <h2 class="anchored" data-anchor-id="step-4-benchmark-the-two-estimators">Step 4: Benchmark the two estimators</h2>
 <p>The helper benchmarks one estimator at a time, so we wrap it in a small function and then concatenate the outputs.</p>
-<div id="bee9c3ae" class="cell" data-execution_count="4">
+<div id="f7e96f1f" class="cell" data-execution_count="4">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> benchmark_model(model_name, estimator):</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    results <span class="op">=</span> evaluate_multiple_dataset_seeds(</span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>        dataset<span class="op">=</span>dataset,</span>
@@ -517,7 +517,7 @@ Important
 </section>
 <section id="step-5-summarize-the-comparison" class="level2">
 <h2 class="anchored" data-anchor-id="step-5-summarize-the-comparison">Step 5: Summarize the comparison</h2>
-<div id="f0167f31" class="cell" data-execution_count="5">
+<div id="096947cb" class="cell" data-execution_count="5">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>summary <span class="op">=</span> (</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    benchmark_results</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    .groupby(<span class="st">"model"</span>)[metric_columns]</span>
