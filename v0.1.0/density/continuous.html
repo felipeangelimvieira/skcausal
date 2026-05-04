@@ -282,7 +282,7 @@ window.Quarto = {
 <p>Use this guide when the treatment is numeric and you need either a conditional density <span class="math inline">\(p(t \mid x)\)</span> or a stabilized density ratio <span class="math inline">\(p(t \mid x) / p(t)\)</span>.</p>
 <section id="choose-an-estimator" class="level2">
 <h2 class="anchored" data-anchor-id="choose-an-estimator">Choose an estimator</h2>
-<div id="62f2d08b" class="cell" data-execution_count="1">
+<div id="adeaeb16" class="cell" data-execution_count="1">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skcausal.utils.lookup <span class="im">import</span> all_density_estimators</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>all_density_estimators(</span>
@@ -391,7 +391,7 @@ window.Quarto = {
 <section id="example-data" class="level2">
 <h2 class="anchored" data-anchor-id="example-data">Example data</h2>
 <p>The examples below use a single continuous treatment column stored in a <code>polars.DataFrame</code>.</p>
-<div id="f929f5d1" class="cell" data-execution_count="2">
+<div id="23a91f13" class="cell" data-execution_count="2">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> polars <span class="im">as</span> pl</span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -411,7 +411,7 @@ window.Quarto = {
 <h2 class="anchored" data-anchor-id="skprodensityestimator"><code>SkproDensityEstimator</code></h2>
 <p><code>SkproDensityEstimator</code> is an adapter around a skpro probabilistic regressor. It fits the wrapped regressor on <code>X</code> and <code>t</code>, calls <code>predict_proba(X)</code>, and evaluates the resulting predictive distribution at the supplied treatment values.</p>
 <p>The current implementation supports floating-point treatment columns (<code>pl.Float32</code> and <code>pl.Float64</code>).</p>
-<div id="4a8991cd" class="cell" data-execution_count="3">
+<div id="9c03cb1c" class="cell" data-execution_count="3">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.ensemble <span class="im">import</span> RandomForestRegressor</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.linear_model <span class="im">import</span> LinearRegression</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skpro.regression.residual <span class="im">import</span> ResidualDouble</span>
@@ -441,7 +441,7 @@ window.Quarto = {
 <section id="permutationweighting" class="level2">
 <h2 class="anchored" data-anchor-id="permutationweighting"><code>PermutationWeighting</code></h2>
 <p><code>PermutationWeighting</code> solves a different problem. It creates a binary classification dataset in which observed <code>(X, t)</code> pairs are labeled <code>1</code> and pairs built from observed <code>X</code> with permuted treatment values are labeled <code>0</code>. The estimator then returns posterior-odds scores from that classifier, which are used as a stabilized density-ratio estimate.</p>
-<div id="4e5839c8" class="cell" data-execution_count="4">
+<div id="1931d95e" class="cell" data-execution_count="4">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.linear_model <span class="im">import</span> LogisticRegression</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skcausal.density.permutation_weighting <span class="im">import</span> PermutationWeighting</span>
@@ -490,7 +490,7 @@ window.Quarto = {
 <section id="evaluation" class="level2">
 <h2 class="anchored" data-anchor-id="evaluation">Evaluation</h2>
 <p>For conditional density estimators, <code>skcausal.density.performance_evaluation.evaluate.evaluate</code> runs cross-validation and uses <code>LogLikelihoodMetric()</code> by default.</p>
-<div id="d2eeee92" class="cell" data-execution_count="5">
+<div id="a4510204" class="cell" data-execution_count="5">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.model_selection <span class="im">import</span> KFold</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skcausal.density.performance_evaluation.evaluate <span class="im">import</span> evaluate</span>
@@ -522,20 +522,20 @@ window.Quarto = {
 <tr class="odd">
 <th data-quarto-table-cell-role="th">0</th>
 <td>-0.672842</td>
-<td>0.030170</td>
-<td>0.005699</td>
+<td>0.030586</td>
+<td>0.005751</td>
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">1</th>
 <td>-1.983167</td>
-<td>0.028936</td>
-<td>0.005390</td>
+<td>0.028868</td>
+<td>0.005410</td>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">2</th>
 <td>-1.325541</td>
-<td>0.028820</td>
-<td>0.005294</td>
+<td>0.028572</td>
+<td>0.005328</td>
 </tr>
 </tbody>
 </table>
