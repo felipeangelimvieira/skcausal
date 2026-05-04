@@ -96,10 +96,6 @@ The key parameters control how the internal classifier trains and aggregates:
 |---|---|---|
 | `max_trials` | `5` | Controls how many trial classifiers are fit in `"ensemble"` or `"convergence"` mode |
 
-::: {.callout-warning}
-`PermutationWeighting` returns nonnegative stabilized ratios, not a normalized density over `t`. Do not treat these values as interchangeable with $p(t \mid x)$ — the ratio scale is correct for GPS-style reweighting, but it does not integrate to 1 over the treatment support.
-:::
-
 ## Evaluation
 
 For conditional density estimators, `skcausal.density.performance_evaluation.evaluate.evaluate` runs cross-validation and uses `LogLikelihoodMetric()` by default.

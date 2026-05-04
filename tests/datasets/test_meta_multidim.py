@@ -15,7 +15,7 @@ def test_meta_multidim_requires_explicit_base_dataset():
 def test_meta_multidim_load_and_predict_y_match_wrapped_dataset():
     dataset = MetaMultidimDataset(
         base_dataset=SyntheticDataset2(n=48, random_state=7),
-        n_bins=4,
+        n_categorical_treatments=4,
         mutual_info=1.0,
         categorical_effect_scale=0.2,
         random_state=7,
@@ -73,13 +73,13 @@ def test_meta_multidim_load_and_predict_y_match_wrapped_dataset():
 def test_meta_multidim_mutual_info_extremes_control_label_alignment():
     aligned_dataset = MetaMultidimDataset(
         base_dataset=SyntheticDataset2(n=200, random_state=13),
-        n_bins=5,
+        n_categorical_treatments=5,
         mutual_info=1.0,
         random_state=13,
     )
     permuted_dataset = MetaMultidimDataset(
         base_dataset=SyntheticDataset2(n=200, random_state=13),
-        n_bins=5,
+        n_categorical_treatments=5,
         mutual_info=0.0,
         random_state=13,
     )
