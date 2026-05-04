@@ -135,6 +135,7 @@ def test_density_pipeline_can_be_used_inside_doubly_robust_pseudo_outcome():
         outcome_regressor=RecordingMeanRegressor(prediction_value=2.0),
         pseudo_outcome_regressor=RecordingMeanRegressor(prediction_value=3.0),
         cv=0,
+        cross_fit=False,
     )
 
     estimator.fit(X, t, y)
