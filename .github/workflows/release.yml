@@ -5,50 +5,74 @@ on:
     types: [published]
 
 jobs:
-  verify-and-publish:
+  build-distributions:
+    name: Build distributions
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: 3.x
+          python-version: '3.11'
 
-      - name: Install Poetry
-        run: pip install poetry
-
-      - name: Extract tag version
-        run: echo "TAG_VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
-
-      - name: Extract tag version without pre-release identifiers
+      - name: Verify release tag matches package version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
-          CLEAN_TAG_VERSION=$(echo $TAG_VERSION | awk -F- '{print $1}')
-          echo $CLEAN_TAG_VERSION
-          echo "CLEAN_TAG_VERSION=$CLEAN_TAG_VERSION" >> $GITHUB_ENV
+          RELEASE_VERSION="${RELEASE_TAG#v}"
+          PACKAGE_VERSION=$(python - <<'PY'
+          import tomllib
+          from pathlib import Path
 
-      - name: Get current package version
-        run: |
-          PACKAGE_VERSION=$(poetry version --short)
-          echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> $GITHUB_ENV
+          with Path("pyproject.toml").open("rb") as pyproject_file:
+              data = tomllib.load(pyproject_file)
 
-      - name: Verify versions match
-        run: |
-          if [ "$CLEAN_TAG_VERSION" != "$PACKAGE_VERSION" ]; then
-            echo "Error: Tag version does not match the pyproject.toml version"
+          print(data["project"]["version"])
+          PY
+          )
+
+          if [ "$RELEASE_VERSION" != "$PACKAGE_VERSION" ]; then
+            echo "Error: release tag $RELEASE_TAG does not match project version $PACKAGE_VERSION"
             exit 1
           fi
 
-      - name: Set version to match the release tag
+      - name: Build distributions
         run: |
-          echo "Setting package version to $TAG_VERSION"
-          poetry version "$TAG_VERSION"
+          python -m pip install --upgrade pip build
+          python -m build
 
-      - name: Publish to PyPI
-        env:
-          POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_API_TOKEN }}
+      - name: Check distributions
         run: |
-          poetry build
-          poetry publish
+          python -m pip install --upgrade twine
+          python -m twine check dist/*
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+  publish-to-pypi:
+    name: Publish to PyPI
+    needs: build-distributions
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/skcausal/
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Publish distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@v1.14.0
