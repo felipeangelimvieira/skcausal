@@ -134,6 +134,8 @@ def test_density_pipeline_can_be_used_inside_doubly_robust_pseudo_outcome():
         density_estimator=density_pipeline,
         outcome_regressor=RecordingMeanRegressor(prediction_value=2.0),
         pseudo_outcome_regressor=RecordingMeanRegressor(prediction_value=3.0),
+        cv=0,
+        cross_fit=False,
     )
 
     estimator.fit(X, t, y)
@@ -153,7 +155,7 @@ def test_density_pipeline_can_be_used_inside_doubly_robust_pseudo_outcome():
         expected_fit_t
     )
 
-    prediction = estimator.predict(X.iloc[:2], pd.DataFrame({"t": [2.5, 4.5]}))
+    prediction = estimator.predict(pd.DataFrame({"t": [2.5, 4.5]}))
 
     assert prediction.shape == (2, 1)
     np.testing.assert_allclose(prediction, np.array([[3.0], [3.0]]))
@@ -226,20 +228,19 @@ def test_causal_and_density_pipelines_can_be_nested_together():
         transformed_y[estimator.estimator_.oof_test_indices_],
     )
 
-    response = estimator.predict(
-        X.head(2),
-        pl.DataFrame({"t": [10.0, 20.0]}),
-    )
+    response = estimator.predict(pl.DataFrame({"t": [10.0, 20.0]}))
 
     expected_predict_X = pl.DataFrame(
         {
-            "inner_outer_x": [11.0, 12.0, 11.0, 12.0],
-            "inner_outer_z": [15.0, 16.0, 15.0, 16.0],
+            "inner_outer_x": [11.0, 12.0, 13.0, 14.0, 11.0, 12.0, 13.0, 14.0],
+            "inner_outer_z": [15.0, 16.0, 17.0, 18.0, 15.0, 16.0, 17.0, 18.0],
         }
     )
-    expected_predict_t = pl.DataFrame({"inner_outer_t": [11.0, 11.0, 21.0, 21.0]})
+    expected_predict_t = pl.DataFrame(
+        {"inner_outer_t": [11.0, 11.0, 11.0, 11.0, 21.0, 21.0, 21.0, 21.0]}
+    )
 
-    assert response.shape == (2,)
-    np.testing.assert_allclose(response, np.array([4.0, 4.0]))
+    assert response.shape == (2, 1)
+    np.testing.assert_allclose(response, np.array([[4.0], [4.0]]))
     assert nested_density.predict_X_.equals(expected_predict_X)
     assert nested_density.predict_t_.equals(expected_predict_t)

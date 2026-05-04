@@ -163,3 +163,38 @@ def test_collect_column_types_raises_when_column_type_is_unregistered(dataframe)
 def test_enforce_dtypes_raises_when_column_type_is_unregistered(dataframe):
     with pytest.raises(ValueError, match="does not match any registered column type"):
         enforce_dtypes(dataframe)
+
+
+@pytest.mark.parametrize(
+    ("dataframe", "column_types"),
+    [
+        (
+            pd.DataFrame({"flag": [True, False], "value": [1, 2]}),
+            {"flag": "categorical", "value": "continuous"},
+        ),
+        (
+            pl.DataFrame({"flag": [True, False], "value": [1, 2]}),
+            {"flag": "categorical", "value": "continuous"},
+        ),
+    ],
+)
+def test_enforce_dtypes_with_explicit_column_types_preserves_boolean_categories(
+    dataframe, column_types
+):
+    converted = enforce_dtypes(dataframe, column_types=column_types)
+
+    assert collect_column_types(converted) == column_types
+
+    if get_backend(converted) == "pandas":
+        assert pd.api.types.is_bool_dtype(converted["flag"])
+        assert str(converted["value"].dtype) == "float64"
+    else:
+        assert converted.schema["flag"] == pl.Boolean
+        assert converted.schema["value"] == pl.Float64
+
+
+def test_enforce_dtypes_with_explicit_column_types_requires_exact_column_match():
+    dataframe = pd.DataFrame({"value": [1, 2]})
+
+    with pytest.raises(ValueError, match="column_types must match the dataframe"):
+        enforce_dtypes(dataframe, column_types={"other": "continuous"})

@@ -1,6 +1,7 @@
 """Base classes for ADRF estimations"""
 
 import numpy as np
+import pandas as pd
 import polars as pl
 from skbase.base import BaseEstimator as _BaseEstimator
 from skcausal.datatypes import convert
@@ -24,12 +25,14 @@ class BaseAverageCausalResponseEstimator(TreatmentCheckMixin, _BaseEstimator):
     """
 
     _tags = {
+        "object_type": ["average_causal_response_estimator"],
         "backend": "polars",
         "capability:t_type": ["continuous", "categorical"],
         "capability:multidimensional_treatment": False,
     }
 
-    def __init__(self): ...
+    def __init__(self):
+        super().__init__()
 
     def fit(self, X, t, y):
         """
@@ -58,6 +61,7 @@ class BaseAverageCausalResponseEstimator(TreatmentCheckMixin, _BaseEstimator):
             If not implemented by the subclass.
         """
         X, t, y = self._check_and_transform(X, t, y, is_fit=True)
+        self._X = X
 
         self._fit(X=X, t=t, y=y)
         return self
@@ -89,22 +93,67 @@ class BaseAverageCausalResponseEstimator(TreatmentCheckMixin, _BaseEstimator):
         """
         raise NotImplementedError("This method must be implemented by subclasses.")
 
-    def predict(self, X, t):
+    def predict(self, t, X=None):
         """
-        Predict the average response for each treatment value in t.
+        Predict a response curve using backend-native treatment inputs.
 
+        Average-response estimators evaluate the prediction table over the
+        covariate sample stored during ``fit``. Prediction-time ``X`` is not
+        part of the supported contract.
+
+        Parameters
+        ----------
+        t : DataFrame-like
+            Treatment variable.
+        X : DataFrame-like, optional
+            Unsupported. The estimator always averages over the covariates
+            stored during ``fit``.
+
+        Returns
+        -------
+        np.ndarray
+            The predicted average response for each treatment value in ``t``.
         """
 
-        X, t, _ = self._check_and_transform(X, t, y=None, is_fit=False)
+        if X is not None:
+            raise ValueError(
+                "predict no longer accepts prediction-time X. Average-response "
+                "estimators use the covariates stored during fit."
+            )
 
-        return np.array(self._predict(X, t))
+        t = self._check_and_transform_t(t, is_fit=False)
 
-    def _predict(self, X, t):
+        predictions = np.asarray(self._predict(t=t))
+        return self._coerce_predictions(predictions, n_t=self._get_n_samples(t))
+
+    def _predict(self, t):
         """
-        Predict using backend-native inputs.
+        Predict using backend-native treatment inputs.
+
+        Subclasses should return one prediction per row in ``t``, averaging
+        over the covariate sample stored during ``fit`` when needed.
         """
 
         raise NotImplementedError("This method must be implemented by subclasses.")
+
+    def _coerce_predictions(self, predictions, n_t):
+        if predictions.ndim == 0:
+            raise ValueError("predict must return at least one prediction.")
+        if predictions.shape[0] != n_t:
+            raise ValueError(
+                "predict must return one prediction per requested " "treatment row."
+            )
+
+        if predictions.ndim == 1:
+            return predictions.reshape(-1, 1)
+
+        return predictions.reshape(predictions.shape[0], -1)
+
+    def _get_fit_X(self):
+        if not hasattr(self, "_X"):
+            raise ValueError("Estimator must be fit before predicting.")
+
+        return self._X
 
     def _check_and_transform_y(self, y, is_fit=False):
         y = convert(y, self.get_tag("backend"))
@@ -114,6 +163,15 @@ class BaseAverageCausalResponseEstimator(TreatmentCheckMixin, _BaseEstimator):
         X = convert(X, self.get_tag("backend"))
         return X
 
+    def _take_rows(self, value, row_indices):
+        if isinstance(value, np.ndarray):
+            return value[row_indices]
+        if isinstance(value, pl.DataFrame):
+            return value.select(pl.all().gather(row_indices.tolist()))
+        if isinstance(value, (pd.DataFrame, pd.Series)):
+            return value.iloc[row_indices].reset_index(drop=True)
+        raise TypeError(f"Cannot take rows from object of type {type(value).__name__}.")
+
     def _get_n_samples(self, value) -> int:
         if isinstance(value, np.ndarray):
             if value.ndim == 0:
@@ -121,6 +179,8 @@ class BaseAverageCausalResponseEstimator(TreatmentCheckMixin, _BaseEstimator):
                     "Expected array-like input with at least one dimension."
                 )
             return value.shape[0]
+        if isinstance(value, (pd.DataFrame, pd.Series)):
+            return len(value)
         if isinstance(value, pl.DataFrame):
             return value.height
         raise TypeError(

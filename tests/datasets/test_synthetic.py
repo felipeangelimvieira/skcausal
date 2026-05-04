@@ -4,32 +4,36 @@ import polars as pl
 from skcausal.datasets.synthetic2 import SyntheticDataset2, SyntheticDataset2Discrete
 
 
-def test_synthetic2_prepare_retrieve():
-    dataset = SyntheticDataset2()
-    dataset.prepare(n=1000)
-    X, t, y = dataset.retrieve(test=False)
-
-    assert isinstance(X, pl.DataFrame)
-    assert isinstance(t, pl.DataFrame)
-    assert isinstance(y, pl.DataFrame)
-    assert X.shape == (1000, 6)
-    assert t.shape == (1000, 1)
-    assert y.shape == (1000, 1)
-    assert t.schema["t_0"] == pl.Float64
-
-
 def test_synthetic2_load_and_predict_y_accept_polars_outputs():
     dataset = SyntheticDataset2(n=32)
     covariates, treatments, _ = dataset.load()
 
     predictions_from_polars = dataset.predict_y(covariates, treatments)
+    predictions_from_pandas = dataset.predict_y(
+        covariates.to_pandas(), treatments.to_pandas()
+    )
     predictions_from_numpy = dataset.predict_y(
         covariates.to_numpy(), treatments.to_numpy()
     )
 
     np.testing.assert_allclose(predictions_from_polars, predictions_from_numpy)
+    np.testing.assert_allclose(predictions_from_polars, predictions_from_pandas)
     assert predictions_from_polars.shape == (32, 1)
     assert dataset.get_grid(10).schema["t_0"] == pl.Float64
+
+
+def test_synthetic2_predict_curve_matches_predict_for_grid():
+    dataset = SyntheticDataset2(n=32, random_state=3)
+    covariates, _, _ = dataset.load()
+    grid = dataset.get_grid(15)
+
+    curve = dataset.predict_curve(covariates, grid)
+    pandas_curve = dataset.predict_curve(covariates.to_pandas(), grid.to_pandas())
+    legacy_curve = dataset.predict(covariates, grid)
+
+    np.testing.assert_allclose(curve, legacy_curve)
+    np.testing.assert_allclose(curve, pandas_curve)
+    assert curve.shape == (15,)
 
 
 def test_synthetic2_discrete_load_and_grid_use_boolean_schema():
@@ -43,10 +47,15 @@ def test_synthetic2_discrete_load_and_grid_use_boolean_schema():
     assert treatments.schema["treatment"] == pl.Boolean
 
     predictions_from_polars = dataset.predict_y(covariates, treatments)
+    predictions_from_pandas = dataset.predict_y(
+        covariates.to_pandas(), treatments.to_pandas()
+    )
     predictions_from_numpy = dataset.predict_y(
         covariates.to_numpy(), treatments.to_numpy()
     )
     np.testing.assert_allclose(predictions_from_polars, predictions_from_numpy)
+    np.testing.assert_allclose(predictions_from_polars, predictions_from_pandas)
+    assert predictions_from_polars.shape == (24, 1)
 
     grid = dataset.get_grid()
     assert isinstance(grid, pl.DataFrame)

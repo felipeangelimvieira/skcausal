@@ -47,8 +47,15 @@ class RecordingAverageResponseEstimator(BaseAverageCausalResponseEstimator):
         self.fit_y_ = copy.deepcopy(y)
         return self
 
-    def _predict(self, X, t):
-        self.predict_X_ = copy.deepcopy(X)
+    def _predict(self, t):
+        self.predict_X_ = None
+        self.predict_t_ = copy.deepcopy(t)
+        return np.full(len(t), self.prediction_value, dtype=float)
+
+
+class XAwareRecordingAverageResponseEstimator(RecordingAverageResponseEstimator):
+    def _predict(self, t):
+        self.predict_X_ = copy.deepcopy(self._get_fit_X())
         self.predict_t_ = copy.deepcopy(t)
         return np.full(len(t), self.prediction_value, dtype=float)
 
@@ -85,7 +92,10 @@ def test_pipeline_applies_transformations_to_requested_arguments():
                 ShiftAndRenameTransformation(offset=5.0, prefix="y_"),
                 "y",
             ),
-            ("estimator", RecordingAverageResponseEstimator(prediction_value=3.0)),
+            (
+                "estimator",
+                XAwareRecordingAverageResponseEstimator(prediction_value=3.0),
+            ),
         ]
     )
 
@@ -99,12 +109,107 @@ def test_pipeline_applies_transformations_to_requested_arguments():
     assert pipeline.estimator_.fit_t_.equals(expected_fit_t)
     assert pipeline.estimator_.fit_y_.equals(expected_fit_y)
 
-    response = pipeline.predict(X, t)
+    response = pipeline.predict(t)
 
-    assert response.shape == (2,)
-    np.testing.assert_allclose(response, np.array([3.0, 3.0]))
+    assert response.shape == (2, 1)
+    np.testing.assert_allclose(response, np.array([[3.0], [3.0]]))
     assert pipeline.estimator_.predict_X_.equals(expected_fit_X)
     assert pipeline.estimator_.predict_t_.equals(expected_fit_t)
+
+
+def test_pipeline_omits_x_when_final_estimator_ignores_it():
+    X = pl.DataFrame({"x": [0.0, 1.0], "z": [2.0, 3.0]})
+    t = pl.DataFrame({"t": [4.0, 5.0]})
+    y = pl.DataFrame({"y": [10.0, 11.0]})
+    pipeline = Pipeline(
+        steps=[
+            (
+                "transform_X",
+                ShiftAndRenameTransformation(offset=10.0, prefix="x_"),
+                "X",
+            ),
+            (
+                "transform_t",
+                ShiftAndRenameTransformation(offset=-2.0, prefix="t_"),
+                "t",
+            ),
+            ("estimator", RecordingAverageResponseEstimator(prediction_value=3.0)),
+        ]
+    )
+
+    pipeline.fit(X, t, y)
+    response = pipeline.predict(t)
+
+    assert response.shape == (2, 1)
+    np.testing.assert_allclose(response, np.array([[3.0], [3.0]]))
+    assert pipeline.estimator_.predict_X_ is None
+    assert pipeline.estimator_.predict_t_.equals(pl.DataFrame({"t_t": [2.0, 3.0]}))
+
+
+def test_pipeline_predict_uses_x_invariant_final_estimator():
+    X = pl.DataFrame({"x": [0.0, 1.0], "z": [2.0, 3.0]})
+    t = pl.DataFrame({"t": [4.0, 5.0]})
+    y = pl.DataFrame({"y": [10.0, 11.0]})
+    t_query = pl.DataFrame({"t": [7.0, 8.0]})
+    pipeline = Pipeline(
+        steps=[
+            (
+                "transform_X",
+                ShiftAndRenameTransformation(offset=10.0, prefix="x_"),
+                "X",
+            ),
+            (
+                "transform_t",
+                ShiftAndRenameTransformation(offset=-2.0, prefix="t_"),
+                "t",
+            ),
+            ("estimator", RecordingAverageResponseEstimator(prediction_value=3.0)),
+        ]
+    )
+
+    pipeline.fit(X, t, y)
+    curve = pipeline.predict(t_query)
+
+    assert curve.shape == (2, 1)
+    np.testing.assert_allclose(curve, np.array([[3.0], [3.0]]))
+    assert pipeline.estimator_.predict_X_ is None
+    assert pipeline.estimator_.predict_t_.equals(pl.DataFrame({"t_t": [5.0, 6.0]}))
+
+
+def test_pipeline_predict_uses_fit_time_x_for_final_estimator():
+    X = pl.DataFrame({"x": [0.0, 1.0], "z": [2.0, 3.0]})
+    t = pl.DataFrame({"t": [4.0, 5.0]})
+    y = pl.DataFrame({"y": [10.0, 11.0]})
+    t_query = pl.DataFrame({"t": [7.0, 8.0]})
+    pipeline = Pipeline(
+        steps=[
+            (
+                "transform_X",
+                ShiftAndRenameTransformation(offset=10.0, prefix="x_"),
+                "X",
+            ),
+            (
+                "transform_t",
+                ShiftAndRenameTransformation(offset=-2.0, prefix="t_"),
+                "t",
+            ),
+            (
+                "estimator",
+                XAwareRecordingAverageResponseEstimator(prediction_value=3.0),
+            ),
+        ]
+    )
+
+    pipeline.fit(X, t, y)
+    curve = pipeline.predict(t_query)
+
+    expected_curve_X = pl.DataFrame({"x_x": [10.0, 11.0], "x_z": [12.0, 13.0]})
+    expected_curve_t = pl.DataFrame({"t_t": [5.0, 6.0]})
+
+    assert pipeline.estimator_.predict_X_.equals(expected_curve_X)
+    assert pipeline.estimator_.predict_t_.equals(expected_curve_t)
+    assert curve.shape == (2, 1)
+    np.testing.assert_allclose(curve, np.array([[3.0], [3.0]]))
 
 
 def test_pipeline_rejects_missing_final_average_response_estimator():

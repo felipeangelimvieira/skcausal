@@ -5,48 +5,23 @@ page-layout: full
 toc: false
 ---
 
-::: {.surface-section}
-`skcausal` is a Python library for causal inference workflows that tries to keep three things explicit: the treatment type, the estimator contract, and the quantity returned by the model. The documentation follows the same structure so users can move from binary effects to density-based continuous treatments without relearning the whole interface.
-:::
+## From personal research to open-source package
 
-[`Design principles`]{.section-kicker}
-## Why The Docs Are Structured This Way
+This package was built for research purposes. While doing my own research, I often had to develop my own API for causal inference and implement state-of-the-art methods from scratch.
+I've decided to share the resulting codebase as an open-source package in case it can be useful to other researchers and practitioners. The package is organized around one consistent estimator contract that covers binary, categorical, and continuous treatments. More to come soon.
 
-::: {.feature-grid}
-::: {.feature-card}
-### Treatment type comes first
+## Citation
 
-Binary, categorical, and continuous treatments correspond to different estimator families and different prediction semantics.
-:::
+Please cite this package, if you use it, as:
 
-::: {.feature-card}
-### Returned quantities stay explicit
+```bib
+@software{angelim_skcausal,
+  author = {Angelim, Felipe},
+  title = {skcausal: A Python package for causal inference},
+  url = {https://github.com/felipeangelimvieira/skcausal},
+  note = {Open-source Python package},
+  year = {n.d.}
+}
+```
 
-The docs call out whether a model returns an average potential outcome, a response curve, a conditional density, or a stabilized ratio.
-:::
-
-::: {.feature-card}
-### Estimators are composable
-
-Outcome models, treatment models, and density estimators are documented as separate pieces so users can see how the full workflow is assembled.
-:::
-
-::: {.feature-card}
-### Examples stay practical
-
-The guides use example-ready `polars.DataFrame` inputs and familiar `scikit-learn` components so the examples are easy to adapt.
-:::
-:::
-
-[`Explore the project`]{.section-kicker}
-## Useful Starting Points
-
-::: {.button-row}
-[View the repository](https://github.com/felipeangelimvieira/skcausal){.hero-button .hero-button-primary}
-[Browse the examples hub](examples/index.qmd){.hero-button .hero-button-secondary}
-[Read the density overview](density/index.qmd){.hero-button .hero-button-secondary}
-:::
-
-::: {.surface-section}
-The goal is not just to expose more estimators. It is to make the causal question, the treatment representation, and the model output easy to understand before you trust the result.
-:::
+Contributions are welcome. Please open issues for requesting new features or reporting bugs, and open pull requests for code contributions. For questions about usage, please check the documentation and examples, and feel free to reach out.

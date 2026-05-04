@@ -1,0 +1,182 @@
+---
+title: "Implement your own method"
+execute:
+    warning: false
+    freeze: true
+---
+
+Use this page when you want to plug your own method into skcausal rather than treat the library as a fixed menu of estimators.
+
+```{python}
+#| echo: false
+from pathlib import Path
+
+from IPython.display import Markdown, display
+
+import skcausal
+
+
+_REPO_ROOT = Path(skcausal.__file__).resolve().parents[2]
+_TEMPLATE_DIR = _REPO_ROOT / "extension_templates"
+
+
+def show_extension_template(filename: str) -> None:
+	"""Render the real extension template resolved from the installed package."""
+	template_path = _TEMPLATE_DIR / filename
+	code = template_path.read_text(encoding="utf-8")
+	display(Markdown(f"```python\n{code}\n```"))
+```
+
+::: {.callout-note appearance="simple"}
+## skcausal Is Meant To Be Customized
+
+The library is designed around small, composable base classes. You can implement your own synthetic benchmark datasets, treatment density estimators, average-response estimators, and benchmarking metrics without modifying the rest of the library.
+:::
+
+## What you can extend
+
+| Extension point | Base class | Typical use |
+|---|---|---|
+| Synthetic benchmark dataset | `BaseSyntheticDataset` | You know the data-generating process and want ground-truth response curves |
+| Density estimator | `BaseDensityEstimator` | You want a new conditional density or stabilized density-ratio model |
+| Average-response estimator | `BaseAverageCausalResponseEstimator` | You want a new ADRF or average-response algorithm |
+| Benchmark metric | `AverageResponseMetric` | You want to compare estimators with a custom score on truth-known synthetic data |
+
+This separation is what makes skcausal flexible: a new estimator can reuse existing datasets and benchmarking utilities, while a new dataset can immediately benchmark existing estimators.
+
+## A practical workflow for researchers
+
+1. Start from the closest extension template rather than from a blank file.
+2. Implement the minimum private hooks required by that base class.
+3. Fit your method against an existing synthetic dataset first, so you can compare against known truth.
+4. Benchmark over multiple random seeds before tuning design choices.
+5. Only then expand to more realistic datasets, larger models, or new metrics.
+
+## Extension templates
+
+Each template lives in `extension_templates/` and the snippets below are read at render time from the installed `skcausal` checkout, so the page shows the real current template rather than a shortened copy.
+
+::: {.callout-note collapse="true"}
+## Average-response estimator template
+
+Full template: [average_causal_response_estimator.py](https://github.com/felipeangelimvieira/skcausal/blob/main/extension_templates/average_causal_response_estimator.py)
+
+```{python}
+#| echo: false
+show_extension_template("average_causal_response_estimator.py")
+```
+
+Use this when your method estimates an average response curve such as an ADRF. The base class handles input conversion and treatment-schema checks before calling your private hooks.
+:::
+
+::: {.callout-note collapse="true"}
+## Density estimator template
+
+Full template: [density_estimator.py](https://github.com/felipeangelimvieira/skcausal/blob/main/extension_templates/density_estimator.py)
+
+```{python}
+#| echo: false
+show_extension_template("density_estimator.py")
+```
+
+Use this when your estimator produces either a conditional treatment density `p(t | x)` or a stabilized ratio such as `p(t | x) / p(t)`.
+:::
+
+::: {.callout-note collapse="true"}
+## Synthetic dataset template
+
+Full template: [synthetic_dataset.py](https://github.com/felipeangelimvieira/skcausal/blob/main/extension_templates/synthetic_dataset.py)
+
+```{python}
+#| echo: false
+show_extension_template("synthetic_dataset.py")
+```
+
+Use this when you want a controlled benchmark with known truth. Once your dataset subclasses `BaseSyntheticDataset`, existing estimator benchmarks can score against its true response curve.
+:::
+
+## Use AI with the templates
+
+::: {.callout-tip}
+AI is a good accelerator here, especially for the boring first pass. Give the model the right template, the mathematical definition of your method, and the constraints you need it to preserve.
+:::
+
+A practical prompt looks like this:
+
+```text
+Here is the skcausal extension template for BaseAverageCausalResponseEstimator.
+Fill in the TODOs for my algorithm, but do not change the public method
+signatures, the base class, or the tag names. My estimator should:
+
+- fit an outcome model m(x, t)
+- optionally use a density model for weighting
+- return one average response per treatment row in _predict
+- include lightweight get_test_params values
+
+Method description:
+[paste your identifying assumptions, nuisance models, and prediction formula here]
+```
+
+Use AI to scaffold, not to skip validation. After it fills the template, run the estimator on a synthetic benchmark and check whether the returned curve has the right shape, scale, and seed-to-seed stability.
+
+## Benchmark a new average-response estimator
+
+If your algorithm subclasses `BaseAverageCausalResponseEstimator`, you can benchmark it directly on any synthetic dataset that subclasses `BaseSyntheticDataset`.
+
+```python
+from skcausal.causal_estimators.benchmarking import evaluate_multiple_dataset_seeds
+from skcausal.causal_estimators.benchmarking.metrics import MAE, RMSE
+
+dataset = MySyntheticDataset(n=2000, random_state=0)
+estimator = MyAverageCausalResponseEstimator(...)
+
+results = evaluate_multiple_dataset_seeds(
+	dataset=dataset,
+	estimator=estimator,
+	metrics=[MAE(n_treatments=128), RMSE(n_treatments=128)],
+	random_states=[0, 1, 2, 3, 4],
+)
+
+summary = results.drop(columns=["dataset_seed"]).mean().to_frame("mean_score")
+summary
+```
+
+This helper clones the dataset across random seeds, fits a fresh clone of your estimator on each seed, and returns one row per seed. The built-in average-response metrics compare your estimator's predicted curve against the dataset's known truth.
+
+::: {.callout-important}
+Average-response benchmarking requires a `BaseSyntheticDataset` because the metric needs access to the true response function, not just observed outcomes.
+:::
+
+## Benchmark a new density estimator
+
+If your new component subclasses `BaseDensityEstimator`, you can evaluate it with cross-validation using the density benchmarking utility.
+
+```python
+from sklearn.model_selection import KFold
+
+from skcausal.density.performance_evaluation.evaluate import evaluate
+from skcausal.density.performance_evaluation.metrics.likelihood import (
+	LogLikelihoodMetric,
+)
+
+X, t, _ = dataset.load()
+density_estimator = MyDensityEstimator(...)
+
+density_results = evaluate(
+	estimator=density_estimator,
+	cv=KFold(n_splits=5, shuffle=True, random_state=0),
+	X=X,
+	t=t,
+	scoring=[LogLikelihoodMetric()],
+)
+
+density_results
+```
+
+This returns one row per fold with the requested metric plus fit and score times. That makes it easy to compare density-model quality and computational cost side by side.
+
+## Where to go next
+
+- See [Continuous Treatments](../examples/continuous_treatments.qmd) for a full end-to-end estimator workflow.
+- See [Density Overview](../density/index.qmd) and [Continuous Treatments](../density/continuous.qmd) for density-estimation examples.
+- Use the [Dataset Catalog](dataset_catalog.qmd) when you want an existing synthetic benchmark before creating your own.

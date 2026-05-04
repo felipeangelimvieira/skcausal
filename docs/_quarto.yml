@@ -1,9 +1,11 @@
 project:
   type: website
+  preview:
+    port: 7777
   render:
     - "*.qmd"
     - "*.md"
-    - "datasets/*.qmd"
+    - "research/*.qmd"
     - "density/*.qmd"
     - "examples/*.qmd"
     - "!book/"
@@ -22,18 +24,26 @@ website:
     left:
 #      - href: book/index.html
 #        text: "Book"
-      - text: "Examples"
+      - href: learn/learn.qmd
+        text: "15-min theory"
+      - text: "For researchers"
+        menu:
+          - href: research/benchmarking.qmd
+            text: "Benchmarking"
+          - href: research/dataset_catalog.qmd
+            text: "Dataset Catalog"
+          - href: research/extending.qmd
+            text: "Implement your own method"
+      - text: "Tutorials"
         menu:
           - href: examples/index.qmd
             text: "Overview"
-          - href: examples/binary_treatments.qmd
-            text: "Binary Treatments"
-          - href: examples/continuous_treatments.qmd
-            text: "Continuous Treatments"
           - href: examples/categorical_treatments.qmd
             text: "Categorical Treatments"
-          - href: examples/dose_response_curve.qmd
-            text: "SyntheticDataset2 Walkthrough"
+          - href: examples/continuous_treatments.qmd
+            text: "Continuous Treatments"
+          - href: examples/multidimensional_treatments.qmd
+            text: "Multidimensional Treatments"
       - text: "Density"
         menu:
           - href: density/index.qmd

@@ -130,10 +130,12 @@ class CategoricalDoublyRobustMixin:
             eps=1e-8,
         )
 
-    def _predict(self, X: pd.DataFrame, t: pd.DataFrame) -> list[float]:
+    def _predict(self, t: pd.DataFrame) -> list[float]:
         """
         Predict the average response for each treatment value in t.
         """
+
+        fit_X = self._get_fit_X()
 
         requested_t = coerce_categorical_treatment(
             t,
@@ -148,17 +150,17 @@ class CategoricalDoublyRobustMixin:
 
         estimates_by_level = {}
         for level in self.treatment_levels_:
-            outcome_prediction = self._predict_outcome_for_level(X, level)
             training_outcome_prediction = self._predict_outcome_for_level(
-                self._X,
+                fit_X,
                 level,
             )
+            outcome_mean = float(np.asarray(training_outcome_prediction).mean())
             bias_correction_term = self._predict_bias_correction_term(
                 training_outcome_prediction,
                 level,
             )
 
-            estimates_by_level[level] = outcome_prediction.mean() + bias_correction_term
+            estimates_by_level[level] = outcome_mean + bias_correction_term
 
         return np.array(
             [estimates_by_level[level] for level in requested_t], dtype=float
@@ -235,8 +237,8 @@ class CategoricalDoublyRobust(
     regressor per observed level, fits a treatment density estimator, and stores
     the empirical marginal frequency of each level.
 
-    During ``predict``, the estimator returns a plug-in estimate based on the
-    supplied covariate sample ``X`` plus a bias-correction term computed on the
+    During ``predict``, the estimator returns a plug-in estimate over the
+    training covariate sample plus a bias-correction term computed on the same
     training sample. The estimator is doubly robust in the usual sense: the
     average potential outcome estimate remains consistent if either the
     level-specific outcome regressors or the treatment density model are
@@ -261,6 +263,8 @@ class CategoricalDoublyRobust(
         ``1 / P(T=t | X)``, while ``"stabilized"`` applies inverse stabilized
         weighting, ``P(T=t) / P(T=t | X)``.
     """
+
+    _tags = {"backend": "pandas"}
 
     def __init__(
         self,
@@ -401,7 +405,7 @@ class CategoricalDirectMethod(
     Each distinct row in ``t`` is treated as one observed categorical treatment
     level, including multi-column treatment combinations. The estimator fits one
     outcome regressor per observed level and predicts the mean of that level's
-    regression function over the supplied covariate sample ``X``.
+    regression function over the covariate sample stored during ``fit``.
 
     No density model or bias correction is used, so the estimate relies solely
     on correct specification of the outcome regressors. Only treatment levels
@@ -413,6 +417,8 @@ class CategoricalDirectMethod(
         Regressor cloned once per observed treatment level and fit on the
         subset of training rows assigned to that level.
     """
+
+    _tags = {"backend": "pandas"}
 
     def __init__(self, outcome_regressor: BaseEstimator):
 

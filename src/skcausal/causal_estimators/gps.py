@@ -3,6 +3,7 @@ from copy import deepcopy
 
 import warnings
 import numpy as np
+import pandas as pd
 import polars as pl
 from sklearn.base import BaseEstimator
 
@@ -11,7 +12,6 @@ from skcausal.causal_estimators.base import (
 )
 from skcausal.causal_estimators._density_utils import predict_density_array
 from skcausal.density.base import BaseDensityEstimator
-from skcausal.utils.polars import convert_categorical_to_dummies, to_dummies
 from sklearn.model_selection import KFold
 
 
@@ -36,18 +36,24 @@ class GPS(BaseAverageCausalResponseEstimator):
         Density estimator used to estimate the propensity score.
 
     outcome_regressor : BaseEstimator
-        Regressor to estimate the outcome
+        Regressor to estimate the outcome. When the treatment includes
+        categorical columns, any required encoding should be handled by this
+        regressor, typically via a preprocessing pipeline.
 
     cv : int, default=5
         Number of cross-validation folds to use when estimating the
         propensity score.
+    max_samples_predict : int, optional
+        Maximum number of covariate rows to average over at prediction time.
+        If provided and ``X`` contains more rows than this value, GPS samples
+        rows without replacement before constructing the score-and-treatment
+        features. This can reduce prediction cost for large evaluation samples.
     """
 
     _tags = {
         "capability:multidimensional_treatment": True,
         "backend": "polars",
         "capability:t_type": ["continuous", "categorical"],
-        "one_hot_encode_enum_columns": False,
     }
 
     def __init__(
@@ -55,6 +61,7 @@ class GPS(BaseAverageCausalResponseEstimator):
         density_regressor: BaseDensityEstimator,
         outcome_regressor: BaseEstimator,
         cv: int = 5,
+        max_samples_predict: Optional[int] = None,
         random_state=0,
     ):
         if density_regressor is None:
@@ -63,17 +70,51 @@ class GPS(BaseAverageCausalResponseEstimator):
         self.density_regressor = density_regressor
         self.outcome_regressor = outcome_regressor
         self.cv = cv
+        self.max_samples_predict = max_samples_predict
         self.random_state = random_state
 
         super().__init__()
+
+        self._max_samples_predict = self._coerce_max_samples_predict(
+            self.max_samples_predict
+        )
+
+    @staticmethod
+    def _coerce_max_samples_predict(
+        max_samples_predict: Optional[int],
+    ) -> Optional[int]:
+        if max_samples_predict is None:
+            return None
+
+        if isinstance(max_samples_predict, bool) or not isinstance(
+            max_samples_predict, (int, np.integer)
+        ):
+            raise TypeError("max_samples_predict must be an integer or None.")
+        if int(max_samples_predict) < 1:
+            raise ValueError("max_samples_predict must be greater than or equal to 1.")
+
+        return int(max_samples_predict)
+
+    def _select_prediction_indices(self, n_samples: int) -> np.ndarray:
+        if self._max_samples_predict is None or self._max_samples_predict >= n_samples:
+            return np.arange(n_samples, dtype=int)
+
+        rng = np.random.default_rng(self.random_state)
+        selected = rng.choice(n_samples, size=self._max_samples_predict, replace=False)
+        return np.sort(selected.astype(int))
 
     def make_treatment_gps_array(
         self,
         X: pl.DataFrame,
         t: pl.DataFrame,
         density_regressor: Optional[BaseDensityEstimator] = None,
-    ) -> np.ndarray:
-        """Return the pair (GPS, T) for each sample in X."""
+    ) -> pd.DataFrame:
+        """Return outcome-model features with GPS and raw treatment columns.
+
+        Categorical treatment columns are preserved as-is so any encoding is
+        delegated to the user-supplied outcome regressor, typically via a
+        preprocessing pipeline.
+        """
 
         density_regressor = (
             self.treatment_regressor_
@@ -93,15 +134,10 @@ class GPS(BaseAverageCausalResponseEstimator):
         else:
             gps = np.ones((X.height, 1), dtype=float)
 
-        if self.get_tag("one_hot_encode_enum_columns", False):
-            for col, dtype in zip(t.columns, t.dtypes):
-                if dtype == pl.Enum or dtype == pl.Categorical:
-                    t = to_dummies(t, col)
+        gps_frame = pd.DataFrame({"gps": np.asarray(gps, dtype=float).reshape(-1)})
+        treatment_frame = t.to_pandas().reset_index(drop=True)
 
-        t = convert_categorical_to_dummies(t)
-        t = t.to_numpy().astype(np.float32)
-
-        return np.concatenate((gps.reshape((-1, 1)), t), axis=1)
+        return pd.concat([gps_frame, treatment_frame], axis=1)
 
     def _fit(self, X: pl.DataFrame, t: pl.DataFrame, y: pl.DataFrame):
         """Fit the outcome model on out-of-fold GPS features."""
@@ -179,15 +215,21 @@ class GPS(BaseAverageCausalResponseEstimator):
         self.treatment_regressor_ = self.density_regressor_
 
         self.oof_test_indices_ = np.asarray(self.oof_test_indices_, dtype=int)
-        self.oof_treatment_gps_ = np.concatenate(oof_treatment_gps, axis=0)
+        self.oof_treatment_gps_ = pd.concat(
+            oof_treatment_gps, axis=0, ignore_index=True
+        )
         outcome_y = y[self.oof_test_indices_]
 
         self.outcome_regressor_.fit(self.oof_treatment_gps_, outcome_y)
 
         return self
 
-    def _predict(self, X: pl.DataFrame, t: pl.DataFrame) -> list[float]:
+    def _predict(self, t: pl.DataFrame) -> list[float]:
         """Predict the average response for each treatment value in t."""
+
+        X = self._get_fit_X()
+        prediction_indices = self._select_prediction_indices(X.height)
+        X = X[prediction_indices]
 
         effects = []
         n_samples = X.height
@@ -196,10 +238,12 @@ class GPS(BaseAverageCausalResponseEstimator):
         treat_gps = self.make_treatment_gps_array(
             repeated_X,
             repeated_treat_values,
-        ).reshape((len(t), n_samples, -1))
+        )
 
         for i in range(t.shape[0]):
-            effect = self.outcome_regressor_.predict(treat_gps[i]).mean()
+            start = i * n_samples
+            stop = start + n_samples
+            effect = self.outcome_regressor_.predict(treat_gps.iloc[start:stop]).mean()
             effects.append(effect)
 
         return effects
@@ -207,12 +251,32 @@ class GPS(BaseAverageCausalResponseEstimator):
     @classmethod
     def get_test_params(cls, parameter_set="default"):
         from skcausal.density.naive import NaiveDensityEstimator
+        from sklearn.compose import ColumnTransformer, make_column_selector
         from sklearn.linear_model import LinearRegression
+        from sklearn.pipeline import make_pipeline
+        from sklearn.preprocessing import OneHotEncoder
+
+        preprocessor = ColumnTransformer(
+            transformers=[
+                (
+                    "encode_categorical",
+                    OneHotEncoder(
+                        handle_unknown="ignore",
+                        sparse_output=False,
+                    ),
+                    make_column_selector(
+                        dtype_include=["category", "object", "string"]
+                    ),
+                )
+            ],
+            remainder="passthrough",
+            verbose_feature_names_out=False,
+        )
 
         return [
             {
                 "density_regressor": NaiveDensityEstimator(),
-                "outcome_regressor": LinearRegression(),
+                "outcome_regressor": make_pipeline(preprocessor, LinearRegression()),
                 "cv": 2,
             }
         ]

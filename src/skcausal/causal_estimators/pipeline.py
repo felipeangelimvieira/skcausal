@@ -38,7 +38,7 @@ class _MeanResponseEstimator(BaseAverageCausalResponseEstimator):
         )
         return self
 
-    def _predict(self, X, t):
+    def _predict(self, t):
         return np.full(len(t), self.mean_response_, dtype=float)
 
 
@@ -103,7 +103,13 @@ class Pipeline(_MetaObjectMixin, BaseAverageCausalResponseEstimator):
 
     def fit(self, X, t, y):
         """Fit all transformations and the final causal-response estimator."""
-        X_transformed, t_transformed, y_transformed = X, t, y
+        X_transformed, t_transformed, y_transformed = self._check_and_transform(
+            X,
+            t,
+            y,
+            is_fit=True,
+        )
+        self._X = X_transformed
 
         self.transform_steps_ = []
         self.named_steps_ = {}
@@ -133,19 +139,15 @@ class Pipeline(_MetaObjectMixin, BaseAverageCausalResponseEstimator):
         ]
         return self
 
-    def predict(self, X, t):
+    def _predict(self, t):
         """Apply fitted transformations and delegate response prediction."""
-        X_transformed, t_transformed = self._transform_inputs(X, t)
-        return np.asarray(self.estimator_.predict(X_transformed, t_transformed))
+        t = self._check_and_transform_t(t, is_fit=False)
+        _, t_transformed = self._transform_inputs(None, t)
+        return np.asarray(self.estimator_.predict(t_transformed))
 
     def _fit(self, X, t, y):
         raise NotImplementedError(
             "Pipeline overrides fit directly and does not use _fit."
-        )
-
-    def _predict(self, X, t):
-        raise NotImplementedError(
-            "Pipeline overrides predict directly and does not use _predict."
         )
 
     def _set_params(self, attr: str, **params):
@@ -223,6 +225,8 @@ class Pipeline(_MetaObjectMixin, BaseAverageCausalResponseEstimator):
 
         for _, transformation, apply_to in self.transform_steps_:
             if apply_to == "X":
+                if X_transformed is None:
+                    continue
                 X_transformed = transformation.transform(X_transformed)
             elif apply_to == "t":
                 t_transformed = transformation.transform(t_transformed)

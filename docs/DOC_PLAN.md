@@ -192,7 +192,7 @@ Implementation note:
 The old `dose_response_curve.qmd` page is outdated. The rewrite should explicitly fix these issues:
 
 - Replace stale internal imports with imports from current public modules that exist in the repo.
-- Replace `prepare(n=..., split_seed=..., preparation_seed=...)` with the current dataset API.
+- Replace `prepare(...)` calls that embed dataset-owned split parameters with the current dataset API, and show train/test or cross-fitting splits as a separate split-object step outside the dataset layer.
 - Replace the nonexistent `get_adrf(...)` call with `dataset.predict(X, treatment_grid)`.
 - Replace plots built from sorted observed treatments with plots over an explicit treatment grid when the goal is to show a smooth response curve.
 - Remove references to modules that no longer exist, such as the old continuous estimator import paths.

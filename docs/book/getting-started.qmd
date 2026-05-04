@@ -23,7 +23,7 @@ graph LR
   X["X: covariates"] --> F["fit(X, t, y)"]
   T["t: treatment"] --> F
   Y["y: outcome"] --> F
-  F --> P["predict(X, requested treatments)"]
+  F --> P["predict(requested treatments)"]
 ```
 
 In the documentation examples, those tables are typically `polars.DataFrame` objects. The important part is not the library choice, but the semantics:
@@ -43,10 +43,10 @@ dataset = SimpleLinearDataset(
     n_features=4,
     random_state=0,
 )
-X, t, y = dataset.retrieve()
+X, t, y = dataset.load()
 ```
 
-The built-in synthetic datasets are useful because they also expose `predict(...)`, which gives you the known target quantity for benchmarking.
+The built-in synthetic datasets are useful because they also expose `predict(...)`, which is separate from the estimator API and gives you the known target quantity for benchmarking.
 
 ## Where To Go Next
 

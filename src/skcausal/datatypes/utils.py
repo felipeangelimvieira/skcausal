@@ -1,6 +1,12 @@
 from skcausal.datatypes._backend import _CONVERSION_FUNCTIONS, BaseBackend
 
-__all__ = ["get_backend", "enforce_dtypes", "convert"]
+__all__ = [
+    "get_backend",
+    "enforce_dtypes",
+    "convert",
+    "check_supported_types",
+    "collect_column_types",
+]
 
 
 def get_backend(df):
@@ -26,17 +32,19 @@ def get_backend(df):
     raise ValueError(f"Unsupported dataframe type {type(df)}.")
 
 
-def enforce_dtypes(df):
+def enforce_dtypes(df, column_types: dict[str, str] | None = None):
     """
-    Enforce the specified column types on the dataframe.
+    Enforce registered column types on the dataframe.
 
     Parameters
     ----------
     df : DataFrame
         The dataframe to enforce the column types on.
-    column_types : dict
+    column_types : dict, optional
         A dictionary where keys are column names and values are the desired
-        column types (e.g., "continuous", "categorical").
+        column types (e.g., "continuous", "categorical"). When omitted,
+        column types are inferred from the existing dataframe dtypes and then
+        normalized to the backend's canonical representation.
 
     Returns
     -------
@@ -48,7 +56,41 @@ def enforce_dtypes(df):
     backend_name = get_backend(df)
     backend = BaseBackend.backends_dict()[backend_name]()
 
-    return backend.convert_column_types(df)
+    if column_types is None:
+        return backend.convert_column_types(df)
+
+    normalized_column_types = dict(column_types)
+    df_columns = list(df.columns)
+    if set(df_columns) != set(normalized_column_types):
+        missing = [
+            column for column in df_columns if column not in normalized_column_types
+        ]
+        extra = [
+            column for column in normalized_column_types if column not in df_columns
+        ]
+        problems = []
+        if missing:
+            problems.append(f"missing column types for {missing}")
+        if extra:
+            problems.append(f"unexpected column types for {extra}")
+        raise ValueError(
+            "column_types must match the dataframe columns exactly: "
+            + "; ".join(problems)
+            + "."
+        )
+
+    backend_column_types = backend.get_column_types()
+    for column in df_columns:
+        column_type_name = normalized_column_types[column]
+        if column_type_name not in backend_column_types:
+            valid = ", ".join(sorted(backend_column_types))
+            raise ValueError(
+                f"Unsupported column type {column_type_name!r} for backend "
+                f"{backend_name!r}. Expected one of {{{valid}}}."
+            )
+        df = backend_column_types[column_type_name].convert_dataframe_column(df, column)
+
+    return df
 
 
 def convert(df, backend: str):

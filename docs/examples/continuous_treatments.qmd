@@ -1,7 +1,9 @@
 ---
 title: "Continuous Treatments"
+bibliography: ../references.bib
 execute:
-  warning: false
+    warning: false
+    freeze: true
 ---
 
 Use this guide when the treatment is numeric — such as a dose, exposure, score, or intensity.
@@ -14,9 +16,13 @@ Start here if you need one copy-pastable example for a continuous treatment and 
 
 ## What we’re estimating
 
-A continuous treatment changes the question from “treated vs. control?” to “what happens at *every possible dose level*?” The result is the **Average Dose-Response Function** (ADRF):
+A continuous treatment changes the question from “treated vs. control?” to “what happens at *every possible dose level*?” The target is the same **Average Response Function (ARF)** from the methodology page:
 
-$$\mu(t) = E[Y(t)], \quad t \in \mathcal{T} \subset \mathbb{R}$$
+$$
+\mu(t) = \mathbb{E}_P[Y^*(t)], \quad t \in \mathcal{T} \subset \mathbb{R}
+$$
+
+For continuous treatments, the same curve is often called the **Average Dose-Response Function** (ADRF).
 
 This is a curve, not a single number.
 
@@ -24,21 +30,14 @@ This is a curve, not a single number.
 **Analogy**: think of a pharmacological dose-response curve. Different doses of a drug produce different average patient responses. We want to estimate that curve from observational data where the dose was not randomized — people received different doses for reasons that also affect the outcome.
 :::
 
-```{mermaid}
-graph LR
-  X["Covariates X"] --> T["Treatment T (numeric)"]
-  X --> Y["Outcome Y"]
-  T --> Y
-  G["Treatment grid"] --> P["Predicted curve"]
-  X --> P
-```
-
-skcausal provides two estimators for continuous treatments in this example:
+This example compares four estimators, including one intentionally naive baseline:
 
 | Estimator | Approach |
 |---|---|
-| `DirectRegressor` | Fits $E[Y \mid X, T]$ and averages over `X` at each grid point |
-| `GPS` | Fits an outcome model on treatment and an estimated treatment score from `predict_density(X, T)` |
+| `DirectNoCovariates` | Fits $\mathbb{E}_P[Y \mid T=t]$ and ignores `X`; observational baseline only |
+| `DirectRegressor` | Fits $\mathbb{E}_P[Y \mid X, T=t]$ and averages over `X` at each grid point |
+| `GPS` | Fits an outcome model on treatment and an estimated treatment score from `predict_density(X, T)` [@hirano2004propensity] |
+| `DoublyRobustPseudoOutcome` | Combines an outcome model with a stabilized density model and smooths pseudo-outcomes over treatment [@kennedy2017non]|
 
 ::: {.callout-note}
 All causal interpretations in this guide assume consistency, no unmeasured confounding after conditioning on `X`, and sufficient overlap across the treatment range you want to evaluate.
@@ -47,80 +46,187 @@ All causal interpretations in this guide assume consistency, no unmeasured confo
 ## Step 1: Import dependencies
 
 ```{python}
+# | code-fold: true
 import numpy as np
 import polars as pl
 import matplotlib.pyplot as plt
 
-from sklearn.linear_model import LinearRegression
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
-from skcausal.causal_estimators import DirectRegressor, GPS
-from skcausal.datasets import SimpleLinearDataset
+from skcausal.causal_estimators import (
+    DirectNoCovariates,
+    DirectRegressor,
+    DoublyRobustPseudoOutcome,
+    GPS,
+)
+from skcausal.datasets import SyntheticDataset2
 from skcausal.density.permutation_weighting import PermutationWeighting
-from skcausal.plotting import use_theme
+from skcausal.plotting import plot_joint_curves, use_theme
+from skcausal.utils.treatment_grid import make_cartesian_treatment_grid
 
 use_theme()
 ```
 
-## Step 2: Load the data
+We also define some utilities:
 
 ```{python}
-dataset = SimpleLinearDataset(
-    n=250,
-    t_types=("continuous",),
-    n_features=4,
-    random_state=0,
-)
-X, t, y = dataset.retrieve()
+# | code-fold: true
+def make_forest_regressor():
+    return RandomForestRegressor(
+        n_estimators=50,
+        min_samples_leaf=5,
+        random_state=0,
+    )
+
+
+def curve_values(curve):
+    """Coerce a single-output curve to a 1D array for tables and metrics."""
+    return np.asarray(curve, dtype=float).reshape(-1)
+
+
+def summarize_curve_errors(estimator_curves, truth, metric_name, metric_fn):
+    """Build a sorted error summary table for a dict of estimated curves."""
+    return pl.DataFrame(
+        {
+            "estimator": list(estimator_curves.keys()),
+            metric_name: [
+                float(metric_fn(predicted, truth))
+                for predicted in estimator_curves.values()
+            ],
+        }
+    ).sort(metric_name)
+```
+
+## Step 2: Load a confounded nonlinear dataset
+
+```{python}
+dataset = SyntheticDataset2(n=2000, n_features=6, random_state=0)
+X, t, y = dataset.load()
 
 X = X.rename({col: f"x{i}" for i, col in enumerate(X.columns)})
+t_col = t.columns[0]
 y = y.rename({y.columns[0]: "y"})
 
 pl.concat([X.head(5), t.head(5), y.head(5)], how="horizontal")
 ```
 
-`t` contains one numeric column. The estimators will learn how the average outcome changes as that column is varied.
+The table has six observed covariates, one numeric treatment column, and one outcome column. Here we use `SyntheticDataset2`, which is intentionally nonlinear and confounded: treatment assignment depends on the covariates, and the outcome surface bends with the treatment value.
 
-## Step 3: Build the evaluation grid
+::: {.callout-note collapse="true"}
+## Optional: Data-Generating Process
 
-Instead of a small table of discrete levels, we build a fine grid spanning the observed treatment range:
+### 2a. Create covariates
 
-```{python}
-grid = pl.DataFrame(
-    {
-        "t0": np.linspace(
-            float(t["t0"].min()),
-            float(t["t0"].max()),
-            X.height,
-        )
-    }
-)
+The dataset samples six observed confounders:
 
-truth = np.asarray(dataset.predict(X, grid), dtype=float).reshape(-1)
-```
+$$
+x_0, \ldots, x_5 \overset{iid}{\sim} \mathcal{N}(0, 1)
+$$
 
-::: {.callout-note}
-The grid has `X.height` rows to satisfy the predict API contract: `X` and the treatment table must have the same number of rows. The `truth` array holds the true average potential outcome at each grid point — available only because this is a synthetic dataset.
+### 2b. Assign a continuous treatment — with confounding
+
+The covariates are first compressed into a latent score:
+
+$$
+s(X) = \sigma\!\left(\frac{v^\top X}{\sqrt{d}}\right)
+$$
+
+where $\sigma(\cdot)$ is the logistic sigmoid and $v \in \mathbb{R}^d$ is a fixed dataset-specific projection. Treatment is then drawn from a mixture of Beta distributions centered around that score:
+
+$$
+T \mid X, B \sim
+\begin{cases}
+\mathrm{Beta}(s(X), 1 - s(X)) & \text{if } B = 1 \\
+\mathrm{Beta}(99 s(X), 100 - 99 s(X)) & \text{if } B = 0
+\end{cases}
+$$
+
+with $B \sim \mathrm{Bernoulli}(0.5)$.
+
+### 2c. Mean response at each treatment value
+
+Conditionally on covariates and treatment, the mean outcome is:
+
+$$
+\mu(X, t) = -5 s(X) + 5 (t - 0.2)^2 - t^3
+$$
+
+The corresponding ADRF is the average of this nonlinear surface over the observed covariate distribution.
+
+### 2d. Generate observed outcomes
+
+Observed outcomes add Gaussian noise around that mean. This benchmark combines nonlinear confounding, curved treatment effects, and known ground truth in the exact implementation of `SyntheticDataset2`.
 :::
 
-## Step 3b: Plot the naive observational curve
+::: {.callout-important}
+**This is confounding**: units with larger values of the latent score $s(X)$ receive systematically different doses, and the same score also shifts outcomes directly. An estimator that ignores `X` will mistake part of that latent-score effect for a treatment effect.
+:::
+
+## Step 3: Define treatment grid
+
+Create an evaluation grid explicitly from the observed treatment table:
+
+```{python}
+grid = make_cartesian_treatment_grid(
+    t,
+    n_continuous_points=10,
+)
+```
+
+For a single continuous treatment, this builds 10 evenly spaced points spanning the observed treatment range. It keeps the example responsive during preview while still tracing the overall curve shape. Increase the dataset size and grid density once the end-to-end workflow is working.
+
+::: {.callout-note}
+`predict` accepts the requested treatment table as its first argument and returns one average response per row in `grid`, averaging over the covariate sample stored during `fit`.
+:::
+
+## Step 4: Compute the truth
+
+Because this is a synthetic dataset, we can compute the true average potential outcome exactly from the dataset's closed-form response function. In the notation from the methodology page, `truth_curve` contains the values of $\mu(t)$ corresponding to the rows in `grid`.
+
+```{python}
+truth_curve = np.asarray(dataset.predict(X, grid), dtype=float).reshape(-1)
+truth = grid.with_columns(pl.Series("truth", truth_curve))
+```
+
+## Step 5: Inspect the naive observational curve
 
 Before fitting any estimator, compare the raw observed averages to the true ADRF. This is the continuous-treatment version of the confounding problem: the observed association between `T` and `Y` is not automatically the causal curve.
 
 ```{python}
-t_values = t["t0"].to_numpy()
+t_values = t[t_col].to_numpy()
 y_values = y["y"].to_numpy()
-bin_edges = np.linspace(float(t["t0"].min()), float(t["t0"].max()), 15)
+bin_edges = np.linspace(float(t[t_col].min()), float(t[t_col].max()), 15)
 bin_ids = np.digitize(t_values, bin_edges[1:-1])
 bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
-observed_curve = np.array([y_values[bin_ids == i].mean() if np.any(bin_ids == i) else np.nan for i in range(len(bin_centers))])
+observed_curve = np.array(
+    [
+        y_values[bin_ids == i].mean() if np.any(bin_ids == i) else np.nan
+        for i in range(len(bin_centers))
+    ]
+)
+observed_grid = pl.DataFrame({t_col: bin_centers})
+observed_truth_curve = np.asarray(
+    dataset.predict(X, observed_grid), dtype=float
+).reshape(-1)
 ```
 
 ```{python}
 fig, ax = plt.subplots(figsize=(8, 4.5))
-ax.plot(bin_centers, observed_curve, marker="o", linewidth=1.5, label="Observed mean within bins")
-ax.plot(grid["t0"].to_numpy(), truth, linewidth=2.5, label="Truth")
-ax.set_xlabel("Treatment")
+ax.scatter(
+    t_values,
+    y_values,
+    s=12,
+    alpha=0.12,
+    label="Observed samples",
+)
+plot_joint_curves(
+    observed_grid,
+    {
+        "Observed mean within bins": observed_curve,
+        "Truth": observed_truth_curve,
+    },
+    ax=ax,
+)
 ax.set_ylabel("Average outcome")
 ax.set_title("Naive observational curve vs true ADRF")
 ax.legend()
@@ -129,49 +235,76 @@ plt.show()
 
 The distance between these two curves is the bias caused by confounding. The goal of the estimators below is to recover the `Truth` line rather than the raw observational trend.
 
-## Step 4: Fit the estimators
+## Step 6: Fit the estimators
+
+### Naive baseline: DirectNoCovariates
+
+`DirectNoCovariates` ignores `X` and fits the observational regression surface
+
+$$
+\hat{\mu}_{\mathrm{naive}}(t) \approx \mathbb{E}_P[Y \mid T=t].
+$$
+
+This is not a causal estimator. It is included only to show the size of the confounding bias when covariates are omitted.
+
+```{python}
+naive = DirectNoCovariates(outcome_regressor=make_forest_regressor())
+naive.fit(X, t, y)
+```
+
+```{python}
+naive_curve = naive.predict(t=grid)
+```
 
 ### Direct regressor
 
-`DirectRegressor` fits an outcome model $\hat{m}(x, t) = \hat{E}[Y \mid X=x, T=t]$ and estimates the ADRF by averaging over the covariate distribution:
+`DirectRegressor` fits an outcome model $\hat{f}(x, t) \approx \mathbb{E}_P[Y \mid X=x, T=t]$ and estimates the response curve by averaging over the observed covariate sample:
 
-$$\hat{\mu}_{DM}(t) = \frac{1}{n} \sum_{i=1}^{n} \hat{m}(X_i,\, t)$$
+$$
+\hat{\mu}_{\mathrm{DM}}(t) = \frac{1}{n} \sum_{i=1}^{n} \hat{f}(x_i, t)
+$$
 
 ```{python}
-direct = DirectRegressor(outcome_regressor=LinearRegression())
-_ = direct.fit(X, t, y)
-direct_curve = np.asarray(direct.predict(X, grid), dtype=float).reshape(-1)
+direct = DirectRegressor(outcome_regressor=make_forest_regressor())
+direct.fit(X, t, y)
 ```
 
-This is equivalent to outcome regression with covariates. On this exactly-linear dataset it will closely track the truth.
+```{python}
+direct_curve = direct.predict(t=grid)
+```
 
-### Generalized propensity score (GPS)
+This is still outcome regression with covariates, but here the outcome model is a random forest. That gives the example a nonlinear regressor without needing hand-built feature engineering.
+
+### Generalized propensity score (GPS) [@hirano2004propensity]
 
 `GPS` in `skcausal` follows a score-adjustment pattern rather than fitting a weighted pseudo-population estimator directly. It first computes a treatment score
 
-$$\hat{g}_i = \widehat{\mathrm{predict\_density}}(X_i, T_i)$$
+$$
+\hat{g}(x_i, t_i) = \widehat{\mathrm{predict\_density}}(x_i, t_i)
+$$
 
-and then fits an outcome model on the pair $(\hat{g}_i, T_i)$ using out-of-fold scores during training. At prediction time, it recomputes the score at each requested treatment value and averages the fitted outcome model over the observed covariate sample:
+and then fits an outcome model on the pair $(\hat{g}(x_i, t_i), t_i)$ using out-of-fold scores during training. At prediction time, it recomputes the score at each requested treatment value and averages the fitted outcome model over the observed covariate sample:
 
-$$\hat{\mu}_{GPS}(t) = \frac{1}{n} \sum_{i=1}^{n} \hat{m}(\hat{g}(X_i, t),\, t)$$
+$$
+\hat{\mu}_{\mathrm{GPS}}(t) = \frac{1}{n} \sum_{i=1}^{n} \hat{f}_{\mathrm{GPS}}(\hat{g}(x_i, t), t)
+$$
 
-In this example, `PermutationWeighting` supplies the treatment score. Because that density estimator returns a stabilized ratio, the GPS features here are built from a density-ratio estimate rather than a normalized conditional density:
+In this example, `PermutationWeighting` [@arbour2021permutation] supplies the treatment score. Because that density estimator returns a stabilized ratio, the GPS features here are built from a density-ratio estimate rather than a normalized conditional density:
 
 ```{python}
 permutation_weighting = PermutationWeighting(
     classifier=RandomForestClassifier(
-        n_estimators=200,
+        n_estimators=50,
         min_samples_leaf=5,
         random_state=0,
     ),
-    treatment_transformation="spline",
-    max_trials=3,
+    max_trials=30,
     random_state=0,
 )
 ```
 
 ::: {.callout-tip}
-**PermutationWeighting intuition**: instead of estimating $p(T \mid X)$ directly, it trains a classifier to distinguish *observed* $(X, T)$ pairs from pairs where $T$ has been randomly shuffled. The classifier's score is proportional to the likelihood ratio $p(T \mid X) / p(T)$. This avoids explicit density estimation and tends to be more stable in higher dimensions.
+**PermutationWeighting intuition**: instead of estimating $P(T \mid X)$ directly, it trains a classifier to distinguish *observed* $(X, T)$ pairs from pairs where $T$ has been randomly shuffled. The classifier's score is proportional to the likelihood ratio $P(T \mid X) / P(T)$. This avoids explicit density estimation and tends to be more stable in higher dimensions.
 :::
 
 ::: {.callout-important}
@@ -179,55 +312,126 @@ Despite the weighting intuition often used to motivate generalized propensity sc
 :::
 
 ```{python}
-from sklearn.ensemble import RandomForestRegressor
-
 gps = GPS(
     density_regressor=permutation_weighting,
-    outcome_regressor=RandomForestRegressor(),
-    cv=3,
+    outcome_regressor=make_forest_regressor(),
+    cv=2,
+    max_samples_predict=200,
     random_state=0,
 )
-_ = gps.fit(X, t, y)
-gps_curve = np.asarray(gps.predict(X, grid), dtype=float).reshape(-1)
+gps.fit(X, t, y)
 ```
 
-## Step 5: Plot the response curves
+```{python}
+gps_curve = gps.predict(t=grid)
+```
+
+Because the score-response relationship is nonlinear here too, the GPS second stage also uses a random forest on the raw `gps` and treatment columns.
+
+### Doubly robust pseudo-outcome
+
+`DoublyRobustPseudoOutcome` combines an outcome model and a stabilized density model. It first builds pseudo-outcomes that correct the outcome-regression residuals with density information, then smooths those pseudo-outcomes over treatment. Under the method's identification and nuisance-model assumptions, the final curve can remain consistent if either the outcome model or the density model is well specified.
 
 ```{python}
-grid_values = grid["t0"].to_numpy()
+from sklearn.pipeline import Pipeline
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import SplineTransformer
 
-fig, ax = plt.subplots(figsize=(8, 5))
-ax.scatter(t["t0"].to_numpy(), y["y"].to_numpy(), s=12, alpha=0.2, label="Observed data")
-ax.plot(grid_values, truth, linewidth=2.5, label="Truth")
-ax.plot(grid_values, direct_curve, linewidth=2, label="DirectRegressor")
-ax.plot(grid_values, gps_curve, linewidth=2, label="GPS")
-ax.set_xlabel("Treatment")
+dr_density = PermutationWeighting(
+    classifier=RandomForestClassifier(
+        n_estimators=100,
+        min_samples_leaf=5,
+        random_state=0,
+    ),
+    max_trials=30,
+    random_state=0,
+)
+
+pseudo_outcome_smoother = Pipeline(
+    [
+        ("spline", SplineTransformer(n_knots=10, degree=2)),
+        ("regressor", LinearRegression()),
+    ]
+)
+
+dr = DoublyRobustPseudoOutcome(
+    density_estimator=dr_density,
+    outcome_regressor=make_forest_regressor(),
+    pseudo_outcome_regressor=pseudo_outcome_smoother,
+    random_state=0,
+    cv=2,
+    cross_fit=True,
+)
+dr.fit(X, t, y)
+```
+
+```{python}
+dr_curve = dr.predict(t=grid)
+```
+
+The final pseudo-outcome smoother only depends on treatment at prediction time, but the same random-forest regressor API works for that last stage too.
+
+## Step 7: Compare to the truth
+
+```{python}
+# | code-fold: true
+estimator_curves = {
+    "DirectNoCovariates": curve_values(naive_curve),
+    "DirectRegressor": curve_values(direct_curve),
+    "GPS": curve_values(gps_curve),
+    "DoublyRobustPseudoOutcome": curve_values(dr_curve),
+}
+
+comparison = grid.with_columns(
+    pl.Series("truth", truth_curve),
+    *[
+        pl.Series(name, values)
+        for name, values in estimator_curves.items()
+    ],
+)
+
+summarize_curve_errors(
+    estimator_curves,
+    truth_curve,
+    "rmse",
+    lambda predicted, truth: np.sqrt(np.mean((predicted - truth) ** 2)),
+)
+```
+
+This table summarizes how closely each estimated curve tracks the true ADRF over the full treatment grid. Lower `rmse` means the fitted curve stays closer to `truth` on average.
+
+```{python}
+fig, ax = plt.subplots(figsize=(8.5, 5))
+plot_joint_curves(
+    grid,
+    {"Truth": truth_curve, **estimator_curves},
+    ax=ax,
+)
+ax.scatter(t[t_col].to_numpy(), y["y"].to_numpy(), s=12, alpha=0.15, label="Observed data")
 ax.set_ylabel("Average outcome")
 ax.set_title("Continuous-treatment response curve")
 ax.legend()
 plt.show()
 ```
 
-## Step 6: Compare numerically
+## Step 8: Compare numerically
 
 ```{python}
-pl.DataFrame(
-    {
-        "estimator": ["DirectRegressor", "GPS"],
-        "mean_absolute_error": [
-            float(np.mean(np.abs(direct_curve - truth))),
-            float(np.mean(np.abs(gps_curve - truth))),
-        ],
-    }
-).sort("mean_absolute_error")
+summarize_curve_errors(
+    estimator_curves,
+    truth_curve,
+    "mean_absolute_error",
+    lambda predicted, truth: np.mean(np.abs(predicted - truth)),
+)
 ```
 
 ::: {.callout-note}
-This toy dataset is exactly linear, which gives `DirectRegressor` a strong advantage. The GPS example demonstrates the API for a density-aware estimator with `PermutationWeighting`, but it should not be read as "direct regression is always better" — on nonlinear or heavily confounded data the GPS can close the gap.
+This benchmark is nonlinear and intentionally confounded. `DirectNoCovariates` is the sanity-check baseline: it shows how far the observational regression can drift from the target when `X` is ignored. Among the causal estimators, `DirectRegressor`, `GPS`, and `DoublyRobustPseudoOutcome` may rank differently depending on how well the nuisance models match the dataset. The GPS and doubly robust examples demonstrate the density-aware APIs with `PermutationWeighting`, and their relative performance will move as the nuisance models, sample size, and confounding strength change.
 :::
 
 ## What to try next
 
-For a more realistic nonlinear benchmark, continue to the [SyntheticDataset2 walkthrough](dose_response_curve.qmd).
+For a fuller benchmark on the same dataset, continue to the [SyntheticDataset2 walkthrough](dose_response_curve.qmd), which adds a naive baseline and more diagnostic plots.
 
 If your treatment is boolean or multi-level instead of numeric, go back to the [examples hub](index.qmd).
+

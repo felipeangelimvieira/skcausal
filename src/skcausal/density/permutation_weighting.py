@@ -27,10 +27,6 @@ class PermutationWeighting(BaseDensityEstimator):
     classifier : ClassifierMixin
         Classifier following the scikit-learn API and exposing
         :meth:`predict_proba`.
-    treatment_transformation : TransformerMixin, optional
-        Transformer applied to the treatment column(s) before concatenation with
-        the features. Pass the string ``"spline"`` to use a spline basis with
-        10 knots and degree 2. Defaults to ``None``.
     n_datasets : int, optional
         Multiplier controlling how many synthetic samples are generated relative
         to the original sample size. Defaults to ``1``.
@@ -54,14 +50,13 @@ class PermutationWeighting(BaseDensityEstimator):
     """
 
     _tags = {
-        "capability:multidimensional_treatment": False,
+        "capability:multidimensional_treatment": True,
         "density_kind": "stabilized",
     }
 
     def __init__(
         self,
         classifier: ClassifierMixin,
-        treatment_transformation: TransformerMixin = None,
         n_datasets: int = 1,
         max_trials: int = 5,
         random_state: int = 0,
@@ -71,7 +66,6 @@ class PermutationWeighting(BaseDensityEstimator):
         epsilon: float = 1e-12,
     ):
         self.classifier = classifier
-        self.treatment_transformation = treatment_transformation
         self.n_datasets = n_datasets
         self.max_trials = max_trials
         self.random_state = random_state
@@ -85,7 +79,6 @@ class PermutationWeighting(BaseDensityEstimator):
     def _fit(self, X: pl.DataFrame, t: pl.DataFrame):
         self._validate_hyperparameters()
         self._rng = np.random.default_rng(self.random_state)
-        self._treatment_transformation_ = self._clone_treatment_transformation()
         self.classifier_ = None
         self.classifiers_ = None
 
@@ -228,13 +221,7 @@ class PermutationWeighting(BaseDensityEstimator):
         if treatment_array.ndim == 1:
             treatment_array = treatment_array.reshape(-1, 1)
 
-        if self._treatment_transformation_ is None:
-            return treatment_array
-
-        if fit_transformer:
-            return self._treatment_transformation_.fit_transform(treatment_array)
-
-        return self._treatment_transformation_.transform(treatment_array)
+        return treatment_array
 
     def _predict_with_classifiers(self, Xt: np.ndarray) -> np.ndarray:
         if self.classifiers_:
@@ -280,13 +267,6 @@ class PermutationWeighting(BaseDensityEstimator):
         if array.ndim == 1:
             array = array.reshape(-1, 1)
         return array
-
-    def _clone_treatment_transformation(self):
-        if self.treatment_transformation is None:
-            return None
-        if self.treatment_transformation == "spline":
-            return SplineTransformer(n_knots=10, degree=2)
-        return copy.deepcopy(self.treatment_transformation)
 
     def _validate_hyperparameters(self):
         if self.max_trials < 1:

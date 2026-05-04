@@ -5,7 +5,11 @@ import polars as pl
 import pytest
 from skbase.testing.test_all_objects import BaseFixtureGenerator, QuickTester
 from sklearn.base import BaseEstimator, RegressorMixin
+from sklearn.compose import ColumnTransformer, make_column_selector
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KernelDensity
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import OneHotEncoder
 
 from skcausal.causal_estimators.base import BaseAverageCausalResponseEstimator
 from skcausal.causal_estimators.categorical import (
@@ -19,6 +23,7 @@ from skcausal.causal_estimators.ignore_covariates import DirectNoCovariates
 from skcausal.causal_estimators.pipeline import Pipeline
 from skcausal.causal_estimators.pseudo_outcome import DoublyRobustPseudoOutcome
 from skcausal.datatypes import collect_column_types
+from skcausal.datasets import Synthetic2MultidimDataset
 from skcausal.density.naive import NaiveDensityEstimator
 from skcausal.density.stabilized_from_conditional import (
     KernelMarginalAndConditional,
@@ -219,9 +224,25 @@ def _build_test_instance(estimator_class):
         params = Pipeline.get_test_params()[0]
         return Pipeline(**params)
     if estimator_class is GPS:
+        preprocessor = ColumnTransformer(
+            transformers=[
+                (
+                    "encode_categorical",
+                    OneHotEncoder(
+                        handle_unknown="ignore",
+                        sparse_output=False,
+                    ),
+                    make_column_selector(
+                        dtype_include=["category", "object", "string"]
+                    ),
+                )
+            ],
+            remainder="passthrough",
+            verbose_feature_names_out=False,
+        )
         return GPS(
             density_regressor=NaiveDensityEstimator(),
-            outcome_regressor=MeanRegressor(),
+            outcome_regressor=make_pipeline(preprocessor, MeanRegressor()),
             cv=2,
             random_state=0,
         )
@@ -277,13 +298,11 @@ class TestAllAverageCausalResponseEstimators(QuickTester, BaseFixtureGenerator):
         predict_parameters = list(inspect.signature(object_class._predict).parameters)
 
         assert fit_parameters == ["self", "X", "t", "y"]
-        assert predict_parameters == ["self", "X", "t"]
+        assert predict_parameters == ["self", "t"]
 
     def test_fit_predict_average_response(self, object_instance, scenario):
         object_instance.fit(scenario.X, scenario.t, scenario.y)
-        response = np.asarray(
-            object_instance.predict(scenario.X, scenario.t), dtype=float
-        )
+        response = np.asarray(object_instance.predict(scenario.t), dtype=float)
 
         assert response.shape[0] == scenario.t.shape[0]
         assert np.isfinite(response).all()
@@ -301,6 +320,95 @@ def test_current_estimators_are_included_in_object_matrix():
     assert "DoublyRobustPseudoOutcome" in object_names
     assert "GPS" in object_names
     assert "Pipeline" in object_names
+
+
+def test_predict_uses_stored_fit_x():
+    class _FitXPredictEstimator(BaseAverageCausalResponseEstimator):
+        _tags = {
+            "backend": "pandas",
+            "capability:t_type": ["continuous"],
+            "capability:multidimensional_treatment": False,
+        }
+
+        def _fit(self, X, t, y):
+            return self
+
+        def _predict(self, t):
+            self.predict_X_ = self._get_fit_X().copy()
+            self.predict_t_ = t.copy()
+            return np.ones(len(t), dtype=float)
+
+    X_train = pd.DataFrame({"x": [1.0, 2.0]})
+    t_train = pd.DataFrame({"t": [0.0, 1.0]})
+    y_train = pd.DataFrame({"y": [3.0, 4.0]})
+    t_query = pd.DataFrame({"t": [2.0, 3.0, 4.0]})
+
+    estimator = _FitXPredictEstimator().fit(X_train, t_train, y_train)
+    prediction = estimator.predict(t_query)
+
+    np.testing.assert_allclose(
+        prediction,
+        np.ones((t_query.shape[0], 1), dtype=float),
+    )
+    assert estimator.predict_X_.equals(X_train)
+    assert estimator.predict_t_.equals(t_query)
+
+
+def test_predict_works_when_x_is_omitted():
+    class _XInvariantEstimator(BaseAverageCausalResponseEstimator):
+        _tags = {
+            "backend": "pandas",
+            "capability:t_type": ["continuous"],
+            "capability:multidimensional_treatment": False,
+        }
+
+        def _fit(self, X, t, y):
+            return self
+
+        def _predict(self, t):
+            self.predict_t_ = t.copy()
+            return np.ones(len(t), dtype=float)
+
+    estimator = _XInvariantEstimator().fit(
+        pd.DataFrame({"x": [0.0, 1.0]}),
+        pd.DataFrame({"t": [0.0, 1.0]}),
+        pd.DataFrame({"y": [1.0, 2.0]}),
+    )
+    t_query = pd.DataFrame({"t": [2.0, 3.0]})
+    prediction = estimator.predict(t_query)
+
+    np.testing.assert_allclose(
+        prediction,
+        np.ones((t_query.shape[0], 1), dtype=float),
+    )
+    assert estimator.predict_t_.equals(t_query)
+
+
+def test_predict_rejects_prediction_time_x():
+    class _XInvariantEstimator(BaseAverageCausalResponseEstimator):
+        _tags = {
+            "backend": "pandas",
+            "capability:t_type": ["continuous"],
+            "capability:multidimensional_treatment": False,
+        }
+
+        def _fit(self, X, t, y):
+            return self
+
+        def _predict(self, t):
+            return np.ones(len(t), dtype=float)
+
+    estimator = _XInvariantEstimator().fit(
+        pd.DataFrame({"x": [0.0, 1.0]}),
+        pd.DataFrame({"t": [0.0, 1.0]}),
+        pd.DataFrame({"y": [1.0, 2.0]}),
+    )
+
+    with pytest.raises(ValueError, match="predict no longer accepts prediction-time X"):
+        estimator.predict(
+            pd.DataFrame({"t": [2.0, 3.0]}),
+            X=pd.DataFrame({"x": [10.0, 20.0]}),
+        )
 
 
 def test_categorical_estimators_receive_boolean_and_enum_scenarios():
@@ -347,7 +455,7 @@ def test_scenarios_are_filtered_by_capability_and_t_type():
         def _fit(self, X, t, y):
             return self
 
-        def _predict(self, X, t):
+        def _predict(self, t):
             return np.ones(len(t), dtype=float)
 
     class _CategoricalOnlyEstimator(BaseAverageCausalResponseEstimator):
@@ -360,7 +468,7 @@ def test_scenarios_are_filtered_by_capability_and_t_type():
         def _fit(self, X, t, y):
             return self
 
-        def _predict(self, X, t):
+        def _predict(self, t):
             return np.ones(len(t), dtype=float)
 
     class _AllTypesSingleTreatmentEstimator(BaseAverageCausalResponseEstimator):
@@ -373,7 +481,7 @@ def test_scenarios_are_filtered_by_capability_and_t_type():
         def _fit(self, X, t, y):
             return self
 
-        def _predict(self, X, t):
+        def _predict(self, t):
             return np.ones(len(t), dtype=float)
 
     class _AllTypesMultidimensionalEstimator(BaseAverageCausalResponseEstimator):
@@ -386,7 +494,7 @@ def test_scenarios_are_filtered_by_capability_and_t_type():
         def _fit(self, X, t, y):
             return self
 
-        def _predict(self, X, t):
+        def _predict(self, t):
             return np.ones(len(t), dtype=float)
 
     all_scenarios, all_names = _get_all_treatment_scenarios()
@@ -421,3 +529,132 @@ def test_scenarios_are_filtered_by_capability_and_t_type():
     assert "two_binary_treatments" in multidimensional_names
     assert "two_continuous_treatments" in multidimensional_names
     assert "continuous_binary_treatments" in multidimensional_names
+
+
+def test_predict_uses_fit_time_x_for_pandas_estimators():
+    class _PandasPredictEstimator(BaseAverageCausalResponseEstimator):
+        _tags = {
+            "backend": "pandas",
+            "capability:t_type": ["continuous"],
+            "capability:multidimensional_treatment": False,
+        }
+
+        def _fit(self, X, t, y):
+            return self
+
+        def _predict(self, t):
+            x_values = self._get_fit_X()["x"].to_numpy(dtype=float)
+            t_values = t["t"].to_numpy(dtype=float)
+            return (x_values.mean() + 10.0 * t_values).reshape(-1, 1)
+
+    estimator = _PandasPredictEstimator().fit(
+        pd.DataFrame({"x": [0.0, 1.0]}),
+        pd.DataFrame({"t": [1.0, 2.0]}),
+        pd.DataFrame({"y": [0.0, 0.0]}),
+    )
+
+    curve = estimator.predict(pd.DataFrame({"t": [2.0, 5.0]}))
+
+    assert curve.shape == (2, 1)
+    np.testing.assert_allclose(curve, np.array([[20.5], [50.5]]))
+
+
+def test_predict_works_for_x_invariant_estimators():
+    class _XInvariantPredictEstimator(BaseAverageCausalResponseEstimator):
+        _tags = {
+            "backend": "pandas",
+            "capability:t_type": ["continuous"],
+            "capability:multidimensional_treatment": False,
+        }
+
+        def _fit(self, X, t, y):
+            return self
+
+        def _predict(self, t):
+            return t["t"].to_numpy(dtype=float)
+
+    estimator = _XInvariantPredictEstimator().fit(
+        pd.DataFrame({"x": [0.0, 1.0]}),
+        pd.DataFrame({"t": [1.0, 2.0]}),
+        pd.DataFrame({"y": [0.0, 0.0]}),
+    )
+
+    curve = estimator.predict(pd.DataFrame({"t": [2.0, 5.0]}))
+
+    assert curve.shape == (2, 1)
+    np.testing.assert_allclose(curve, np.array([[2.0], [5.0]]))
+
+
+def test_direct_regressor_predict_averages_over_fit_x():
+    class _RowwiseLinearRegressor(BaseEstimator, RegressorMixin):
+        def fit(self, X, y, sample_weight=None):
+            return self
+
+        def predict(self, X):
+            return X["x"].to_numpy(dtype=float) + 10.0 * X["t"].to_numpy(dtype=float)
+
+    estimator = DirectRegressor(outcome_regressor=_RowwiseLinearRegressor()).fit(
+        pd.DataFrame({"x": [0.0, 1.0]}),
+        pd.DataFrame({"t": [1.0, 2.0]}),
+        pd.DataFrame({"y": [0.0, 0.0]}),
+    )
+
+    t_query = pd.DataFrame({"t": [2.0, 5.0]})
+
+    prediction = estimator.predict(t_query)
+
+    np.testing.assert_allclose(prediction, np.array([[20.5], [50.5]]))
+
+
+def test_direct_regressor_supports_mixed_treatment_with_tree_pipeline():
+    dataset = Synthetic2MultidimDataset(
+        n=96,
+        n_features=4,
+        n_categorical_treatments=2,
+        mutual_info=0.7,
+        categorical_effect_scale=0.2,
+        random_state=0,
+    )
+    X, t, y = dataset.load()
+
+    outcome_regressor = make_pipeline(
+        ColumnTransformer(
+            transformers=[
+                (
+                    "encode_categorical",
+                    OneHotEncoder(handle_unknown="ignore", sparse_output=False),
+                    make_column_selector(
+                        dtype_include=["category", "object", "string"]
+                    ),
+                )
+            ],
+            remainder="passthrough",
+            verbose_feature_names_out=False,
+        ),
+        RandomForestRegressor(n_estimators=25, min_samples_leaf=4, random_state=0),
+    )
+
+    estimator = DirectRegressor(outcome_regressor=outcome_regressor)
+
+    estimator.fit(X, t, y)
+    response = np.asarray(estimator.predict(dataset.get_grid(4)), dtype=float).reshape(
+        -1
+    )
+
+    assert estimator.get_tag("capability:multidimensional_treatment") is True
+    assert response.shape == (8,)
+    assert np.isfinite(response).all()
+
+
+def test_predict_rejects_prediction_time_x():
+    estimator = DirectRegressor(outcome_regressor=MeanRegressor()).fit(
+        pd.DataFrame({"x": [0.0, 1.0]}),
+        pd.DataFrame({"t": [1.0, 2.0]}),
+        pd.DataFrame({"y": [0.0, 0.0]}),
+    )
+
+    t_query = pd.DataFrame({"t": [2.0, 5.0]})
+    X_query = pd.DataFrame({"x": [1.0, 3.0]})
+
+    with pytest.raises(ValueError, match="prediction-time X"):
+        estimator.predict(t_query, X=X_query)

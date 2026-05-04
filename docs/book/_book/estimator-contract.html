@@ -214,7 +214,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<p>The package is organized around a small public contract: fit on observed data, then predict at requested treatment levels or treatment grids.</p>
+<p>The package is organized around a small public contract: fit on observed data, then call <code>predict(...)</code> at requested treatment levels or treatment grids.</p>
 <section id="one-interface-different-estimands" class="level2" data-number="3.1">
 <h2 data-number="3.1" class="anchored" data-anchor-id="one-interface-different-estimands"><span class="header-section-number">3.1</span> One Interface, Different Estimands</h2>
 <div class="cell" data-layout-align="default">
@@ -267,9 +267,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="prediction-requires-a-requested-treatment-table" class="level2" data-number="3.2">
 <h2 data-number="3.2" class="anchored" data-anchor-id="prediction-requires-a-requested-treatment-table"><span class="header-section-number">3.2</span> Prediction Requires A Requested Treatment Table</h2>
-<p>The package does not treat prediction as “just give me <code>X</code>”. It treats prediction as “give me <code>X</code> and the intervention I want to evaluate”.</p>
+<p>The package does not treat prediction as “just give me <code>X</code>”. It treats prediction as “give me the intervention I want to evaluate”, and average-response estimators then average over the covariate sample stored during <code>fit</code>.</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>estimator.fit(X, t, y)</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>estimated_effect <span class="op">=</span> estimator.predict(X, requested_treatment)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>estimated_effect <span class="op">=</span> estimator.predict(requested_treatment)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>That means the <em>shape</em> of <code>requested_treatment</code> matters:</p>
 <ol type="1">
 <li>For binary or categorical problems, it usually contains a small set of treatment levels.</li>

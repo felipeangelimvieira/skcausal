@@ -90,7 +90,7 @@ def test_categorical_doubly_robust_corrects_constant_outcome_bias(
     dataset_builder,
     target_density_kind,
 ):
-    X_train, t_train, y_train, X_query, t_query, expected = dataset_builder()
+    X_train, t_train, y_train, _, t_query, expected = dataset_builder()
     estimator = CategoricalDoublyRobust(
         density_estimator=NaiveDensityEstimator(),
         outcome_regressor=OffsetMeanRegressor(offset=0.75),
@@ -98,41 +98,37 @@ def test_categorical_doubly_robust_corrects_constant_outcome_bias(
     )
 
     estimator.fit(X_train, t_train, y_train)
-    prediction = estimator.predict(X_query, t_query)
+    prediction = estimator.predict(t_query)
 
-    np.testing.assert_allclose(prediction, expected)
+    np.testing.assert_allclose(prediction, expected.reshape(-1, 1))
 
 
 @pytest.mark.parametrize("target_density_kind", ["conditional", "stabilized"])
 def test_categorical_inverse_propensity_weighting_matches_observed_level_means(
     target_density_kind,
 ):
-    X_train, t_train, y_train, X_query, t_query, expected = (
-        _make_single_treatment_dataset()
-    )
+    X_train, t_train, y_train, _, t_query, expected = _make_single_treatment_dataset()
     estimator = CategoricalInversePropensityWeighting(
         density_estimator=NaiveDensityEstimator(),
         target_density_kind=target_density_kind,
     )
 
     estimator.fit(X_train, t_train, y_train)
-    prediction = estimator.predict(X_query, t_query)
+    prediction = estimator.predict(t_query)
 
-    np.testing.assert_allclose(prediction, expected)
+    np.testing.assert_allclose(prediction, expected.reshape(-1, 1))
 
 
 def test_categorical_direct_method_fits_without_density_estimator():
-    X_train, t_train, y_train, X_query, t_query, expected = (
-        _make_single_treatment_dataset()
-    )
+    X_train, t_train, y_train, _, t_query, expected = _make_single_treatment_dataset()
     estimator = CategoricalDirectMethod(
         outcome_regressor=OffsetMeanRegressor(offset=0.0)
     )
 
     estimator.fit(X_train, t_train, y_train)
-    prediction = estimator.predict(X_query, t_query)
+    prediction = estimator.predict(t_query)
 
-    np.testing.assert_allclose(prediction, expected)
+    np.testing.assert_allclose(prediction, expected.reshape(-1, 1))
 
 
 @pytest.mark.parametrize(

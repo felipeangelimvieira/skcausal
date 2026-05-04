@@ -1,0 +1,140 @@
+---
+title: "Dataset Catalog"
+toc: false
+freeze: false
+format:
+  html:
+    html-math-method: mathjax
+execute:
+  cache: false
+  echo: false
+  warning: false
+---
+
+This page is generated from the dataset registry. It enumerates the classes returned by `all_datasets`, calls `create_test_instances_and_names()`, and renders each returned example with `plot_marginal_curves`.
+
+Datasets expose a single sample. Any train/test or cross-fitting holdout should be created outside the dataset layer with a split object.
+
+Use the dropdown to switch between datasets without leaving the page.
+
+::: {.dataset-catalog-math-sentinel style="display:none" aria-hidden="true"}
+$$
+0
+$$
+:::
+
+<script>
+window.MathJax = window.MathJax || {
+  tex: {
+    inlineMath: [['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  options: {
+    skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+  }
+};
+
+window.datasetCatalogMathJaxReady = window.datasetCatalogMathJaxReady || new Promise((resolve, reject) => {
+  if (window.MathJax?.typesetPromise) {
+    resolve(window.MathJax);
+    return;
+  }
+
+  const script = document.createElement("script");
+  script.src = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js";
+  script.async = true;
+  script.dataset.datasetCatalogMathjax = "true";
+  script.onload = () => {
+    const startup = window.MathJax?.startup?.promise;
+    if (startup) {
+      startup.then(() => resolve(window.MathJax)).catch(reject);
+      return;
+    }
+    resolve(window.MathJax);
+  };
+  script.onerror = reject;
+  document.head.appendChild(script);
+});
+</script>
+
+```{python}
+from pathlib import Path
+import sys
+from IPython.display import HTML, display
+
+
+def find_docs_root() -> Path:
+    for candidate in [Path.cwd(), *Path.cwd().parents]:
+        if (candidate / "research" / "datasets.py").exists():
+            return candidate
+        if (candidate / "docs" / "research" / "datasets.py").exists():
+            return candidate / "docs"
+    raise FileNotFoundError("Unable to locate docs/research/datasets.py")
+
+
+docs_root = find_docs_root()
+repo_root = docs_root.parent
+
+src_root = repo_root / "src"
+if str(src_root) not in sys.path:
+  sys.path.insert(0, str(src_root))
+if str(docs_root) not in sys.path:
+    sys.path.insert(0, str(docs_root))
+
+from skcausal.plotting import use_theme
+from research.datasets import render_dataset_browser_html
+
+use_theme()
+```
+
+```{python}
+display(HTML(render_dataset_browser_html()))
+```
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const select = document.getElementById("dataset-browser-select");
+  const panels = Array.from(document.querySelectorAll("[data-dataset-panel]"));
+
+  const typesetPanel = (panel) => {
+    if (!panel || !window.datasetCatalogMathJaxReady) {
+      return;
+    }
+
+    window.datasetCatalogMathJaxReady
+      .then((MathJax) => {
+        if (!MathJax?.typesetPromise) {
+          return;
+        }
+        if (MathJax.typesetClear) {
+          MathJax.typesetClear([panel]);
+        }
+        return MathJax.typesetPromise([panel]);
+      })
+      .catch((error) => {
+        console.error("Failed to typeset dataset catalog math", error);
+      });
+  };
+
+  if (!select || panels.length === 0) {
+    return;
+  }
+
+  const updatePanels = (selectedDataset) => {
+    panels.forEach((panel) => {
+      panel.hidden = panel.dataset.datasetPanel !== selectedDataset;
+      if (!panel.hidden) {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(panel);
+        }
+        typesetPanel(panel);
+      }
+    });
+  };
+
+  updatePanels(select.value);
+  select.addEventListener("change", (event) => {
+    updatePanels(event.target.value);
+  });
+});
+</script>

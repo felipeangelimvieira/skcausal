@@ -16,7 +16,6 @@ scores = estimator.predict_density(X, t)
 The documented density estimators take `polars.DataFrame` inputs for both covariates `X` and treatment `t`.
 :::
 
-[`Returned quantity`]{.section-kicker}
 ## What `predict_density` Means
 
 `skcausal` currently exposes two density-like output kinds.
@@ -28,8 +27,9 @@ The documented density estimators take `polars.DataFrame` inputs for both covari
 
 Inspect `estimator.get_tag("density_kind")` before comparing estimators or choosing an evaluation metric.
 
-[`Estimator map`]{.section-kicker}
 ## Documented Density Components
+
+We support Skpro probabilistic regressors for continuous treatments and scikit-learn classifiers for categorical treatments. Permutation Weighting is the most flexible one for both types of treatments.
 
 ::: {.docs-card-grid}
 ::: {.docs-card}
@@ -41,7 +41,7 @@ Use this when you need a proper conditional treatment density from a probabilist
 ::: {.docs-card}
 ### PermutationWeighting
 
-Use this when you need a classifier-based stabilized density ratio for single-column continuous treatments.
+Use this when you need a classifier-based stabilized density ratio for any treatment structure.
 :::
 
 ::: {.docs-card}
@@ -57,7 +57,7 @@ Use this when you want cross-validated density scoring with `LogLikelihoodMetric
 :::
 :::
 
-[`Interpretation`]{.section-kicker}
+
 ## Continuous Estimators In This Guide
 
 | Estimator | Returns | Core idea |
@@ -65,9 +65,6 @@ Use this when you want cross-validated density scoring with `LogLikelihoodMetric
 | `SkproDensityEstimator` | Conditional density | Wrap a skpro probabilistic regressor and evaluate its `pdf` at the supplied treatment values. |
 | `PermutationWeighting` | Stabilized density ratio | Train a classifier to separate observed `(X, t)` pairs from pairs with permuted treatments. |
 
-Because `LogLikelihoodMetric()` applies `log` to the output of `predict_density`, it is directly interpretable as a log-likelihood when `density_kind` is `"conditional"`. For `"stabilized"` estimators, it becomes a log-score on the returned ratio scale instead.
-
 ::: {.button-row}
 [Continue to the continuous density guide](continuous.qmd){.hero-button .hero-button-primary}
-[Open example workflows](../examples/index.qmd){.hero-button .hero-button-secondary}
 :::
