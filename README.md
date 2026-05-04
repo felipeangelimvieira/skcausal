@@ -4,7 +4,7 @@
 
 It is built around average potential outcomes and dose-response functions rather than per-unit counterfactual prediction.
 
-[Documentation](https://skcausal.com) | [Continuous treatments](https://skcausal.com/latest/examples/continuous_treatments.html) | [Categorical treatments](https://skcausal.com/latest/examples/categorical_treatments.html) | [Multidimensional treatments](https://skcausal.com/latest/examples/multidimensional_treatments.html)
+[Documentation](https://skcausal.com/latest) | [Continuous treatments](https://skcausal.com/latest/examples/continuous_treatments.html) | [Categorical treatments](https://skcausal.com/latest/examples/categorical_treatments.html) | [Multidimensional treatments](https://skcausal.com/latest/examples/multidimensional_treatments.html)
 
 ## What The Package Includes
 
