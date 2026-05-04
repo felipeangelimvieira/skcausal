@@ -591,7 +591,7 @@ w(X,T) = \frac{P(X)}{P(X \mid T)} = \frac{P(X)}{P(X,T)/P(T)} = \frac{P(T)}{P(X,T
 </div>
 </div>
 <p>The “classifier” we need here is more general than a standard sklearn classifier — for continuous treatments, we need a conditional density <span class="math inline">\(P(T \mid X)\)</span>, not class probabilities. <code>skcausal</code> provides several density estimators for this:</p>
-<div id="30b7ed89" class="cell" data-execution_count="2">
+<div id="7d7603ad" class="cell" data-execution_count="2">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skcausal.utils.lookup <span class="im">import</span> all_density_estimators</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>all_density_estimators(as_dataframe<span class="op">=</span><span class="va">True</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>

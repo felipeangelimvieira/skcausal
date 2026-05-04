@@ -380,7 +380,7 @@ Note
 </section>
 <section id="step-1-import-dependencies" class="level2">
 <h2 class="anchored" data-anchor-id="step-1-import-dependencies">Step 1: Import dependencies</h2>
-<div id="c828e5ab" class="cell" data-execution_count="1">
+<div id="1beb6ea1" class="cell" data-execution_count="1">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
@@ -414,7 +414,7 @@ Note
 </section>
 <section id="step-2-load-a-confounded-mixed-treatment-dataset" class="level2">
 <h2 class="anchored" data-anchor-id="step-2-load-a-confounded-mixed-treatment-dataset">Step 2: Load a confounded mixed-treatment dataset</h2>
-<div id="676b04fc" class="cell" data-execution_count="2">
+<div id="d057c03c" class="cell" data-execution_count="2">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>dataset <span class="op">=</span> Synthetic2MultidimDataset(</span>
@@ -562,7 +562,7 @@ Important
 <section id="step-3-define-practical-model-builders" class="level2">
 <h2 class="anchored" data-anchor-id="step-3-define-practical-model-builders">Step 3: Define practical model builders</h2>
 <p>The nuisance models below use the same expressive forest defaults. The only deliberate exception is the final doubly robust smoother, which uses a spline basis over the continuous treatment coordinate and a linear regressor over the expanded treatment features.</p>
-<div id="366590a9" class="cell" data-execution_count="3">
+<div id="9d7f7d3e" class="cell" data-execution_count="3">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> make_forest_mixed_treatment_regressor(categorical_column):</span>
@@ -595,7 +595,7 @@ Important
 <span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
-<div id="2569623f" class="cell" data-execution_count="4">
+<div id="028a1117" class="cell" data-execution_count="4">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> make_forest_permutation_weighting():</span>
@@ -611,7 +611,7 @@ Important
 <span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
-<div id="b061d545" class="cell" data-execution_count="5">
+<div id="c6ebea97" class="cell" data-execution_count="5">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> make_spline_mixed_treatment_regressor(continuous_column, categorical_column):</span>
@@ -657,7 +657,7 @@ Important
 <span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
-<div id="570d6fea" class="cell" data-execution_count="6">
+<div id="011c8916" class="cell" data-execution_count="6">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> mean_absolute_error(left, right):</span>
@@ -667,7 +667,7 @@ Important
 </section>
 <section id="step-4-build-the-intervention-grid" class="level2">
 <h2 class="anchored" data-anchor-id="step-4-build-the-intervention-grid">Step 4: Build the intervention grid</h2>
-<div id="86a08141" class="cell" data-execution_count="7">
+<div id="7a6e154c" class="cell" data-execution_count="7">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>grid <span class="op">=</span> make_cartesian_treatment_grid(</span>
@@ -752,7 +752,7 @@ Note
 </section>
 <section id="step-5-compute-the-truth" class="level2">
 <h2 class="anchored" data-anchor-id="step-5-compute-the-truth">Step 5: Compute the truth</h2>
-<div id="11746f50" class="cell" data-execution_count="8">
+<div id="20839d52" class="cell" data-execution_count="8">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>truth_curve <span class="op">=</span> dataset.predict(X, grid).flatten()</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>truth <span class="op">=</span> grid.with_columns(pl.Series(<span class="st">"truth"</span>, truth_curve))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
@@ -760,7 +760,7 @@ Note
 </section>
 <section id="step-6-inspect-the-raw-observational-surface" class="level2">
 <h2 class="anchored" data-anchor-id="step-6-inspect-the-raw-observational-surface">Step 6: Inspect the raw observational surface</h2>
-<div id="ea066e49" class="cell" data-execution_count="9">
+<div id="8a4f2c49" class="cell" data-execution_count="9">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>naive <span class="op">=</span> DirectNoCovariates(</span>
@@ -770,7 +770,7 @@ Note
 <span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>naive_curve <span class="op">=</span> naive.predict(t<span class="op">=</span>grid).flatten()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
-<div id="a4606373" class="cell" data-execution_count="10">
+<div id="4bcfa3a3" class="cell" data-execution_count="10">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    <span class="dv">1</span>,</span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    <span class="bu">len</span>(dataset.levels_),</span>
@@ -804,7 +804,7 @@ Note
 <section id="step-7-fit-directregressor" class="level2">
 <h2 class="anchored" data-anchor-id="step-7-fit-directregressor">Step 7: Fit DirectRegressor</h2>
 <p><code>DirectRegressor</code> uses the same mixed-treatment outcome model, but now the model sees both <code>X</code> and the treatment table. Prediction averages over the observed covariate sample at each requested treatment row.</p>
-<div id="2e5b0771" class="cell" data-execution_count="11">
+<div id="b50594ba" class="cell" data-execution_count="11">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>direct <span class="op">=</span> DirectRegressor(</span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    outcome_regressor<span class="op">=</span>make_forest_mixed_treatment_regressor(categorical_col)</span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>)</span>
@@ -815,7 +815,7 @@ Note
 <section id="step-8-fit-gps" class="level2">
 <h2 class="anchored" data-anchor-id="step-8-fit-gps">Step 8: Fit GPS</h2>
 <p><code>GPS</code> augments the outcome model with a treatment score computed from <code>predict_density(X, t)</code>. In this example that score comes from <code>PermutationWeighting</code>, which returns a stabilized density-ratio-style quantity. So this is best read as a score-adjustment example, not as a parametric conditional-density example.</p>
-<div id="a6f5bdd6" class="cell" data-execution_count="12">
+<div id="71b4e815" class="cell" data-execution_count="12">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>gps <span class="op">=</span> GPS(</span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>    density_regressor<span class="op">=</span>make_forest_permutation_weighting(),</span>
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    outcome_regressor<span class="op">=</span>make_forest_mixed_treatment_regressor(categorical_col),</span>
@@ -830,7 +830,7 @@ Note
 <section id="step-9-fit-doublyrobustpseudooutcome" class="level2">
 <h2 class="anchored" data-anchor-id="step-9-fit-doublyrobustpseudooutcome">Step 9: Fit DoublyRobustPseudoOutcome</h2>
 <p><code>DoublyRobustPseudoOutcome</code> uses the same forest outcome model and the same stabilized score model, then smooths the pseudo-outcomes over treatment with a spline basis over the continuous coordinate and encoded indicators for the categorical coordinate.</p>
-<div id="87873482" class="cell" data-execution_count="13">
+<div id="d6dd3e57" class="cell" data-execution_count="13">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>dr <span class="op">=</span> DoublyRobustPseudoOutcome(</span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    density_estimator<span class="op">=</span>make_forest_permutation_weighting(),</span>
 <span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    outcome_regressor<span class="op">=</span>make_forest_mixed_treatment_regressor(categorical_col),</span>
@@ -848,7 +848,7 @@ Note
 </section>
 <section id="step-10-compare-estimates" class="level2">
 <h2 class="anchored" data-anchor-id="step-10-compare-estimates">Step 10: Compare estimates</h2>
-<div id="f6b52b7c" class="cell" data-execution_count="14">
+<div id="f32decf7" class="cell" data-execution_count="14">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>comparison <span class="op">=</span> grid.with_columns(</span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>    pl.Series(<span class="st">"truth"</span>, truth_curve),</span>
 <span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    pl.Series(<span class="st">"DirectNoCovariates"</span>, naive_curve),</span>
@@ -966,7 +966,7 @@ Note
 </div>
 </div>
 </div>
-<div id="33e50905" class="cell" data-execution_count="15">
+<div id="07cd9eb0" class="cell" data-execution_count="15">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(</span>
@@ -1011,7 +1011,7 @@ Note
 </div>
 </div>
 </div>
-<div id="35deaabe" class="cell" data-execution_count="16">
+<div id="b75dc9ee" class="cell" data-execution_count="16">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>pl.DataFrame(</span>
 <span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>    {</span>
 <span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>        <span class="st">"estimator"</span>: [</span>
@@ -1088,7 +1088,7 @@ Note
 <section id="optional-verify-discovered-support-with-lookup" class="level2">
 <h2 class="anchored" data-anchor-id="optional-verify-discovered-support-with-lookup">Optional: Verify discovered support with lookup</h2>
 <p>The main tutorial above uses four estimators because those are the current average-response estimators tagged as supporting both multidimensional treatments and mixed continuous/categorical treatment types.</p>
-<div id="08b79daf" class="cell" data-execution_count="17">
+<div id="f76c759f" class="cell" data-execution_count="17">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>estimator_catalog <span class="op">=</span> all_causal_average_response_estimators(</span>
 <span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>    as_dataframe<span class="op">=</span><span class="va">True</span>,</span>
 <span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>    filter_tags<span class="op">=</span>{<span class="st">"capability:multidimensional_treatment"</span>: <span class="va">True</span>},</span>
@@ -1148,7 +1148,7 @@ Note
 </div>
 </div>
 </div>
-<div id="4bbefd61" class="cell" data-execution_count="18">
+<div id="a0b3fbd8" class="cell" data-execution_count="18">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>density_catalog <span class="op">=</span> all_density_estimators(</span>
 <span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>    as_dataframe<span class="op">=</span><span class="va">True</span>,</span>
 <span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>    filter_tags<span class="op">=</span>{<span class="st">"capability:multidimensional_treatment"</span>: <span class="va">True</span>},</span>
