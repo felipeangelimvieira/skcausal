@@ -290,5 +290,7 @@ def fit_cbps_continuous(
             "t_sd": design.t_sd_,
             "bal_loss": continuous_bal_loss(params_opt, design),
             "mle_params": mle_params,
+            "inv_v_init": inv_v_init,
+            "design": design,
         },
     )

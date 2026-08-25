@@ -59,3 +59,15 @@ def test_collinear_columns_raise():
     X = np.column_stack([X, X[:, 0] + X[:, 1]])
     with pytest.raises(ValueError, match="full rank"):
         DesignStandardizer().fit(X)
+
+
+def test_coef_from_original_round_trips():
+    X = _make_X()
+    design = DesignStandardizer().fit(X)
+    beta_u = np.array([[0.5, -1.0], [2.0, 0.3], [-0.7, 1.1], [0.1, 0.0]])
+    np.testing.assert_allclose(
+        design.coef_from_original(design.coef_to_original(beta_u)), beta_u, atol=1e-10
+    )
+    np.testing.assert_allclose(
+        design.coef_from_original(design.coef_to_original(beta_u[:, 0])), beta_u[:, 0]
+    )

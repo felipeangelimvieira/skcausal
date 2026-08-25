@@ -248,5 +248,5 @@ def fit_cbps_multinomial(
         J=float(J_opt),
         mle_J=float(mle_J),
         converged=bool(converged),
-        extra={"bal_loss": bal_loss(params_opt, U, T), "mle_beta": mle_beta},
+        extra={"bal_loss": bal_loss(params_opt, U, T), "mle_beta": mle_beta, "inv_v_init": inv_v_init},
     )

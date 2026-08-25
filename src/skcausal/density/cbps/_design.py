@@ -78,3 +78,14 @@ class DesignStandardizer:
         beta[1:] = beta[1:] / self.sd_[:, None]
         beta[0] = beta[0] - self.mean_ @ beta[1:]
         return beta[:, 0] if squeeze else beta
+
+    def coef_from_original(self, beta_orig: np.ndarray) -> np.ndarray:
+        """Inverse of :meth:`coef_to_original`."""
+        beta_orig = np.asarray(beta_orig, dtype=float)
+        squeeze = beta_orig.ndim == 1
+        beta = beta_orig.reshape(beta_orig.shape[0], -1).copy()
+
+        beta[0] = beta[0] + self.mean_ @ beta[1:]
+        beta[1:] = beta[1:] * self.sd_[:, None]
+        beta_u = (self.v_.T @ beta) * self.d_[:, None]
+        return beta_u[:, 0] if squeeze else beta_u
