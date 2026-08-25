@@ -37,10 +37,14 @@ def test_gradients_match_finite_differences(J):
     inv_v = pinv_symmetric(gmm_weighting_matrix(U, multinomial_probs(U, params)))
 
     numeric = approx_fprime(params, lambda p: gmm_loss(p, U, T, inv_v), 1e-6)
-    np.testing.assert_allclose(gmm_gradient(params, U, T, inv_v), numeric, rtol=1e-4, atol=1e-6)
+    np.testing.assert_allclose(
+        gmm_gradient(params, U, T, inv_v), numeric, rtol=1e-4, atol=1e-6
+    )
 
     numeric_bal = approx_fprime(params, lambda p: bal_loss(p, U, T), 1e-6)
-    np.testing.assert_allclose(bal_gradient(params, U, T), numeric_bal, rtol=1e-4, atol=1e-6)
+    np.testing.assert_allclose(
+        bal_gradient(params, U, T), numeric_bal, rtol=1e-4, atol=1e-6
+    )
 
 
 @pytest.mark.parametrize("J", [2, 3])

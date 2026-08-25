@@ -37,10 +37,14 @@ def test_gradients_match_finite_differences():
     inv_v = pinv_symmetric(att_weighting_matrix(U, treat, att_probs(U, params)))
 
     numeric = _central_difference(lambda p: att_gmm_loss(p, U, treat, inv_v), params)
-    np.testing.assert_allclose(att_gmm_gradient(params, U, treat, inv_v), numeric, rtol=1e-5)
+    np.testing.assert_allclose(
+        att_gmm_gradient(params, U, treat, inv_v), numeric, rtol=1e-5
+    )
 
     numeric_bal = _central_difference(lambda p: att_bal_loss(p, U, treat), params)
-    np.testing.assert_allclose(att_bal_gradient(params, U, treat), numeric_bal, rtol=1e-5)
+    np.testing.assert_allclose(
+        att_bal_gradient(params, U, treat), numeric_bal, rtol=1e-5
+    )
 
 
 @pytest.mark.parametrize("twostep", [True, False])

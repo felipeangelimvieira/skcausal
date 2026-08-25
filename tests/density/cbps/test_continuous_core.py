@@ -49,7 +49,9 @@ def test_gradients_match_finite_differences():
     params = design.mle_params_ * 1.05
     inv_v = pinv_symmetric(continuous_weighting_matrix(params, design))
 
-    numeric = _central_difference(lambda p: continuous_gmm_loss(p, design, inv_v), params)
+    numeric = _central_difference(
+        lambda p: continuous_gmm_loss(p, design, inv_v), params
+    )
     np.testing.assert_allclose(
         continuous_gmm_gradient(params, design, inv_v), numeric, rtol=1e-5, atol=1e-10
     )
@@ -86,9 +88,13 @@ def test_result_contents(method):
     assert result.extra["sigmasq"] > 0
     # U-space coefficients reproduce the conditional mean on the original scale.
     design = ContinuousDesign().fit(U, t)
-    expected_mean = design.xtilde_ @ result.extra["beta_tilde"] * t.std(ddof=1) + t.mean()
+    expected_mean = (
+        design.xtilde_ @ result.extra["beta_tilde"] * t.std(ddof=1) + t.mean()
+    )
     np.testing.assert_allclose(U @ result.beta, expected_mean, atol=1e-8)
-    np.testing.assert_allclose(result.extra["sigmasq"], result.extra["sigmasq_tilde"] * t.var(ddof=1))
+    np.testing.assert_allclose(
+        result.extra["sigmasq"], result.extra["sigmasq_tilde"] * t.var(ddof=1)
+    )
 
 
 def test_over_improves_on_mle():

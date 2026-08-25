@@ -173,7 +173,12 @@ def _jacobians(params, design):
     d_score_beta = -x.T @ x / sigmasq / n
     d_score_sig = (-(x * resid[:, None]).sum(axis=0) / sigmasq**2 / n)[:, None]
     d_bal_beta = x.T @ (x * (-resid / sigmasq * w)[:, None]) / n
-    d_bal_sig = ((x * (w * (1.0 / (2 * sigmasq) - resid**2 / (2 * sigmasq**2)))[:, None]).sum(axis=0) / n)[:, None]
+    d_bal_sig = (
+        (x * (w * (1.0 / (2 * sigmasq) - resid**2 / (2 * sigmasq**2)))[:, None]).sum(
+            axis=0
+        )
+        / n
+    )[:, None]
     d_var_beta = (x.T @ (-2.0 * resid / sigmasq) / n)[None, :]
     d_var_sig = np.array([[np.sum(-(resid**2) / sigmasq**2) / n]])
 
@@ -225,9 +230,7 @@ def fit_cbps_continuous(
         params = scale_search(lambda p: continuous_gmm_loss(p, design), mle_params)
     except ValueError as error:
         # R stops here and asks for method="exact"; do that automatically.
-        warnings.warn(
-            f"{error} Falling back to the balance-only (exact) objective."
-        )
+        warnings.warn(f"{error} Falling back to the balance-only (exact) objective.")
         bal_only = True
         inv_v_init = None
         mle_J = mle_bal

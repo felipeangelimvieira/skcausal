@@ -15,7 +15,10 @@ def _data(n=400, seed=0):
 
 def test_tags_follow_density_kind():
     assert CBPSContinuous().get_tag("density_kind") == "conditional"
-    assert CBPSContinuous(density_kind="stabilized").get_tag("density_kind") == "stabilized"
+    assert (
+        CBPSContinuous(density_kind="stabilized").get_tag("density_kind")
+        == "stabilized"
+    )
     assert CBPSContinuous().get_tag("capability:t_type") == ["continuous"]
     with pytest.raises(ValueError, match="density_kind"):
         CBPSContinuous(density_kind="other")
@@ -30,7 +33,9 @@ def test_conditional_density_is_gaussian_on_original_scale():
     density = estimator.predict_density(X_new, t_new)
 
     mean = np.column_stack([np.ones(8), X_new.to_numpy()]) @ estimator.coefficients_
-    expected = norm.pdf(t_new["t"].to_numpy(), loc=mean, scale=np.sqrt(estimator.sigmasq_))
+    expected = norm.pdf(
+        t_new["t"].to_numpy(), loc=mean, scale=np.sqrt(estimator.sigmasq_)
+    )
     np.testing.assert_allclose(density[:, 0], expected)
     assert estimator.coefficients_.shape == (4,)
     assert estimator.fitted_weights_.shape == (len(X),)

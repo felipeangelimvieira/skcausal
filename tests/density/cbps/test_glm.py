@@ -35,7 +35,9 @@ def test_multinomial_with_two_levels_equals_logistic():
 
 def test_multinomial_matches_sklearn_three_levels():
     X, U, rng = _make_design()
-    logits = np.column_stack([np.zeros(len(X)), X @ [1.0, 0.0, 0.5], X @ [-0.5, 1.0, 0.0]])
+    logits = np.column_stack(
+        [np.zeros(len(X)), X @ [1.0, 0.0, 0.5], X @ [-0.5, 1.0, 0.0]]
+    )
     probs = np.exp(logits) / np.exp(logits).sum(axis=1, keepdims=True)
     labels = np.array([rng.choice(3, p=p) for p in probs])
     T = np.eye(3)[labels]

@@ -164,5 +164,9 @@ def fit_cbps_binary_att(
         J=float(J_opt),
         mle_J=float(mle_J),
         converged=bool(opt.success),
-        extra={"bal_loss": att_bal_loss(params_opt, U, treat), "mle_beta": mle_params, "inv_v_init": inv_v_init},
+        extra={
+            "bal_loss": att_bal_loss(params_opt, U, treat),
+            "mle_beta": mle_params,
+            "inv_v_init": inv_v_init,
+        },
     )

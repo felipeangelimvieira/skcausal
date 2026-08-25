@@ -39,7 +39,9 @@ def _load(case):
         t = pl.DataFrame({"treat": frame["treat"].astype(float)})
     else:
         levels = sorted(frame["treat"].astype(str).unique())
-        t = pl.DataFrame({"treat": pl.Series(frame["treat"].astype(str)).cast(pl.Enum(levels))})
+        t = pl.DataFrame(
+            {"treat": pl.Series(frame["treat"].astype(str)).cast(pl.Enum(levels))}
+        )
     return fixture, X, t
 
 
@@ -61,7 +63,9 @@ def _objectives_at(estimator, fixture):
         U = estimator.design_.u_
         linear_predictor = U @ estimator.design_.coef_from_original(r_coef[:, 0])
         beta_tilde = np.linalg.lstsq(
-            design.xtilde_, (linear_predictor - design.t_mean_) / design.t_sd_, rcond=None
+            design.xtilde_,
+            (linear_predictor - design.t_mean_) / design.t_sd_,
+            rcond=None,
         )[0]
         sigmasq_tilde = fixture["sigmasq"] / design.t_sd_**2
         params = np.concatenate([beta_tilde, [np.log(sigmasq_tilde)]])
@@ -111,7 +115,9 @@ def fitted_case(request):
 def test_objective_at_r_coefficients_reproduces_r_J(fitted_case):
     name, fixture, estimator, _, _ = fitted_case
     if not fixture["twostep"]:
-        pytest.skip("continuous-updating J depends on the weighting matrix at the optimum")
+        pytest.skip(
+            "continuous-updating J depends on the weighting matrix at the optimum"
+        )
     gmm_at_r, bal_at_r = _objectives_at(estimator, fixture)
     continuous_exact = fixture["data"] == "continuous" and fixture["method"] == "exact"
     ours = bal_at_r if continuous_exact else gmm_at_r

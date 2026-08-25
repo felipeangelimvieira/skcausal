@@ -124,12 +124,12 @@ def _moment_jacobians(U, T, probs):
     ratio = T / probs
     for a in range(m):  # moment level a + 1
         pa = probs[:, a + 1]
-        for l in range(m):  # parameter level l + 1
-            pl = probs[:, l + 1]
-            delta = 1.0 if a == l else 0.0
-            d_score_w = -pa * (delta - pl)
-            d_bal_w = -ratio[:, a + 1] * delta + ratio[:, a + 1] * pl - ratio[:, 0] * pl
-            rows, cols = slice(a * k, (a + 1) * k), slice(l * k, (l + 1) * k)
+        for b in range(m):  # parameter level b + 1
+            pb = probs[:, b + 1]
+            delta = 1.0 if a == b else 0.0
+            d_score_w = -pa * (delta - pb)
+            d_bal_w = -ratio[:, a + 1] * delta + ratio[:, a + 1] * pb - ratio[:, 0] * pb
+            rows, cols = slice(a * k, (a + 1) * k), slice(b * k, (b + 1) * k)
             d_score[rows, cols] = U.T @ (U * d_score_w[:, None]) / n
             d_bal[rows, cols] = U.T @ (U * d_bal_w[:, None]) / n
     return d_score, d_bal
@@ -248,5 +248,9 @@ def fit_cbps_multinomial(
         J=float(J_opt),
         mle_J=float(mle_J),
         converged=bool(converged),
-        extra={"bal_loss": bal_loss(params_opt, U, T), "mle_beta": mle_beta, "inv_v_init": inv_v_init},
+        extra={
+            "bal_loss": bal_loss(params_opt, U, T),
+            "mle_beta": mle_beta,
+            "inv_v_init": inv_v_init,
+        },
     )

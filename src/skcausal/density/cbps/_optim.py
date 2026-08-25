@@ -13,7 +13,13 @@ from typing import Callable, Optional
 import numpy as np
 from scipy.optimize import minimize, minimize_scalar
 
-__all__ = ["scale_search", "minimize_bfgs", "OptimResult", "pick_best", "pinv_symmetric"]
+__all__ = [
+    "scale_search",
+    "minimize_bfgs",
+    "OptimResult",
+    "pick_best",
+    "pinv_symmetric",
+]
 
 PROBS_MIN = 1e-6
 
@@ -68,9 +74,7 @@ def minimize_bfgs(
         if not np.isfinite(fun):
             raise FloatingPointError("non-finite objective")
     except (FloatingPointError, ValueError, np.linalg.LinAlgError):
-        result = minimize(
-            loss, x0, method="Nelder-Mead", options={"maxiter": max_iter}
-        )
+        result = minimize(loss, x0, method="Nelder-Mead", options={"maxiter": max_iter})
         x, fun, success = result.x, float(result.fun), bool(result.success)
 
     # scipy may report failure on precision loss while sitting at the optimum;

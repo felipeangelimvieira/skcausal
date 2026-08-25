@@ -66,7 +66,9 @@ def test_multi_level_treatment(dtype):
     X, labels = _multi_data()
     if dtype == "enum":
         names = np.array(["control", "low", "high"])[labels]
-        t = pl.DataFrame({"t": pl.Series(names).cast(pl.Enum(["control", "low", "high"]))})
+        t = pl.DataFrame(
+            {"t": pl.Series(names).cast(pl.Enum(["control", "low", "high"]))}
+        )
         expected_classes = ["control", "low", "high"]
     else:
         # polars Categorical keeps first-appearance order; sorted lexically here.
@@ -110,8 +112,12 @@ def test_non_numeric_covariates_raise():
 def test_predict_on_new_data_uses_original_scale_coefficients():
     X, t = _binary_data()
     estimator = CBPSCategorical().fit(X, t)
-    X_new = pl.DataFrame(np.random.default_rng(3).normal(size=(10, 3)), schema=X.columns)
+    X_new = pl.DataFrame(
+        np.random.default_rng(3).normal(size=(10, 3)), schema=X.columns
+    )
 
     probs = estimator.predict_proba(X_new)
-    logits = np.column_stack([np.ones(10), X_new.to_numpy()]) @ estimator.coefficients_[:, 0]
+    logits = (
+        np.column_stack([np.ones(10), X_new.to_numpy()]) @ estimator.coefficients_[:, 0]
+    )
     np.testing.assert_allclose(probs[:, 1], 1 / (1 + np.exp(-logits)), atol=1e-6)
