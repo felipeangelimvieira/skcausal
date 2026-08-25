@@ -218,10 +218,20 @@ def fit_cbps_continuous(
 
     design = ContinuousDesign().fit(U, t)
     mle_params = design.mle_params_
-    mle_J = continuous_gmm_loss(mle_params, design)
     mle_bal = continuous_bal_loss(mle_params, design)
-    inv_v_init = pinv_symmetric(continuous_weighting_matrix(mle_params, design))
-    params = scale_search(lambda p: continuous_gmm_loss(p, design), mle_params)
+    try:
+        inv_v_init = pinv_symmetric(continuous_weighting_matrix(mle_params, design))
+        mle_J = continuous_gmm_loss(mle_params, design)
+        params = scale_search(lambda p: continuous_gmm_loss(p, design), mle_params)
+    except ValueError as error:
+        # R stops here and asks for method="exact"; do that automatically.
+        warnings.warn(
+            f"{error} Falling back to the balance-only (exact) objective."
+        )
+        bal_only = True
+        inv_v_init = None
+        mle_J = mle_bal
+        params = mle_params
 
     bal = lambda p: continuous_bal_loss(p, design)  # noqa: E731
     bal_jac = (lambda p: continuous_bal_gradient(p, design)) if twostep else None
