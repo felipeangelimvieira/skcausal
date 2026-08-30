@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import polars as pl
 import pytest
 
@@ -28,6 +29,33 @@ class ToySemiSyntheticDataset(BaseSemiSyntheticDataset):
 
     def _sample_outcome(self, mean, X, treatment, rng):
         return np.asarray(mean) + rng.normal(scale=0.1, size=np.asarray(mean).shape)
+
+    def _get_grid(self, n):
+        return pl.DataFrame({"t": np.linspace(-1.0, 1.0, n)})
+
+
+class PolarsOnlySemiSyntheticDataset(BaseSemiSyntheticDataset):
+    column_types = {"t": "continuous"}
+
+    def _prepare_dgp(self, X, rng):
+        assert isinstance(X, pl.DataFrame)
+
+    def _sample_treatment(self, X, rng):
+        assert isinstance(X, pl.DataFrame)
+        return pl.DataFrame({"t": np.zeros(X.height)})
+
+    def _log_prob(self, X, treatment):
+        assert isinstance(X, pl.DataFrame)
+        assert isinstance(treatment, pl.DataFrame)
+        return np.zeros(X.height)
+
+    def _predict_y(self, X, treatment):
+        assert isinstance(X, pl.DataFrame)
+        assert isinstance(treatment, pl.DataFrame)
+        return np.zeros((X.height, 1))
+
+    def _sample_outcome(self, mean, X, treatment, rng):
+        return np.asarray(mean)
 
     def _get_grid(self, n):
         return pl.DataFrame({"t": np.linspace(-1.0, 1.0, n)})
@@ -74,3 +102,38 @@ def test_base_rejects_prepare_sample_size_and_misaligned_oracle_rows():
 def test_base_requires_a_dataset_object():
     with pytest.raises(TypeError, match="BaseDataset"):
         ToySemiSyntheticDataset(object(), random_state=3)
+
+
+def test_base_requires_predict_y_hook_before_construction():
+    class MissingPredictYDataset(BaseSemiSyntheticDataset):
+        column_types = {"t": "continuous"}
+
+        def _prepare_dgp(self, X, rng):
+            pass
+
+        def _sample_treatment(self, X, rng):
+            return pl.DataFrame({"t": np.zeros(X.height)})
+
+        def _log_prob(self, X, treatment):
+            return np.zeros(X.height)
+
+        def _sample_outcome(self, mean, X, treatment, rng):
+            return np.asarray(mean)
+
+        def _get_grid(self, n):
+            return pl.DataFrame({"t": np.linspace(-1.0, 1.0, n)})
+
+    with pytest.raises(TypeError, match="_predict_y"):
+        MissingPredictYDataset(ToyRealDataset())
+
+
+def test_oracle_hooks_receive_polars_for_numpy_and_pandas_inputs():
+    dataset = PolarsOnlySemiSyntheticDataset(ToyRealDataset(), random_state=5)
+
+    numpy_X = np.array([[1.0, 2.0], [3.0, 4.0]])
+    numpy_treatment = np.array([0.1, 0.2])
+    assert dataset.predict_y(numpy_X, numpy_treatment).shape == (2, 1)
+
+    pandas_X = pd.DataFrame({"feature": [1.0, 2.0]})
+    pandas_treatment = pd.DataFrame({"t": [0.1, 0.2]})
+    assert dataset.log_prob(pandas_X, pandas_treatment).shape == (2, 1)

@@ -1,4 +1,4 @@
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 import numpy as np
 import polars as pl
@@ -8,7 +8,7 @@ from skcausal.datasets.base import BaseDataset, BaseSyntheticDataset
 __all__ = ["BaseSemiSyntheticDataset"]
 
 
-class BaseSemiSyntheticDataset(BaseSyntheticDataset):
+class BaseSemiSyntheticDataset(BaseSyntheticDataset, ABC):
     outcome_columns = ("y",)
 
     def __init__(self, real_dataset: BaseDataset, random_state: int = 42):
@@ -110,6 +110,10 @@ class BaseSemiSyntheticDataset(BaseSyntheticDataset):
 
     @abstractmethod
     def _log_prob(self, X, treatment):
+        raise NotImplementedError
+
+    @abstractmethod
+    def _predict_y(self, X, treatment):
         raise NotImplementedError
 
     @abstractmethod
