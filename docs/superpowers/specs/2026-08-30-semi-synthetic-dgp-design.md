@@ -245,8 +245,10 @@ CategoricalSemiSyntheticDataset(
 )
 ```
 
-Treatment levels are `0, ..., n_treatments - 1`. When target probabilities are
-omitted, they are uniform. The confounded probabilities are
+Internal treatment indices are `0, ..., n_treatments - 1`; released levels are
+the corresponding string labels `"0", ..., str(n_treatments - 1)` so the
+treatment column uses the repository's canonical categorical dtype. When target
+probabilities are omitted, they are uniform. The confounded probabilities are
 
 \[
 \widetilde p_k(x)
@@ -472,10 +474,11 @@ schema; extra or missing columns receive a clear validation error rather than
 being silently reordered or discarded.
 
 Concrete DGPs validate category counts, probability vectors, domain bounds,
-nonnegative confounding settings, positive noise scales, and
-`randomized_weight` in `[0, 1]`. Treatment outputs use their declared dynamic
-`column_types` so the categorical and continuous DGPs participate correctly in
-the existing datatype and discovery machinery.
+nonnegative confounding/effect/outcome-noise scales, strictly positive
+continuous treatment noise, and `randomized_weight` in `[0, 1]`. Treatment
+outputs use their declared dynamic `column_types` so the categorical and
+continuous DGPs participate correctly in the existing datatype and discovery
+machinery.
 
 ## Files and Exports
 
