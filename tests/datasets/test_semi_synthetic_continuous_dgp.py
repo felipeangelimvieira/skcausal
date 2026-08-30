@@ -380,6 +380,19 @@ def test_continuous_target_bias_calibrates_strength():
     assert dataset.confounding_bias_ >= 0.0
 
 
+def test_continuous_zero_target_selects_zero_strength():
+    dataset = ContinuousSemiSyntheticDataset(
+        ToyRealDataset(),
+        target_confounding_bias=0.0,
+        treatment_only_strength=0.0,
+        random_state=18,
+    )
+
+    assert dataset.confounding_strength_ == 0.0
+    assert dataset.confounding_bias_ == 0.0
+    assert dataset.confounding_bias_ratio_ == 0.0
+
+
 def test_continuous_fixed_strength_bias_uses_frozen_grid_rms_discrepancy():
     dataset = ContinuousSemiSyntheticDataset(
         ToyRealDataset(),

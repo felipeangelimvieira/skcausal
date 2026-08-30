@@ -127,3 +127,58 @@ Result: `2 files already formatted`; `All checks passed!`; `174 passed in
   concrete continuous constructor and its prescribed fitted attributes.
 - The generic calibration helper's bracketing and tolerance policy is retained
   unchanged from Task 3.
+
+## Fix round 1 — exact zero at the independent-assignment boundary
+
+### Root cause
+
+With candidate confounding strength zero and `treatment_only_strength=0.0`, both
+continuous mixture components are independent of source rows. The finite-grid
+bias calculation nevertheless subtracted a floating-point density-weighted
+mean from an unweighted mean and returned
+`3.335980926195209e-16` instead of mathematical zero. Because the shared
+calibrator requires the target to lie inside its evaluated endpoint interval,
+`target_confounding_bias=0.0` was rejected as unattainable.
+
+### RED
+
+Added a constructor-level regression requiring a zero target with zero
+treatment-only strength to fit zero strength and store exact zero raw and
+normalized bias:
+
+```text
+uv run pytest tests/datasets/test_semi_synthetic_continuous_dgp.py::test_continuous_zero_target_selects_zero_strength -q
+```
+
+Result before the fix: `1 failed in 3.38s`. Construction raised `ValueError:
+Target is outside the attainable metric interval [3.335980926195209e-16,
+3.335980926195209e-16].`
+
+### Minimal fix and GREEN
+
+`_bias_at_strength` now returns exact `(0.0, 0.0)` when both candidate strength
+and treatment-only strength are zero, matching the exact row-independent
+assignment law. The shared calibrator, positive-strength metric, density,
+support, transformation, and Jacobian paths are unchanged.
+
+```text
+uv run pytest tests/datasets/test_semi_synthetic_continuous_dgp.py::test_continuous_zero_target_selects_zero_strength -q
+uv run pytest tests/datasets/test_semi_synthetic_continuous_dgp.py -q
+```
+
+Results: `1 passed in 1.22s`; continuous file `25 passed in 3.95s`.
+
+### Fix-round verification
+
+```text
+uv run ruff format src/skcausal/datasets/semi_synthetic_continuous.py tests/datasets/test_semi_synthetic_continuous_dgp.py
+uv run ruff check src/skcausal/datasets/semi_synthetic_continuous.py tests/datasets/test_semi_synthetic_continuous_dgp.py
+uv run pytest tests/datasets/test_semi_synthetic_continuous_dgp.py tests/datasets/test_semi_synthetic_categorical_dgp.py tests/datasets/test_semi_synthetic_base.py tests/datasets/test_semi_synthetic_helpers.py tests/datasets/test_all_datasets.py -q
+uv run pytest -q
+```
+
+Result: `2 files left unchanged`; `All checks passed!`; focused and
+compatibility suites `175 passed in 6.08s`; full suite `783 passed, 419
+warnings in 9.14s`. The continuous suite includes the existing positive-target,
+fixed-strength RMS, randomized exact-zero, transformed exact-density, support,
+and Jacobian regressions.

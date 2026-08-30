@@ -476,7 +476,9 @@ class ContinuousSemiSyntheticDataset(BaseSemiSyntheticDataset):
         return self._log_prob_at_strength(X, treatment, self.confounding_strength_)
 
     def _bias_at_strength(self, X, strength):
-        if self.randomized_weight == 1.0:
+        if self.randomized_weight == 1.0 or (
+            strength == 0.0 and self.treatment_only_strength == 0.0
+        ):
             return 0.0, 0.0
 
         distortions = []
