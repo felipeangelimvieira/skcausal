@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>semi-synthetic-dgp-design – skcausal</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-3a8c703fb520cc07f7eefc65bb59a90d.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "textbox",
+  "limit": 5,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<style>html{ scroll-behavior: smooth; }</style>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-chtml.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="../../styles.css">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">skcausal</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../learn/learn.html"> 
+<span class="menu-text">15-min theory</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-for-researchers" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">For researchers</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-for-researchers">    
+        <li>
+    <a class="dropdown-item" href="../../research/benchmarking.html">
+ <span class="dropdown-text">Benchmarking</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../../research/dataset_catalog.html">
+ <span class="dropdown-text">Dataset Catalog</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../../research/extending.html">
+ <span class="dropdown-text">Implement your own method</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-tutorials" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Tutorials</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-tutorials">    
+        <li>
+    <a class="dropdown-item" href="../../examples/index.html">
+ <span class="dropdown-text">Overview</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../../examples/categorical_treatments.html">
+ <span class="dropdown-text">Categorical Treatments</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../../examples/continuous_treatments.html">
+ <span class="dropdown-text">Continuous Treatments</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../../examples/multidimensional_treatments.html">
+ <span class="dropdown-text">Multidimensional Treatments</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-density" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Density</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-density">    
+        <li>
+    <a class="dropdown-item" href="../../density/index.html">
+ <span class="dropdown-text">Overview</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../../density/continuous.html">
+ <span class="dropdown-text">Continuous Treatments</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../../about.html"> 
+<span class="menu-text">About</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/felipeangelimvieira/skcausal"> <i class="bi bi-github" role="img" aria-label="GitHub repository">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<header id="title-block-header" class="quarto-title-block"></header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active" data-toc-expanded="99">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#semi-synthetic-observational-dgp-design" id="toc-semi-synthetic-observational-dgp-design" class="nav-link active" data-scroll-target="#semi-synthetic-observational-dgp-design">Semi-Synthetic Observational DGP Design</a>
+  <ul class="collapse">
+  <li><a href="#status" id="toc-status" class="nav-link" data-scroll-target="#status">Status</a></li>
+  <li><a href="#goal" id="toc-goal" class="nav-link" data-scroll-target="#goal">Goal</a></li>
+  <li><a href="#non-goals" id="toc-non-goals" class="nav-link" data-scroll-target="#non-goals">Non-goals</a></li>
+  <li><a href="#architecture" id="toc-architecture" class="nav-link" data-scroll-target="#architecture">Architecture</a>
+  <ul class="collapse">
+  <li><a href="#one-base-class-for-a-complete-dgp" id="toc-one-base-class-for-a-complete-dgp" class="nav-link" data-scroll-target="#one-base-class-for-a-complete-dgp">One base class for a complete DGP</a></li>
+  <li><a href="#protected-subclass-contract" id="toc-protected-subclass-contract" class="nav-link" data-scroll-target="#protected-subclass-contract">Protected subclass contract</a></li>
+  </ul></li>
+  <li><a href="#public-api" id="toc-public-api" class="nav-link" data-scroll-target="#public-api">Public API</a></li>
+  <li><a href="#randomness-and-replications" id="toc-randomness-and-replications" class="nav-link" data-scroll-target="#randomness-and-replications">Randomness and Replications</a></li>
+  <li><a href="#internal-causal-roles" id="toc-internal-causal-roles" class="nav-link" data-scroll-target="#internal-causal-roles">Internal Causal Roles</a></li>
+  <li><a href="#categorical-reference-dgp" id="toc-categorical-reference-dgp" class="nav-link" data-scroll-target="#categorical-reference-dgp">Categorical Reference DGP</a></li>
+  <li><a href="#scalar-continuous-reference-dgp" id="toc-scalar-continuous-reference-dgp" class="nav-link" data-scroll-target="#scalar-continuous-reference-dgp">Scalar-Continuous Reference DGP</a></li>
+  <li><a href="#unified-gaussian-outcome-surface" id="toc-unified-gaussian-outcome-surface" class="nav-link" data-scroll-target="#unified-gaussian-outcome-surface">Unified Gaussian Outcome Surface</a></li>
+  <li><a href="#confounding-calibration" id="toc-confounding-calibration" class="nav-link" data-scroll-target="#confounding-calibration">Confounding Calibration</a></li>
+  <li><a href="#input-output-and-validation" id="toc-input-output-and-validation" class="nav-link" data-scroll-target="#input-output-and-validation">Input, Output, and Validation</a></li>
+  <li><a href="#files-and-exports" id="toc-files-and-exports" class="nav-link" data-scroll-target="#files-and-exports">Files and Exports</a></li>
+  <li><a href="#testing" id="toc-testing" class="nav-link" data-scroll-target="#testing">Testing</a></li>
+  <li><a href="#extension-boundaries" id="toc-extension-boundaries" class="nav-link" data-scroll-target="#extension-boundaries">Extension Boundaries</a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content quarto-banner-title-block" id="quarto-document-content">
+
+
+
+
+<section id="semi-synthetic-observational-dgp-design" class="level1">
+<h1>Semi-Synthetic Observational DGP Design</h1>
+<section id="status" class="level2">
+<h2 class="anchored" data-anchor-id="status">Status</h2>
+<p>Approved in conversation on 2026-08-30 and amended by the final numerical-law ruling on the same date. This document defines the design to be implemented; it does not describe unrelated package behavior.</p>
+</section>
+<section id="goal" class="level2">
+<h2 class="anchored" data-anchor-id="goal">Goal</h2>
+<p>Add a small, extensible base for semi-synthetic observational datasets that:</p>
+<ul>
+<li>takes an existing <code>BaseDataset</code> object as its source of real covariates;</li>
+<li>preserves the source covariate rows and empirical distribution;</li>
+<li>simulates treatment and outcome from a frozen structural DGP;</li>
+<li>exposes the exact conditional assignment law (g(a x));</li>
+<li>exposes the exact conditional outcome mean (m(a, x)) through the existing <code>predict_y</code> API;</li>
+<li>supports categorical and scalar-continuous reference DGPs initially; and</li>
+<li>can be subclassed for vector, mixed, ordinal, count, alternative-outcome, and hidden-confounding DGPs without changing the base contract.</li>
+</ul>
+<p>The design should fit the existing dataset philosophy: dataset objects own their generation lifecycle, return <code>(X, treatment, outcome)</code> from <code>load</code>, use Polars at the internal dataset boundary, participate in <code>skbase</code> cloning and discovery, and expose average response curves through <code>predict_curve</code>/<code>predict</code>.</p>
+</section>
+<section id="non-goals" class="level2">
+<h2 class="anchored" data-anchor-id="non-goals">Non-goals</h2>
+<p>The first implementation will not add separate public objects for score generation, treatment assignment, outcome generation, calibration, or benchmark orchestration. It will not refactor the existing <code>SemiSyntheticRegressor</code> or <code>SemiSyntheticClassifier</code> classes.</p>
+<p>Only categorical and scalar-continuous treatment implementations and Gaussian continuous outcomes are built in initially. Other mechanisms are extensions of the same protected base-class contract, not reasons to expand that contract.</p>
+</section>
+<section id="architecture" class="level2">
+<h2 class="anchored" data-anchor-id="architecture">Architecture</h2>
+<section id="one-base-class-for-a-complete-dgp" class="level3">
+<h3 class="anchored" data-anchor-id="one-base-class-for-a-complete-dgp">One base class for a complete DGP</h3>
+<p><code>BaseSemiSyntheticDataset</code> extends <code>BaseSyntheticDataset</code>. A concrete subclass represents one coherent DGP and owns both oracle functions, rather than composing separate assignment and outcome objects. This keeps deliberately coupled quantities, such as shared prognostic scores and targeted selection, in one place.</p>
+<p>The class is initialized with a real dataset object:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> BaseSemiSyntheticDataset(BaseSyntheticDataset):</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>,</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>        real_dataset: BaseDataset,</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>        random_state: <span class="bu">int</span> <span class="op">=</span> <span class="dv">42</span>,</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    ):</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>        ...</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>During preparation it clones the supplied object and calls its existing contract:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="va">self</span>.real_dataset_ <span class="op">=</span> <span class="va">self</span>.real_dataset.clone()</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>X, _, _ <span class="op">=</span> <span class="va">self</span>.real_dataset_.load()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Only <code>X</code> is used. The source treatment and outcome are ignored by the built-in DGPs. The released covariate frame retains the source rows, values, names, and order. Encoding, imputation, standardization, and latent scores are stored only as internal fitted state.</p>
+<p>Cloning prevents the generator from mutating the caller’s dataset object and matches the package’s nested-object conventions.</p>
+</section>
+<section id="protected-subclass-contract" class="level3">
+<h3 class="anchored" data-anchor-id="protected-subclass-contract">Protected subclass contract</h3>
+<p>The base class owns lifecycle, validation, backend coercion, random-stream separation, and public wrappers. Concrete subclasses implement the causal mathematics through these hooks:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> BaseSemiSyntheticDataset(BaseSyntheticDataset):</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> _prepare_dgp(<span class="va">self</span>, X, rng):</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>        <span class="co">"""Freeze encoders, scores, structural coefficients, and calibration."""</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> _sample_treatment(<span class="va">self</span>, X, rng):</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>        <span class="co">"""Draw a treatment frame from the frozen assignment law."""</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> _log_prob(<span class="va">self</span>, X, treatment):</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>        <span class="co">"""Evaluate exact conditional log-mass or log-density row by row."""</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> _predict_y(<span class="va">self</span>, X, treatment):</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>        <span class="co">"""Evaluate the frozen conditional outcome mean row by row."""</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> _sample_outcome(<span class="va">self</span>, mean, X, treatment, rng):</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>        <span class="co">"""Draw outcomes around the conditional mean."""</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> _get_grid(<span class="va">self</span>, n):</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>        <span class="co">"""Return valid intervention rows for this DGP."""</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The exact private method names may follow existing <code>BaseSyntheticDataset</code> conventions during implementation, but these responsibilities must remain separate. In particular, structural preparation must not be repeated when a new stochastic replication is drawn.</p>
+<p>A mixin is intentionally not used. The source data, frozen DGP state, oracle functions, and sampling lifecycle share state and ordering; a base class makes those invariants explicit. Small numerical operations shared by concrete DGPs remain private functions rather than public framework classes.</p>
+</section>
+</section>
+<section id="public-api" class="level2">
+<h2 class="anchored" data-anchor-id="public-api">Public API</h2>
+<p>The new base adds only two public capabilities to the existing synthetic dataset API:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>dataset.log_prob(X, treatment)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>dataset.sample(random_state)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Normal usage is:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>dataset <span class="op">=</span> CategoricalSemiSyntheticDataset(</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    real_dataset<span class="op">=</span>real_dataset,</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    confounding_strength<span class="op">=</span><span class="fl">1.0</span>,</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    randomized_weight<span class="op">=</span><span class="fl">0.2</span>,</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    random_state<span class="op">=</span><span class="dv">42</span>,</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>X, treatment, outcome <span class="op">=</span> dataset.load()</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>mean <span class="op">=</span> dataset.predict_y(X, treatment)</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>curve <span class="op">=</span> dataset.predict_curve(X, dataset.get_grid())</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>log_probability <span class="op">=</span> dataset.log_prob(X, treatment)</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>X_rep, treatment_rep, outcome_rep <span class="op">=</span> dataset.sample(random_state<span class="op">=</span><span class="dv">7</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The method semantics are:</p>
+<ul>
+<li>Construction freezes the structural DGP and generates the initial sample.</li>
+<li>Repeated <code>load()</code> calls return the same initial sample.</li>
+<li><code>sample(random_state)</code> draws new treatment and outcome noise while retaining the same <code>X</code>, encoders, latent score definitions, coefficients, assignment law, and outcome surface.</li>
+<li><code>sample</code> does not mutate the frames subsequently returned by <code>load</code>.</li>
+<li>Equal sampling seeds return equal replications.</li>
+<li><code>predict_y(X, treatment)</code> is the exact (m(a,x)) and retains the existing <code>(n_samples, n_outcomes)</code> return convention.</li>
+<li><code>log_prob(X, treatment)</code> evaluates paired rows and returns an <code>(n_samples, 1)</code> float array. It is a log-probability mass for categorical treatments and a log-density for continuous treatments.</li>
+<li><code>get_grid(n)</code> returns valid intervention rows for the concrete DGP.</li>
+<li><code>predict_curve</code> and its <code>predict</code> alias continue to compute empirical-population average responses using the source covariates.</li>
+</ul>
+<p><code>prepare(n=...)</code> is invalid because sample size comes from <code>real_dataset</code>. Calling parameterless <code>prepare()</code> may reconstruct the same structural DGP and initial sample deterministically from <code>random_state</code>, consistent with existing semi-synthetic datasets.</p>
+</section>
+<section id="randomness-and-replications" class="level2">
+<h2 class="anchored" data-anchor-id="randomness-and-replications">Randomness and Replications</h2>
+<p>Structural randomness and initial sampling randomness are derived from separate child streams of the constructor’s <code>random_state</code>. Structural randomness covers feature selection, nonlinear score definitions, DGP coefficients, and any unit-level latent variables that are part of the frozen condition. Sampling randomness covers treatment draws and outcome noise.</p>
+<p><code>sample(random_state)</code> creates fresh treatment and outcome generators from the given seed and never consumes or modifies the structural generator. This gives replications a common structural DGP without introducing a benchmark runner or replication artifact format.</p>
+</section>
+<section id="internal-causal-roles" class="level2">
+<h2 class="anchored" data-anchor-id="internal-causal-roles">Internal Causal Roles</h2>
+<p>The built-in DGPs encode and standardize a private copy of <code>X</code>, then freeze sparse nonlinear functions producing:</p>
+<p>[ q_C(X),q_P(X),q_Z(X),q_M(X). ]</p>
+<p>The roles are structural:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Internal score</th>
+<th style="text-align: right;">Assignment</th>
+<th style="text-align: right;">Baseline outcome</th>
+<th style="text-align: right;">Treatment effect</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>(q_C)</td>
+<td style="text-align: right;">yes</td>
+<td style="text-align: right;">yes</td>
+<td style="text-align: right;">no</td>
+</tr>
+<tr class="even">
+<td>(q_P)</td>
+<td style="text-align: right;">no</td>
+<td style="text-align: right;">yes</td>
+<td style="text-align: right;">no</td>
+</tr>
+<tr class="odd">
+<td>(q_Z)</td>
+<td style="text-align: right;">yes</td>
+<td style="text-align: right;">no</td>
+<td style="text-align: right;">no</td>
+</tr>
+<tr class="even">
+<td>(q_M)</td>
+<td style="text-align: right;">no</td>
+<td style="text-align: right;">no</td>
+<td style="text-align: right;">yes</td>
+</tr>
+</tbody>
+</table>
+<p>The internal helper stores the encoding schema, imputation values, selected encoded columns, nonlinear operations, coefficients, and source-population means and scales. It can transform compatible new <code>X</code> rows using the frozen definitions. It is not a public DGP component.</p>
+<p>Nonlinear score terms may include sparse linear projections, squares, pairwise products, sine transformations, and threshold indicators. Zero-variance scores use scale one. Multiple confounding scores are generated by default so distinct treatment components in future subclasses can depend on distinct shared causes.</p>
+<p>The built-in baseline risk is</p>
+<p>[ _0(x)=f_C{q_C(x)}+f_P{q_P(x)}. ]</p>
+<p>The assignment predictor uses the same outcome-predictive confounding contribution, rather than the full baseline risk:</p>
+<p>[ _A(x) = +B_C q_C(x) +B_Zq_Z(x). ]</p>
+<p>The frozen <code>B_C q_C</code> term is constructed to align with <code>f_C(q_C)</code>. This creates targeted selection while retaining <code>q_P</code> as outcome-only. All shared causes remain functions of released <code>X</code> in the observed-confounding reference DGPs.</p>
+</section>
+<section id="categorical-reference-dgp" class="level2">
+<h2 class="anchored" data-anchor-id="categorical-reference-dgp">Categorical Reference DGP</h2>
+<p>The first categorical implementation is <code>CategoricalSemiSyntheticDataset</code>. Its primary configuration is:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>CategoricalSemiSyntheticDataset(</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    real_dataset,</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    n_treatments<span class="op">=</span><span class="dv">2</span>,</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    target_probabilities<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    confounding_strength<span class="op">=</span><span class="fl">1.0</span>,</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    target_confounding_bias<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    treatment_only_strength<span class="op">=</span><span class="fl">1.0</span>,</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>    randomized_weight<span class="op">=</span><span class="fl">0.1</span>,</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    outcome_effect_scale<span class="op">=</span><span class="fl">1.0</span>,</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    effect_heterogeneity_scale<span class="op">=</span><span class="fl">0.5</span>,</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>    outcome_noise_scale<span class="op">=</span><span class="fl">1.0</span>,</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>    random_state<span class="op">=</span><span class="dv">42</span>,</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Internal treatment indices are <code>0, ..., n_treatments - 1</code>; released levels are the corresponding string labels <code>"0", ..., str(n_treatments - 1)</code> so the treatment column uses the repository’s canonical categorical dtype. When target probabilities are omitted, they are uniform. The confounded probabilities are</p>
+<p>[ p_k(x) =_k . ]</p>
+<p>The exact assignment law is</p>
+<p>[ p_k(x)=(1-)p_k(x)+_k, ]</p>
+<p>where <code>randomized_weight</code> is () and () is the target randomized distribution. Intercepts are calibrated numerically so the empirical mean of the final probabilities matches <code>target_probabilities</code>. At (), the law is randomized and independent of <code>X</code>.</p>
+<p><code>treatment_only_strength</code> scales the (B_Zq_Z) contribution independently of confounding strength. It can therefore create treatment predictability without changing which outcome-predictive scores enter assignment.</p>
+<p><code>_sample_treatment</code> draws from these row-specific probabilities. <code>_log_prob</code> returns the logarithm of the selected category probability. Unsupported but well-formed category values receive <code>-inf</code>; malformed treatment inputs raise a validation error.</p>
+<p>The treatment basis uses the first category as reference:</p>
+<p>[ b(a)=^. ]</p>
+</section>
+<section id="scalar-continuous-reference-dgp" class="level2">
+<h2 class="anchored" data-anchor-id="scalar-continuous-reference-dgp">Scalar-Continuous Reference DGP</h2>
+<p>The first continuous implementation is <code>ContinuousSemiSyntheticDataset</code>. Its primary configuration is:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>ContinuousSemiSyntheticDataset(</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    real_dataset,</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    treatment_domain<span class="op">=</span><span class="st">"real"</span>,</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    confounding_strength<span class="op">=</span><span class="fl">1.0</span>,</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    target_confounding_bias<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    treatment_only_strength<span class="op">=</span><span class="fl">1.0</span>,</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    randomized_weight<span class="op">=</span><span class="fl">0.1</span>,</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    treatment_noise_scale<span class="op">=</span><span class="fl">1.0</span>,</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    outcome_effect_scale<span class="op">=</span><span class="fl">1.0</span>,</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    effect_heterogeneity_scale<span class="op">=</span><span class="fl">0.5</span>,</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    outcome_noise_scale<span class="op">=</span><span class="fl">1.0</span>,</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>    random_state<span class="op">=</span><span class="dv">42</span>,</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Let the unconditioned confounded latent candidate be Gaussian:</p>
+<p>[ Z_C^*X=xN!( +b_C^q_C(x)+b_Z^q_Z(x), _A^2 ). ]</p>
+<p><code>treatment_only_strength</code> scales the (b_Z^q_Z) contribution independently of (). The unconditioned randomized candidate is (Z_R^*N(0,_A^2)), independently of <code>X</code>. With probability (1-) the assignment uses the confounded component and with probability () it uses the randomized component.</p>
+<p>For <code>treatment_domain="real"</code>, the candidates are used without conditioning: (Z_C=Z_C^<em>) and (Z_R=Z_R^</em>). For positive and bounded domains, let (I_T=[z_{},z_{}]) be the finite latent interval whose endpoints round-trip through the configured transform to finite, distinct, strictly interior IEEE-754 float treatments. Each component is conditioned separately:</p>
+<p>[ Z_C=(Z_C^<em>Z_C^</em>I_T), Z_R=(Z_R^<em>Z_R^</em>I_T). ]</p>
+<p>The selected latent component then uses the configured transformation:</p>
+[ A=T(Z)=
+<span class="math display">\[\begin{cases}
+Z, &amp; \text{real},\\
+\exp(Z), &amp; \text{positive},\\
+L+(U-L)\operatorname{logistic}(Z), &amp; \text{bounded }[L,U].
+\end{cases}\]</span>
+<p>]</p>
+<p><code>treatment_domain</code> accepts <code>"real"</code>, <code>"positive"</code>, or a finite <code>(lower, upper)</code> pair with at least two distinct representable interior treatment values. <code>_sample_treatment</code> and <code>_log_prob</code> use the same unconditioned law for the real domain and the same component-wise conditioned law for transformed domains. The latter includes each truncated-Gaussian normalization constant, followed by a stable log-mixture calculation and the exact change-of-variables Jacobian. <code>_log_prob</code> returns <code>-inf</code> outside the configured representable support. Treatments are never clipped. Thus the positive and bounded numerical law is explicitly a Gaussian conditioned on representably invertible float support, not an ideal real-number Gaussian transformed first and repaired afterward.</p>
+<p>The default continuous treatment basis contains standardized linear, quadratic, sinusoidal, and hinge terms over a frozen central intervention region. That region is obtained by transforming fixed lower and upper quantiles of the randomized latent Gaussian; it is finite even when mathematical support is unbounded. <code>get_grid</code> uses this same region. The implementation freezes every centering, scaling, quantile, and knot quantity during structural preparation.</p>
+</section>
+<section id="unified-gaussian-outcome-surface" class="level2">
+<h2 class="anchored" data-anchor-id="unified-gaussian-outcome-surface">Unified Gaussian Outcome Surface</h2>
+<p>Both concrete DGPs implement</p>
+<p>[ m(a,x)= _0(x) +b(a)^ +b(a)^q_M(x). ]</p>
+<p><code>outcome_effect_scale</code> controls the scale of the frozen main-effect coefficients and <code>effect_heterogeneity_scale</code> controls the interaction coefficients. The reference treatment has a zero treatment basis, making <code>mu_0</code> its conditional mean.</p>
+<p>Observed outcomes are</p>
+<p>[ Y=m(A,X)+_Y, N(0,1), ]</p>
+<p>where <code>outcome_noise_scale</code> is (_Y). <code>_predict_y</code> never includes this noise.</p>
+<p>The outcome implementation is kept as private numerical functions shared by the two concrete classes, not as an <code>OutcomeDGP</code> object. A future Bernoulli or count DGP overrides <code>_sample_outcome</code> and applies the appropriate inverse link inside <code>_predict_y</code> while retaining the same base-class contract.</p>
+</section>
+<section id="confounding-calibration" class="level2">
+<h2 class="anchored" data-anchor-id="confounding-calibration">Confounding Calibration</h2>
+<p><code>confounding_strength</code> directly supplies () when <code>target_confounding_bias</code> is <code>None</code>. When a target is provided, the structural scores and outcome surface remain fixed while preparation varies only (), recalibrating categorical intercepts at each candidate value.</p>
+<p>Calibration is private implementation machinery, not a public diagnostics or calibrator object. It uses the exact oracle functions to calculate</p>
+<p>[ _{}(a)=1n_i m(a,X_i) ]</p>
+<p>and</p>
+<p>[ _{}(a)= {_i g(aX_i)}. ]</p>
+<p>The intervention-specific distortion is</p>
+<p>[ <em>{}(a) =</em>{}(a)-_{}(a). ]</p>
+<p>The normalized calibration target is measured relative to</p>
+<p>[ s_0={_0(X_i)}. ]</p>
+<p>For categorical treatments, the scalar bias summary is</p>
+<p>[ , ]</p>
+<p>which is the maximum absolute pairwise naive-contrast distortion divided by baseline-risk standard deviation.</p>
+<p>For continuous treatments, the scalar summary is</p>
+<p>[ { 1M<em>{m=1}^M </em>{}(a<sup>{(m)})</sup>2 }^{1/2}, ]</p>
+<p>using the deterministic intervention grid returned by <code>get_grid</code>.</p>
+<p><code>target_confounding_bias=0.5</code> therefore requests distortion equal to half a baseline-risk standard deviation. Preparation stores the achieved values as <code>confounding_strength_</code>, <code>confounding_bias_</code> in raw outcome units, and <code>confounding_bias_ratio_</code>.</p>
+<p>The numerical search brackets a crossing while holding all non-assignment structure fixed, then refines it to a fixed internal tolerance. If the target is below the bias at the minimum strength, above the attainable bias under the configured randomized mixture/noise, or normalization is impossible because <code>s_0</code> is zero, preparation raises an informative <code>ValueError</code> containing the attainable range.</p>
+<p>Overlap remains a separate property. <code>randomized_weight</code> and, for continuous treatment, <code>treatment_noise_scale</code> control it. The base API does not add a public <code>oracle_diagnostics</code> method: callers can derive any desired diagnostic from <code>predict_y</code> and <code>log_prob</code>, and broader reporting belongs in benchmark evaluation code.</p>
+</section>
+<section id="input-output-and-validation" class="level2">
+<h2 class="anchored" data-anchor-id="input-output-and-validation">Input, Output, and Validation</h2>
+<p>The base validates that <code>real_dataset</code> is a <code>BaseDataset</code>, is cloneable, and returns a nonempty covariate frame with unique columns. It derives <code>n</code> from that frame. Source treatment and outcome values are not inspected by the built-in DGPs.</p>
+<p>The private encoder:</p>
+<ul>
+<li>imputes missing numeric values with frozen source-population medians;</li>
+<li>imputes missing categorical values with a frozen sentinel/category;</li>
+<li>standardizes numeric features;</li>
+<li>encodes categorical features with unknown-category handling;</li>
+<li>rejects infinite numeric values; and</li>
+<li>preserves the released source frame without applying these transformations to it.</li>
+</ul>
+<p>A numeric source column with no finite observed value cannot define an imputation value and raises a validation error.</p>
+<p>Oracle calls accept NumPy, pandas, and Polars inputs through the same coercion pattern as <code>BaseSyntheticDataset</code>. <code>X</code> and treatment inputs must have equal row counts. New <code>X</code> frames must contain the source feature columns in the expected schema; extra or missing columns receive a clear validation error rather than being silently reordered or discarded.</p>
+<p>Concrete DGPs validate category counts, probability vectors, domain bounds, finite nonnegative confounding/effect/outcome-noise scales, strictly positive finite continuous treatment noise, and finite <code>randomized_weight</code> in <code>[0, 1]</code>. Bounded domains must also yield strictly ordered latent bounds that round-trip to distinct representable interior treatments. Treatment outputs use their declared dynamic <code>column_types</code> so the categorical and continuous DGPs participate correctly in the existing datatype and discovery machinery.</p>
+</section>
+<section id="files-and-exports" class="level2">
+<h2 class="anchored" data-anchor-id="files-and-exports">Files and Exports</h2>
+<p>The implementation is split into three focused modules:</p>
+<pre class="text"><code>src/skcausal/datasets/
+    semi_synthetic.py
+    semi_synthetic_categorical.py
+    semi_synthetic_continuous.py</code></pre>
+<p><code>semi_synthetic.py</code> contains <code>BaseSemiSyntheticDataset</code> and private shared numerical helpers. The other modules contain the two complete reference DGPs. <code>src/skcausal/datasets/__init__.py</code> exports all three public classes.</p>
+<p>No existing semi-synthetic class is renamed or changed beyond any narrowly necessary shared compatibility fix discovered during implementation.</p>
+</section>
+<section id="testing" class="level2">
+<h2 class="anchored" data-anchor-id="testing">Testing</h2>
+<p>Tests must cover:</p>
+<ol type="1">
+<li>Exact preservation of source <code>X</code>, including columns and row order.</li>
+<li>Cloning the source dataset without mutating it.</li>
+<li>NumPy, pandas, and Polars oracle inputs.</li>
+<li>Structural reproducibility from constructor seeds.</li>
+<li>Replication reproducibility and non-mutation of <code>load()</code> outputs.</li>
+<li>Categorical probability normalization and target marginal calibration.</li>
+<li>Categorical randomized assignment at <code>randomized_weight=1</code>.</li>
+<li>Continuous density normalization for the unconditioned real law and the representably conditioned positive and bounded laws.</li>
+<li>Exact mixture log-probabilities, transformed-domain truncation constants, and support behavior.</li>
+<li>Agreement between <code>predict_y</code> and the generated Gaussian conditional mean.</li>
+<li>Confounding-target calibration within numerical tolerance.</li>
+<li>Clear failures for invalid source data, parameters, schemas, and treatments.</li>
+<li>Dataset discovery, cloning, parameter inspection, and <code>get_test_params</code>.</li>
+<li>The existing full test suite.</li>
+</ol>
+<p>The randomized sanity test verifies that fully randomized assignment produces zero oracle confounding distortion up to numerical tolerance. Calibration tests verify that score definitions and outcome coefficients remain fixed while assignment strength changes.</p>
+</section>
+<section id="extension-boundaries" class="level2">
+<h2 class="anchored" data-anchor-id="extension-boundaries">Extension Boundaries</h2>
+<p>The base signatures already accept treatment frames with any number and mix of columns. A future vector or mixed treatment DGP implements a joint sampler and joint <code>_log_prob</code>; no base change is required. Ordinal and count DGPs likewise only provide concrete assignment laws.</p>
+<p>Alternative outcome families override the mean/link and sampling hooks. Hidden confounding can be represented by frozen internal unit-level scores consumed by both oracle functions but omitted from the released <code>X</code>; such a subclass must clearly label its identification violation and define whether predictions on new rows are supported.</p>
+<p>A source-outcome prognostic model can be added in a subclass’s structural preparation or through a future private helper. The base does not require source outcomes and therefore does not couple real-dataset acquisition to a particular prediction model.</p>
+<p>Benchmark condition matrices, artifact persistence, intervention-support reports, and performance summaries remain outside the dataset object. They can use the stable <code>load</code>, <code>sample</code>, <code>predict_y</code>, <code>predict_curve</code>, and <code>log_prob</code> interfaces without changing the generation core.</p>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>skcausal</p>
+</div>   
+    <div class="nav-footer-center">
+<p>State-of-the-art unified API for causal inference</p>
+</div>
+    <div class="nav-footer-right">
+<p><a href="https://github.com/felipeangelimvieira/skcausal">GitHub</a></p>
+</div>
+  </div>
+</footer>
+
+
+
+
+<script src="../../site_libs/quarto-html/zenscroll-min.js"></script>
+</body></html>
