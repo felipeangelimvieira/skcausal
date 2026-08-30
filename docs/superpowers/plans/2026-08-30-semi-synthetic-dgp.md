@@ -19,6 +19,7 @@
 - Initial built-ins cover categorical and scalar-continuous treatments with Gaussian continuous outcomes.
 - Categorical outputs use repository-compatible string levels from `"0"` through `str(K - 1)` stored with categorical dtype.
 - Confounding and overlap remain separate: `confounding_strength` or normalized `target_confounding_bias` controls shared prognostic selection; `randomized_weight` and continuous treatment noise control overlap.
+- The real continuous domain uses the unconditioned latent Gaussian mixture. Positive and bounded domains condition each Gaussian component on the finite latent interval that round-trips to distinct representable interior float treatments; sampling and `log_prob` implement that same exact conditioned law without clipping.
 - Do not add SciPy or another dependency; use NumPy and Python's `statistics.NormalDist` for numerical work.
 - Existing `SemiSyntheticRegressor` and `SemiSyntheticClassifier` behavior must remain unchanged.
 
@@ -888,7 +889,7 @@ git commit -m "feat: calibrate categorical confounding bias"
 
 **Interfaces:**
 - Consumes: `BaseSemiSyntheticDataset`, score/baseline helpers, normal log-density and log-mixture helpers.
-- Produces: `ContinuousSemiSyntheticDataset` supporting `"real"`, `"positive"`, and `(lower, upper)` domains; exact transformed mixture density; nonlinear treatment basis; Gaussian outcome; and `get_test_params`.
+- Produces: `ContinuousSemiSyntheticDataset` supporting `"real"`, `"positive"`, and `(lower, upper)` domains; an exact unconditioned real latent mixture and exact representably conditioned transformed-domain mixtures; nonlinear treatment basis; Gaussian outcome; and `get_test_params`.
 
 - [ ] **Step 1: Write failing domain, density, and outcome tests**
 
@@ -1051,7 +1052,7 @@ class ContinuousSemiSyntheticDataset(BaseSemiSyntheticDataset):
         super().__init__(real_dataset=real_dataset, random_state=random_state)
 ```
 
-Accept only `"real"`, `"positive"`, or a two-finite-number tuple with lower `<` upper. Require positive treatment noise, nonnegative remaining scales, and mixture weight in `[0, 1]`.
+Accept only `"real"`, `"positive"`, or a two-finite-number tuple with lower `<` upper. A bounded tuple must yield strictly ordered latent bounds that round-trip to at least two distinct representable interior treatment floats. Require positive treatment noise, nonnegative remaining scales, and mixture weight in `[0, 1]`.
 
 In `_prepare_dgp`, fit scores/baseline; store the source scores, source `mu0`, source targeted-selection signal, and `baseline_standard_deviation_ = np.std(source_mu0, ddof=0)`; draw a length-two treatment-only coefficient vector scaled by `1 / sqrt(2)`; draw the five treatment-basis main-effect coefficients and `(5, 2)` modifier matrix; and set `confounding_strength_`. Define the central latent intervention region using `NormalDist().inv_cdf(0.01)` and `NormalDist().inv_cdf(0.99)` times `treatment_noise_scale`. Freeze the raw treatment-basis values, source-grid means/scales, and hinge knots at latent quantiles 1/3 and 2/3; subtract the basis at latent reference zero so the reference effect is zero.
 
@@ -1086,9 +1087,9 @@ def _latent_mean(self, X, strength=None):
     return strength * signal + self.treatment_only_strength * treatment_only
 ```
 
-For sampling, draw a Bernoulli mixture indicator; use location zero for randomized rows and `_latent_mean` for confounded rows; then add Gaussian noise with `treatment_noise_scale` and apply the configured transform.
+For sampling, draw a Bernoulli mixture indicator; use location zero for randomized rows and `_latent_mean` for confounded rows. In the real domain, add unconditioned Gaussian noise with `treatment_noise_scale`. In positive and bounded domains, draw from that selected Gaussian component conditioned on the frozen representably invertible latent interval. Apply the configured transform without clipping.
 
-For `_log_prob`, inverse-transform valid treatments, compute confounded and randomized latent Normal log-densities, combine them with `_log_mixture`, and add the inverse Jacobian. Assign `-inf` outside positive/bounded support.
+For `_log_prob`, inverse-transform valid treatments. Use ordinary Normal log-densities for the real domain and component-specific truncated-Normal log-densities, including their normalization constants, for positive and bounded domains. Combine them with `_log_mixture`, add the inverse Jacobian, and assign `-inf` outside the frozen representable support.
 
 Evaluate the treatment basis from latent `z = T^{-1}(a)` using linear, quadratic, sinusoidal, and two hinge terms; apply frozen centering/scaling and subtract the transformed reference basis. `_predict_y` combines baseline, basis main effects, and modifier interactions. `_sample_outcome` adds configured Gaussian noise. `_get_grid` linearly spaces latent points over the frozen central region before applying the domain transform.
 

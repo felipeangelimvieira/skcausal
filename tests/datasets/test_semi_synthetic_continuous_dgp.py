@@ -365,6 +365,76 @@ def test_continuous_dgp_rejects_invalid_domains_and_noise():
         ContinuousSemiSyntheticDataset(ToyRealDataset(), treatment_noise_scale=0.0)
 
 
+@pytest.mark.parametrize(
+    "treatment_domain",
+    [
+        (1.0, 1.0),
+        (1.0, np.nextafter(1.0, np.inf)),
+        (
+            1.0,
+            np.nextafter(np.nextafter(1.0, np.inf), np.inf),
+        ),
+    ],
+)
+def test_bounded_domain_requires_distinct_representable_interior_treatments(
+    treatment_domain,
+):
+    with pytest.raises(ValueError, match="treatment_domain"):
+        ContinuousSemiSyntheticDataset(
+            ToyRealDataset(), treatment_domain=treatment_domain
+        )
+
+
+def test_extreme_finite_continuous_configuration_rejects_nonfinite_log_weights():
+    with pytest.raises(ValueError, match="at least one finite log weight"):
+        ContinuousSemiSyntheticDataset(
+            ToyRealDataset(),
+            treatment_domain="real",
+            confounding_strength=1e200,
+            randomized_weight=0.0,
+            random_state=7,
+        )
+
+
+def test_continuous_latent_mean_rejects_nonrepresentable_derived_values():
+    dataset = ContinuousSemiSyntheticDataset(ToyRealDataset(), random_state=7)
+    X, _, _ = dataset.load()
+
+    with pytest.raises(ValueError, match="latent treatment means must be finite"):
+        dataset._latent_mean(X, strength=np.finfo(float).max)
+
+
+def test_continuous_treatment_basis_rejects_nonrepresentable_derived_values():
+    dataset = ContinuousSemiSyntheticDataset(ToyRealDataset(), random_state=7)
+    X, _, _ = dataset.load()
+
+    with pytest.raises(ValueError, match="treatment basis must be finite"):
+        dataset.predict_y(X.head(1), np.array([[1e200]]))
+
+
+def test_continuous_oracle_rejects_nonrepresentable_outcome_means():
+    dataset = ContinuousSemiSyntheticDataset(ToyRealDataset(), random_state=7)
+    X, _, _ = dataset.load()
+    dataset.outcome_main_effects_.fill(np.finfo(float).max)
+
+    with pytest.raises(ValueError, match="Oracle outcome means must be finite"):
+        dataset.predict_y(X.head(1), dataset.get_grid(2).tail(1))
+
+
+def test_continuous_outcome_sampler_rejects_nonrepresentable_samples():
+    dataset = ContinuousSemiSyntheticDataset(ToyRealDataset(), random_state=7)
+    dataset.outcome_noise_scale = np.finfo(float).max
+    largest_finite_mean = np.full((1, 1), np.finfo(float).max)
+
+    with pytest.raises(ValueError, match="Sampled outcomes must be finite"):
+        dataset._sample_outcome(
+            largest_finite_mean,
+            None,
+            None,
+            np.random.default_rng(0),
+        )
+
+
 def test_continuous_target_bias_calibrates_strength():
     dataset = ContinuousSemiSyntheticDataset(
         ToyRealDataset(),

@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 import numpy as np
 import pandas as pd
 import polars as pl
@@ -8,7 +10,7 @@ from tests.datasets._semi_synthetic_test_utils import ToyRealDataset
 
 
 class ToySemiSyntheticDataset(BaseSemiSyntheticDataset):
-    column_types = {"t": "continuous"}
+    column_types: ClassVar = {"t": "continuous"}
 
     def _prepare_dgp(self, X, rng):
         self.offset_ = float(X.get_column("age").mean())
@@ -35,7 +37,7 @@ class ToySemiSyntheticDataset(BaseSemiSyntheticDataset):
 
 
 class PolarsOnlySemiSyntheticDataset(BaseSemiSyntheticDataset):
-    column_types = {"t": "continuous"}
+    column_types: ClassVar = {"t": "continuous"}
 
     def _prepare_dgp(self, X, rng):
         assert isinstance(X, pl.DataFrame)
@@ -106,7 +108,7 @@ def test_base_requires_a_dataset_object():
 
 def test_base_requires_predict_y_hook_before_construction():
     class MissingPredictYDataset(BaseSemiSyntheticDataset):
-        column_types = {"t": "continuous"}
+        column_types: ClassVar = {"t": "continuous"}
 
         def _prepare_dgp(self, X, rng):
             pass

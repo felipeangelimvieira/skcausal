@@ -126,3 +126,52 @@ def test_categorical_dgp_validates_configuration_and_unknown_levels():
     X, _, _ = dataset.load()
     unknown = pl.DataFrame({"t": ["unsupported"] * X.height})
     assert np.isneginf(dataset.log_prob(X, unknown)).all()
+
+
+@pytest.mark.parametrize(
+    "parameter",
+    [
+        "confounding_strength",
+        "target_confounding_bias",
+        "treatment_only_strength",
+        "randomized_weight",
+        "outcome_effect_scale",
+        "effect_heterogeneity_scale",
+        "outcome_noise_scale",
+    ],
+)
+@pytest.mark.parametrize("value", [np.nan, np.inf, -np.inf])
+def test_categorical_dgp_rejects_nonfinite_scalar_configuration(parameter, value):
+    with pytest.raises(ValueError, match=parameter):
+        CategoricalSemiSyntheticDataset(
+            ToyRealDataset(),
+            **{parameter: value},
+        )
+
+
+def test_categorical_inverse_cdf_closes_a_rounded_probability_undershoot(
+    monkeypatch,
+):
+    dataset = CategoricalSemiSyntheticDataset(
+        ToyRealDataset(), n_treatments=3, random_state=2
+    )
+    X, _, _ = dataset.load()
+    undershooting_probabilities = np.tile(
+        [0.1, 0.2, 0.6999999999999997],
+        (X.height, 1),
+    )
+
+    monkeypatch.setattr(
+        dataset,
+        "_probabilities",
+        lambda covariates: undershooting_probabilities,
+    )
+
+    class MaximumUniformGenerator:
+        @staticmethod
+        def random(size):
+            return np.full(size, np.nextafter(1.0, 0.0))
+
+    treatment = dataset._sample_treatment(X, MaximumUniformGenerator())
+
+    assert treatment.get_column("t").to_list() == ["2"] * X.height

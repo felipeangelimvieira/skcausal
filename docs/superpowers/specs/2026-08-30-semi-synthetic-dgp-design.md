@@ -2,8 +2,9 @@
 
 ## Status
 
-Approved in conversation on 2026-08-30. This document defines the design to be
-implemented; it does not describe the current package behavior.
+Approved in conversation on 2026-08-30 and amended by the final numerical-law
+ruling on the same date. This document defines the design to be implemented; it
+does not describe unrelated package behavior.
 
 ## Goal
 
@@ -304,19 +305,33 @@ ContinuousSemiSyntheticDataset(
 )
 ```
 
-The confounded latent treatment is Gaussian:
+Let the unconditioned confounded latent candidate be Gaussian:
 
 \[
-Z\mid X=x\sim N\!\left(
+Z_C^*\mid X=x\sim N\!\left(
 \alpha+\lambda b_C^\top q_C(x)+b_Z^\top q_Z(x),
 \sigma_A^2
 \right).
 \]
 
 `treatment_only_strength` scales the \(b_Z^\top q_Z\) contribution independently
-of \(\lambda\). With probability \(\omega\), a latent treatment is instead drawn
-from \(N(0,\sigma_A^2)\), independently of `X`. Both mixture components use the
-same configured transformation:
+of \(\lambda\). The unconditioned randomized candidate is
+\(Z_R^*\sim N(0,\sigma_A^2)\), independently of `X`. With probability
+\(1-\omega\) the assignment uses the confounded component and with probability
+\(\omega\) it uses the randomized component.
+
+For `treatment_domain="real"`, the candidates are used without conditioning:
+\(Z_C=Z_C^*\) and \(Z_R=Z_R^*\). For positive and bounded domains, let
+\(I_T=[z_{\min},z_{\max}]\) be the finite latent interval whose endpoints
+round-trip through the configured transform to finite, distinct, strictly
+interior IEEE-754 float treatments. Each component is conditioned separately:
+
+\[
+Z_C=(Z_C^*\mid Z_C^*\in I_T),\qquad
+Z_R=(Z_R^*\mid Z_R^*\in I_T).
+\]
+
+The selected latent component then uses the configured transformation:
 
 \[
 A=T(Z)=
@@ -328,9 +343,15 @@ L+(U-L)\operatorname{logistic}(Z), & \text{bounded }[L,U].
 \]
 
 `treatment_domain` accepts `"real"`, `"positive"`, or a finite `(lower, upper)`
-pair. `_log_prob` uses a stable log-mixture calculation and the exact
-change-of-variables Jacobian. It returns `-inf` outside the configured support.
-Treatments are never clipped.
+pair with at least two distinct representable interior treatment values.
+`_sample_treatment` and `_log_prob` use the same unconditioned law for the real
+domain and the same component-wise conditioned law for transformed domains.
+The latter includes each truncated-Gaussian normalization constant, followed by
+a stable log-mixture calculation and the exact change-of-variables Jacobian.
+`_log_prob` returns `-inf` outside the configured representable support.
+Treatments are never clipped. Thus the positive and bounded numerical law is
+explicitly a Gaussian conditioned on representably invertible float support,
+not an ideal real-number Gaussian transformed first and repaired afterward.
 
 The default continuous treatment basis contains standardized linear,
 quadratic, sinusoidal, and hinge terms over a frozen central intervention
@@ -474,11 +495,12 @@ schema; extra or missing columns receive a clear validation error rather than
 being silently reordered or discarded.
 
 Concrete DGPs validate category counts, probability vectors, domain bounds,
-nonnegative confounding/effect/outcome-noise scales, strictly positive
-continuous treatment noise, and `randomized_weight` in `[0, 1]`. Treatment
-outputs use their declared dynamic `column_types` so the categorical and
-continuous DGPs participate correctly in the existing datatype and discovery
-machinery.
+finite nonnegative confounding/effect/outcome-noise scales, strictly positive
+finite continuous treatment noise, and finite `randomized_weight` in `[0, 1]`.
+Bounded domains must also yield strictly ordered latent bounds that round-trip
+to distinct representable interior treatments. Treatment outputs use their
+declared dynamic `column_types` so the categorical and continuous DGPs
+participate correctly in the existing datatype and discovery machinery.
 
 ## Files and Exports
 
@@ -509,8 +531,10 @@ Tests must cover:
 5. Replication reproducibility and non-mutation of `load()` outputs.
 6. Categorical probability normalization and target marginal calibration.
 7. Categorical randomized assignment at `randomized_weight=1`.
-8. Continuous density normalization for real, positive, and bounded domains.
-9. Exact mixture log-probabilities and support behavior.
+8. Continuous density normalization for the unconditioned real law and the
+   representably conditioned positive and bounded laws.
+9. Exact mixture log-probabilities, transformed-domain truncation constants,
+   and support behavior.
 10. Agreement between `predict_y` and the generated Gaussian conditional mean.
 11. Confounding-target calibration within numerical tolerance.
 12. Clear failures for invalid source data, parameters, schemas, and treatments.

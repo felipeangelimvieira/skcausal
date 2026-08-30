@@ -105,6 +105,11 @@ def test_log_mixture_and_normalized_weights_are_stable():
     np.testing.assert_allclose(weights.sum(), 1.0)
 
 
+def test_normalized_log_weights_rejects_when_no_log_weight_is_finite():
+    with pytest.raises(ValueError, match="at least one finite log weight"):
+        _normalized_log_weights(np.array([-np.inf, -np.inf]))
+
+
 def test_strength_calibration_finds_crossing_and_rejects_unreachable_target():
     strength, achieved = _calibrate_confounding_strength(
         metric=lambda value: value**2,

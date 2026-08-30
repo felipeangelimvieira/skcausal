@@ -294,7 +294,8 @@ def _calibrate_softmax_intercepts(logits, target):
 
 
 def _normal_logpdf(value, location, scale):
-    return -0.5 * ((value - location) / scale) ** 2 - np.log(scale) - 0.5 * _LOG_2PI
+    with np.errstate(over="ignore", invalid="ignore"):
+        return -0.5 * ((value - location) / scale) ** 2 - np.log(scale) - 0.5 * _LOG_2PI
 
 
 def _log_mixture(left, right, weight):
@@ -306,9 +307,23 @@ def _log_mixture(left, right, weight):
 
 
 def _normalized_log_weights(log_values):
+    log_values = np.asarray(log_values, dtype=float)
+    if (
+        log_values.size == 0
+        or not np.isfinite(log_values).any()
+        or np.isnan(log_values).any()
+        or np.isposinf(log_values).any()
+    ):
+        raise ValueError(
+            "Normalized log weights require at least one finite log weight and "
+            "cannot contain NaN or positive infinity."
+        )
     shifted = log_values - np.max(log_values)
     weights = np.exp(shifted)
-    return weights / weights.sum()
+    total = weights.sum()
+    if not np.isfinite(total) or total <= 0.0:
+        raise ValueError("Normalized log weights must have a finite positive sum.")
+    return weights / total
 
 
 def _calibrate_confounding_strength(metric, target, initial_strength):

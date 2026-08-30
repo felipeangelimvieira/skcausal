@@ -57,15 +57,17 @@ class CategoricalSemiSyntheticDataset(BaseSemiSyntheticDataset):
             "effect_heterogeneity_scale": effect_heterogeneity_scale,
             "outcome_noise_scale": outcome_noise_scale,
         }.items():
-            if float(value) < 0.0:
-                raise ValueError(f"{name} must be nonnegative.")
+            if not np.isfinite(float(value)) or float(value) < 0.0:
+                raise ValueError(f"{name} must be finite and nonnegative.")
         if target_confounding_bias is not None and (
             not np.isfinite(float(target_confounding_bias))
             or float(target_confounding_bias) < 0.0
         ):
-            raise ValueError("target_confounding_bias must be nonnegative.")
-        if not 0.0 <= float(randomized_weight) <= 1.0:
-            raise ValueError("randomized_weight must be between 0 and 1.")
+            raise ValueError("target_confounding_bias must be finite and nonnegative.")
+        if not np.isfinite(float(randomized_weight)) or not (
+            0.0 <= float(randomized_weight) <= 1.0
+        ):
+            raise ValueError("randomized_weight must be finite and between 0 and 1.")
         self.n_treatments = n_treatments
         self.target_probabilities = target_probabilities
         self.confounding_strength = confounding_strength
@@ -209,7 +211,9 @@ class CategoricalSemiSyntheticDataset(BaseSemiSyntheticDataset):
     def _sample_treatment(self, X, rng):
         probabilities = self._probabilities(X)
         uniforms = rng.random(probabilities.shape[0])
-        indices = (uniforms[:, None] > np.cumsum(probabilities, axis=1)).sum(axis=1)
+        cdf = np.cumsum(probabilities, axis=1)
+        cdf[:, -1] = 1.0
+        indices = (uniforms[:, None] > cdf).sum(axis=1)
         levels = np.asarray(self.treatment_levels_, dtype=str)[indices]
         return pl.DataFrame({"t": levels})
 
