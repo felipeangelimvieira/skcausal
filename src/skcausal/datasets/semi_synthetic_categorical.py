@@ -5,6 +5,7 @@ import polars as pl
 
 from skcausal.datasets.semi_synthetic import (
     BaseSemiSyntheticDataset,
+    _calibrate_confounding_strength,
     _calibrate_softmax_intercepts,
     _fit_baseline_surface,
     _fit_causal_score_map,
@@ -23,6 +24,7 @@ class CategoricalSemiSyntheticDataset(BaseSemiSyntheticDataset):
         n_treatments=2,
         target_probabilities=None,
         confounding_strength=1.0,
+        target_confounding_bias=None,
         treatment_only_strength=1.0,
         randomized_weight=0.1,
         outcome_effect_scale=1.0,
@@ -57,11 +59,17 @@ class CategoricalSemiSyntheticDataset(BaseSemiSyntheticDataset):
         }.items():
             if float(value) < 0.0:
                 raise ValueError(f"{name} must be nonnegative.")
+        if target_confounding_bias is not None and (
+            not np.isfinite(float(target_confounding_bias))
+            or float(target_confounding_bias) < 0.0
+        ):
+            raise ValueError("target_confounding_bias must be nonnegative.")
         if not 0.0 <= float(randomized_weight) <= 1.0:
             raise ValueError("randomized_weight must be between 0 and 1.")
         self.n_treatments = n_treatments
         self.target_probabilities = target_probabilities
         self.confounding_strength = confounding_strength
+        self.target_confounding_bias = target_confounding_bias
         self.treatment_only_strength = treatment_only_strength
         self.randomized_weight = randomized_weight
         self.outcome_effect_scale = outcome_effect_scale
@@ -99,10 +107,46 @@ class CategoricalSemiSyntheticDataset(BaseSemiSyntheticDataset):
             size=(self.n_treatments - 1, 2),
         )
 
-        self.confounding_strength_ = self.confounding_strength
-        logits = self._confounded_logits(X, self.confounding_strength_)
-        self.assignment_intercepts_ = _calibrate_softmax_intercepts(
-            logits, self.target_probabilities_
+        self._source_category_outcome_means = np.column_stack(
+            [
+                self.source_mu0_,
+                self.source_mu0_[:, None]
+                + self.outcome_main_effects_[None, :]
+                + self.source_scores_.modifiers @ self.outcome_modifier_coefficients_.T,
+            ]
+        )
+
+        if self.baseline_standard_deviation_ == 0.0:
+            raise ValueError(
+                "Categorical confounding bias cannot be normalized because the "
+                "baseline standard deviation is zero."
+            )
+        if (
+            self.randomized_weight == 1.0
+            and self.target_confounding_bias is not None
+            and float(self.target_confounding_bias) > 0.0
+        ):
+            raise ValueError(
+                "A positive target_confounding_bias is unattainable for a fully "
+                "randomized assignment."
+            )
+
+        if self.target_confounding_bias is None:
+            self.confounding_strength_ = self.confounding_strength
+        elif self.randomized_weight == 1.0:
+            self.confounding_strength_ = 0.0
+        else:
+            self.confounding_strength_, _ = _calibrate_confounding_strength(
+                lambda strength: self._bias_at_strength(X, strength)[1],
+                float(self.target_confounding_bias),
+                self.confounding_strength,
+            )
+
+        _, self.assignment_intercepts_ = self._probabilities_at_strength(
+            X, self.confounding_strength_
+        )
+        self.confounding_bias_, self.confounding_bias_ratio_ = self._bias_at_strength(
+            X, self.confounding_strength_
         )
 
     def _check_and_transform_X(self, covariates):
@@ -129,10 +173,34 @@ class CategoricalSemiSyntheticDataset(BaseSemiSyntheticDataset):
             + self.treatment_only_strength * treatment_only
         )
 
+    def _probabilities_at_strength(self, X, strength):
+        logits = self._confounded_logits(X, strength)
+        intercepts = _calibrate_softmax_intercepts(logits, self.target_probabilities_)
+        confounded = _softmax(logits + intercepts)
+        probabilities = (
+            1.0 - self.randomized_weight
+        ) * confounded + self.randomized_weight * self.target_probabilities_
+        return probabilities, intercepts
+
+    def _bias_at_strength(self, X, strength):
+        if self.randomized_weight == 1.0:
+            return 0.0, 0.0
+        probabilities, _ = self._probabilities_at_strength(X, strength)
+        causal_means = self._source_category_outcome_means.mean(axis=0)
+        observational_means = (probabilities * self._source_category_outcome_means).sum(
+            axis=0
+        ) / probabilities.sum(axis=0)
+        distortions = observational_means - causal_means
+        bias = float(np.ptp(distortions))
+        return bias, bias / self.baseline_standard_deviation_
+
     def _probabilities(self, X, strength=None):
-        strength = self.confounding_strength_ if strength is None else strength
+        if strength is not None:
+            probabilities, _ = self._probabilities_at_strength(X, strength)
+            return probabilities
         confounded = _softmax(
-            self._confounded_logits(X, strength) + self.assignment_intercepts_
+            self._confounded_logits(X, self.confounding_strength_)
+            + self.assignment_intercepts_
         )
         return (
             1.0 - self.randomized_weight

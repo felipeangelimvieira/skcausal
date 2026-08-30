@@ -57,6 +57,47 @@ def test_categorical_randomized_component_is_independent_of_X():
     )
 
 
+def test_categorical_target_bias_calibrates_strength_without_changing_marginal():
+    dataset = CategoricalSemiSyntheticDataset(
+        ToyRealDataset(),
+        n_treatments=3,
+        target_probabilities=[0.3, 0.4, 0.3],
+        confounding_strength=1.0,
+        target_confounding_bias=0.35,
+        treatment_only_strength=0.0,
+        randomized_weight=0.1,
+        random_state=21,
+    )
+    X, _, _ = dataset.load()
+    probabilities = _all_level_probabilities(dataset, X)
+
+    np.testing.assert_allclose(dataset.confounding_bias_ratio_, 0.35, atol=2e-3)
+    np.testing.assert_allclose(probabilities.mean(axis=0), [0.3, 0.4, 0.3], atol=1e-9)
+    assert dataset.confounding_strength_ >= 0.0
+
+
+def test_fully_randomized_categorical_assignment_has_zero_oracle_bias():
+    dataset = CategoricalSemiSyntheticDataset(
+        ToyRealDataset(), randomized_weight=1.0, random_state=8
+    )
+
+    np.testing.assert_allclose(dataset.confounding_bias_ratio_, 0.0, atol=1e-12)
+
+
+def test_categorical_target_bias_must_be_nonnegative():
+    with pytest.raises(ValueError, match="target_confounding_bias"):
+        CategoricalSemiSyntheticDataset(ToyRealDataset(), target_confounding_bias=-0.1)
+
+
+def test_fully_randomized_categorical_assignment_rejects_positive_target_bias():
+    with pytest.raises(ValueError, match="unattainable.*fully randomized"):
+        CategoricalSemiSyntheticDataset(
+            ToyRealDataset(),
+            randomized_weight=1.0,
+            target_confounding_bias=0.1,
+        )
+
+
 def test_categorical_outcome_oracle_accepts_all_backends():
     dataset = CategoricalSemiSyntheticDataset(
         ToyRealDataset(), outcome_noise_scale=0.0, random_state=12
