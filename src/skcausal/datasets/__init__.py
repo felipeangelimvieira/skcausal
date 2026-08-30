@@ -1,5 +1,3 @@
-from importlib import import_module
-
 from .categorical import ExampleCategorical
 from .ihdp import IHDPContinuous
 from .kang_schafer import (
@@ -10,13 +8,19 @@ from .kang_schafer import (
 )
 from .meta_multidim import MetaMultidimDataset
 from .nurse_staffing import NurseStaffing
+from .semi_synthetic import BaseSemiSyntheticDataset
+from .semi_synthetic_categorical import CategoricalSemiSyntheticDataset
 from .semi_synthetic_classifier import SemiSyntheticClassifier
+from .semi_synthetic_continuous import ContinuousSemiSyntheticDataset
 from .semi_synthetic_regressor import SemiSyntheticRegressor
-from .synthetic_vcnet import SyntheticVCNet
 from .synthetic2 import SyntheticDataset2, SyntheticDataset2Discrete
 from .synthetic2_multidim import Synthetic2MultidimDataset
+from .synthetic_vcnet import SyntheticVCNet
 
 __all__ = [
+    "BaseSemiSyntheticDataset",
+    "CategoricalSemiSyntheticDataset",
+    "ContinuousSemiSyntheticDataset",
     "ExampleCategorical",
     "IHDPContinuous",
     "KangSchaferBinary",
@@ -27,8 +31,8 @@ __all__ = [
     "NurseStaffing",
     "SemiSyntheticClassifier",
     "SemiSyntheticRegressor",
-    "SyntheticVCNet",
+    "Synthetic2MultidimDataset",
     "SyntheticDataset2",
     "SyntheticDataset2Discrete",
-    "Synthetic2MultidimDataset",
+    "SyntheticVCNet",
 ]
