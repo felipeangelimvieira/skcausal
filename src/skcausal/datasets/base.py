@@ -420,7 +420,7 @@ class BaseSyntheticDataset(BaseDataset):
 
         curve = []
         for treatment in treatment_rows:
-            treatment_array = np.asarray(treatment, dtype=object)
+            treatment_array = np.asarray(treatment)
             if treatment_array.ndim == 0:
                 tiled_treatments = np.full(covariate_count, treatment_array.item())
             else:

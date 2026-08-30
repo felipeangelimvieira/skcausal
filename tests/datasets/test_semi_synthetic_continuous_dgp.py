@@ -33,6 +33,25 @@ def test_real_continuous_density_integrates_and_outcome_oracle_matches_noise_fre
     assert dataset.get_grid(11).shape == (11, 1)
 
 
+def test_continuous_predict_curve_preserves_numeric_treatment_dtype():
+    dataset = ContinuousSemiSyntheticDataset(ToyRealDataset(), random_state=5)
+    X, _, _ = dataset.load()
+    grid = dataset.get_grid(7)
+    expected = np.array(
+        [
+            dataset.predict_y(
+                X,
+                np.full((X.height, 1), intervention),
+            ).mean()
+            for intervention in grid.get_column("t")
+        ]
+    )
+
+    actual = dataset.predict(X, grid)
+
+    np.testing.assert_allclose(actual, expected)
+
+
 def test_positive_and_bounded_domains_have_exact_support_and_normalized_density():
     positive = ContinuousSemiSyntheticDataset(
         ToyRealDataset(), treatment_domain="positive", random_state=6
