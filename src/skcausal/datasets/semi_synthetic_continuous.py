@@ -7,10 +7,12 @@ import polars as pl
 
 from skcausal.datasets.semi_synthetic import (
     BaseSemiSyntheticDataset,
+    _calibrate_confounding_strength,
     _fit_baseline_surface,
     _fit_causal_score_map,
     _log_mixture,
     _normal_logpdf,
+    _normalized_log_weights,
 )
 
 __all__ = ["ContinuousSemiSyntheticDataset"]
@@ -153,6 +155,7 @@ class ContinuousSemiSyntheticDataset(BaseSemiSyntheticDataset):
         real_dataset,
         treatment_domain="real",
         confounding_strength=1.0,
+        target_confounding_bias=None,
         treatment_only_strength=1.0,
         randomized_weight=0.1,
         treatment_noise_scale=1.0,
@@ -190,6 +193,11 @@ class ContinuousSemiSyntheticDataset(BaseSemiSyntheticDataset):
         }.items():
             if not np.isfinite(float(value)) or float(value) < 0.0:
                 raise ValueError(f"{name} must be nonnegative.")
+        if target_confounding_bias is not None and (
+            not np.isfinite(float(target_confounding_bias))
+            or float(target_confounding_bias) < 0.0
+        ):
+            raise ValueError("target_confounding_bias must be nonnegative.")
         if not np.isfinite(float(randomized_weight)) or not (
             0.0 <= float(randomized_weight) <= 1.0
         ):
@@ -197,6 +205,7 @@ class ContinuousSemiSyntheticDataset(BaseSemiSyntheticDataset):
 
         self.treatment_domain = treatment_domain
         self.confounding_strength = confounding_strength
+        self.target_confounding_bias = target_confounding_bias
         self.treatment_only_strength = treatment_only_strength
         self.randomized_weight = randomized_weight
         self.treatment_noise_scale = treatment_noise_scale
@@ -242,6 +251,51 @@ class ContinuousSemiSyntheticDataset(BaseSemiSyntheticDataset):
         self.reference_treatment_basis_ = self._standardized_treatment_basis(
             np.zeros(1)
         )[0]
+
+        self._bias_grid_ = self._get_grid(31)
+        self._source_grid_outcome_means_ = np.vstack(
+            [
+                self._predict_y(
+                    X,
+                    pl.DataFrame(
+                        {
+                            "t": np.full(
+                                X.height,
+                                intervention,
+                            )
+                        }
+                    ),
+                )
+                for intervention in self._bias_grid_.get_column("t")
+            ]
+        )
+        if self.baseline_standard_deviation_ == 0.0:
+            raise ValueError(
+                "Continuous confounding bias cannot be normalized because the "
+                "baseline standard deviation is zero."
+            )
+        if (
+            self.randomized_weight == 1.0
+            and self.target_confounding_bias is not None
+            and float(self.target_confounding_bias) > 0.0
+        ):
+            raise ValueError(
+                "A positive target_confounding_bias is unattainable for a fully "
+                "randomized assignment."
+            )
+        if self.target_confounding_bias is None:
+            self.confounding_strength_ = self.confounding_strength
+        elif self.randomized_weight == 1.0:
+            self.confounding_strength_ = 0.0
+        else:
+            self.confounding_strength_, _ = _calibrate_confounding_strength(
+                lambda strength: self._bias_at_strength(X, strength)[1],
+                float(self.target_confounding_bias),
+                self.confounding_strength,
+            )
+        self.confounding_bias_, self.confounding_bias_ratio_ = self._bias_at_strength(
+            X, self.confounding_strength_
+        )
 
     def _check_and_transform_X(self, covariates):
         if isinstance(covariates, np.ndarray):
@@ -372,7 +426,7 @@ class ContinuousSemiSyntheticDataset(BaseSemiSyntheticDataset):
             )
         return pl.DataFrame({"t": self._forward_transform(latent)})
 
-    def _log_prob(self, X, treatment):
+    def _log_prob_at_strength(self, X, treatment, strength):
         values = treatment.get_column("t").to_numpy().astype(float, copy=False)
         valid = self._valid_treatment(values)
         log_density = np.full(values.shape, -np.inf, dtype=float)
@@ -392,14 +446,14 @@ class ContinuousSemiSyntheticDataset(BaseSemiSyntheticDataset):
         if self.treatment_domain == "real":
             confounded = _normal_logpdf(
                 latent,
-                self._latent_mean(X)[valid_indices],
+                self._latent_mean(X, strength)[valid_indices],
                 self.treatment_noise_scale,
             )
             randomized = _normal_logpdf(latent, 0.0, self.treatment_noise_scale)
         else:
             confounded = _truncated_normal_logpdf(
                 latent,
-                self._latent_mean(X)[valid_indices],
+                self._latent_mean(X, strength)[valid_indices],
                 self.treatment_noise_scale,
                 lower,
                 upper,
@@ -417,6 +471,24 @@ class ContinuousSemiSyntheticDataset(BaseSemiSyntheticDataset):
             self.randomized_weight,
         ) + self._log_abs_inverse_jacobian(values[valid_indices])
         return log_density
+
+    def _log_prob(self, X, treatment):
+        return self._log_prob_at_strength(X, treatment, self.confounding_strength_)
+
+    def _bias_at_strength(self, X, strength):
+        if self.randomized_weight == 1.0:
+            return 0.0, 0.0
+
+        distortions = []
+        for intervention, outcome_means in zip(
+            self._bias_grid_.get_column("t"), self._source_grid_outcome_means_
+        ):
+            treatment = pl.DataFrame({"t": np.full(X.height, intervention)})
+            log_density = self._log_prob_at_strength(X, treatment, strength)
+            weights = _normalized_log_weights(log_density)
+            distortions.append(weights @ outcome_means - outcome_means.mean())
+        bias = float(np.sqrt(np.mean(np.square(distortions))))
+        return bias, bias / self.baseline_standard_deviation_
 
     def _raw_treatment_basis(self, latent):
         latent = np.asarray(latent, dtype=float).reshape(-1)

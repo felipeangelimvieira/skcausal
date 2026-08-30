@@ -363,3 +363,68 @@ def test_continuous_dgp_rejects_invalid_domains_and_noise():
         ContinuousSemiSyntheticDataset(ToyRealDataset(), treatment_domain=(2.0, -1.0))
     with pytest.raises(ValueError, match="treatment_noise_scale"):
         ContinuousSemiSyntheticDataset(ToyRealDataset(), treatment_noise_scale=0.0)
+
+
+def test_continuous_target_bias_calibrates_strength():
+    dataset = ContinuousSemiSyntheticDataset(
+        ToyRealDataset(),
+        target_confounding_bias=0.25,
+        treatment_only_strength=0.0,
+        randomized_weight=0.15,
+        treatment_noise_scale=1.2,
+        random_state=18,
+    )
+
+    np.testing.assert_allclose(dataset.confounding_bias_ratio_, 0.25, atol=2e-3)
+    assert dataset.confounding_strength_ >= 0.0
+    assert dataset.confounding_bias_ >= 0.0
+
+
+def test_continuous_fixed_strength_bias_uses_frozen_grid_rms_discrepancy():
+    dataset = ContinuousSemiSyntheticDataset(
+        ToyRealDataset(),
+        confounding_strength=0.75,
+        treatment_only_strength=0.0,
+        randomized_weight=0.2,
+        random_state=19,
+    )
+    X, _, _ = dataset.load()
+    distortions = []
+    for intervention in dataset.get_grid(31).get_column("t"):
+        repeated_treatment = np.full((X.height, 1), intervention)
+        outcome_means = dataset.predict_y(X, repeated_treatment)[:, 0]
+        log_density = dataset.log_prob(X, repeated_treatment)[:, 0]
+        weights = np.exp(log_density - np.max(log_density))
+        weights /= weights.sum()
+        distortions.append(weights @ outcome_means - outcome_means.mean())
+    expected_bias = np.sqrt(np.mean(np.square(distortions)))
+
+    np.testing.assert_allclose(dataset.confounding_strength_, 0.75)
+    np.testing.assert_allclose(dataset.confounding_bias_, expected_bias)
+    np.testing.assert_allclose(
+        dataset.confounding_bias_ratio_,
+        expected_bias / dataset.baseline_standard_deviation_,
+    )
+
+
+def test_fully_randomized_continuous_assignment_has_zero_oracle_bias():
+    dataset = ContinuousSemiSyntheticDataset(
+        ToyRealDataset(), randomized_weight=1.0, random_state=20
+    )
+
+    np.testing.assert_allclose(dataset.confounding_bias_, 0.0, atol=1e-12)
+    np.testing.assert_allclose(dataset.confounding_bias_ratio_, 0.0, atol=1e-12)
+
+    with pytest.raises(ValueError, match="unattainable"):
+        ContinuousSemiSyntheticDataset(
+            ToyRealDataset(),
+            target_confounding_bias=0.1,
+            randomized_weight=1.0,
+            random_state=20,
+        )
+
+
+@pytest.mark.parametrize("target", [-0.1, np.inf, np.nan])
+def test_continuous_dgp_rejects_invalid_target_confounding_bias(target):
+    with pytest.raises(ValueError, match="target_confounding_bias"):
+        ContinuousSemiSyntheticDataset(ToyRealDataset(), target_confounding_bias=target)
