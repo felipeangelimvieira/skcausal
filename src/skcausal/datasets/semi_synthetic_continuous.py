@@ -80,6 +80,12 @@ def _standard_normal_log_interval(lower, upper):
         return _standard_normal_logcdf(upper)
     if upper == np.inf:
         return _standard_normal_logcdf(-lower)
+
+    width = upper - lower
+    midpoint = 0.5 * lower + 0.5 * upper
+    if width * max(1.0, abs(midpoint)) <= np.sqrt(np.finfo(float).eps):
+        return math.log(width) - 0.5 * midpoint * midpoint - _HALF_LOG_2PI
+
     if upper <= 0.0:
         return _log_difference(
             _standard_normal_logcdf(upper), _standard_normal_logcdf(lower)

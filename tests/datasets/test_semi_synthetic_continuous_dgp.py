@@ -268,6 +268,45 @@ def test_bounded_log_density_is_negative_infinity_outside_restricted_latent_supp
     assert np.isneginf(bounded.log_prob(X_bounded.head(1), bounded_edge)[0, 0])
 
 
+@pytest.mark.parametrize(
+    (
+        "treatment_domain",
+        "noise_scale",
+        "reference_treatment",
+        "reference_log_jacobian",
+    ),
+    [
+        ((-2.0, 3.0), 1e18, 0.5, np.log(0.8)),
+        ("positive", 1e19, 1.0, 0.0),
+    ],
+)
+def test_narrow_standardized_support_has_finite_uniform_limit_and_nontrivial_samples(
+    treatment_domain, noise_scale, reference_treatment, reference_log_jacobian
+):
+    dataset = ContinuousSemiSyntheticDataset(
+        ToyRealDataset(),
+        treatment_domain=treatment_domain,
+        treatment_noise_scale=noise_scale,
+        random_state=7,
+    )
+    X, treatment, _ = dataset.load()
+    lower, upper = dataset.latent_support_bounds_
+    support_width = upper - lower
+    latent = dataset._inverse_transform(treatment.get_column("t").to_numpy())
+    sample_quantiles = (latent - lower) / support_width
+
+    assert support_width / noise_scale < np.finfo(float).eps
+    assert np.unique(latent).size > 4
+    assert np.ptp(sample_quantiles) > 0.2
+
+    reference = np.full((X.height, 1), reference_treatment)
+    expected = -np.log(support_width) + reference_log_jacobian
+    actual = dataset.log_prob(X, reference)[:, 0]
+
+    assert np.isfinite(actual).all()
+    np.testing.assert_allclose(actual, expected, atol=1e-12, rtol=0.0)
+
+
 def test_continuous_randomized_assignment_density_is_independent_of_x():
     dataset = ContinuousSemiSyntheticDataset(
         ToyRealDataset(), randomized_weight=1.0, random_state=10

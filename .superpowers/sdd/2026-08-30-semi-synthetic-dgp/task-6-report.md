@@ -348,3 +348,74 @@ uv run pytest -q
 
 Result: `137 passed in 1.91s`; full suite `774 passed, 419 warnings in 7.55s`.
 Warning classes match the existing baseline.
+
+## Fix round 3 — narrow standardized truncation intervals
+
+### Root cause and RED evidence
+
+The crossing-zero branch of `_standard_normal_log_interval` computed
+`1 - (left_tail + right_tail)` in ordinary probability space. When latent
+support width divided by treatment noise was below machine epsilon, both tails
+rounded to `0.5`; the interval log mass became `-inf`. Sampling then collapsed
+to a support edge and component likelihoods used a corrupted normalizer.
+
+A parameterized bounded/positive regression was added first. The final RED
+fixture uses bounded noise `1e18` and positive noise `1e19`, ensuring both
+standardized support widths are below Float64 epsilon:
+
+```text
+uv run pytest tests/datasets/test_semi_synthetic_continuous_dgp.py::test_narrow_standardized_support_has_finite_uniform_limit_and_nontrivial_samples -q
+```
+
+Result before the fix: `2 failed, 2 warnings in 1.05s`. The bounded sample had
+one unique inverse treatment across all eight rows. The positive sample varied,
+but its log-density missed the hand-derived uniform limit by `0.64902786`.
+Both paths emitted divide-by-zero from the rounded crossing-zero subtraction.
+
+### Minimal implementation
+
+For finite intervals satisfying
+
+```text
+width * max(1, abs(midpoint)) <= sqrt(machine epsilon)
+```
+
+the shared interval primitive now evaluates the midpoint log integral directly:
+
+```text
+log(width) - midpoint**2 / 2 - log(sqrt(2*pi))
+```
+
+In this activation regime, variation of the standard-normal log density across
+the interval is at most `sqrt(epsilon)`, so midpoint quadrature error is at
+machine precision. This avoids subtracting rounded CDF/tail values and is used
+unchanged by both inverse-CDF sampling and truncated-component likelihoods.
+Ordinary-width and one-sided-tail branches are untouched; no dependency was
+added.
+
+### GREEN and final verification
+
+```text
+uv run pytest tests/datasets/test_semi_synthetic_continuous_dgp.py::test_narrow_standardized_support_has_finite_uniform_limit_and_nontrivial_samples -q
+uv run pytest tests/datasets/test_semi_synthetic_continuous_dgp.py -q
+```
+
+Results: `2 passed in 1.22s`; `18 passed in 1.60s`. Both domains produce more
+than four distinct inverse treatments with nontrivial quantile spread, finite
+densities, and the uniform-limit log-density within absolute tolerance `1e-12`.
+
+```text
+uv run ruff format src/skcausal/datasets/semi_synthetic_continuous.py tests/datasets/test_semi_synthetic_continuous_dgp.py
+uv run ruff check src/skcausal/datasets/semi_synthetic_continuous.py tests/datasets/test_semi_synthetic_continuous_dgp.py
+uv run pytest tests/datasets/test_semi_synthetic_continuous_dgp.py tests/datasets/test_semi_synthetic_base.py tests/datasets/test_semi_synthetic_helpers.py -q
+```
+
+Result: `2 files left unchanged`; `All checks passed!`; `34 passed in 1.61s`.
+
+```text
+uv run pytest tests/datasets/test_all_datasets.py tests/datasets/test_semi_synthetic_categorical_dgp.py tests/datasets/test_semi_synthetic_regressor.py tests/datasets/test_semi_synthetic_classifier.py -q
+uv run pytest -q
+```
+
+Result: `137 passed in 1.86s`; full suite `776 passed, 419 warnings in 5.51s`.
+Warning classes match the existing baseline.
