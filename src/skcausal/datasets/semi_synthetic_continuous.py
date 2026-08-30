@@ -14,6 +14,25 @@ from skcausal.datasets.semi_synthetic import (
 
 __all__ = ["ContinuousSemiSyntheticDataset"]
 
+_FLOAT_MAX = np.finfo(float).max
+_SMALLEST_POSITIVE_FLOAT = np.nextafter(0.0, 1.0)
+
+
+def _log_positive_difference(upper, lower):
+    upper, lower = np.broadcast_arrays(
+        np.asarray(upper, dtype=float), np.asarray(lower, dtype=float)
+    )
+    with np.errstate(over="ignore"):
+        difference = upper - lower
+    result = np.log(difference)
+    overflow = np.isposinf(difference)
+    if overflow.any():
+        result = np.asarray(result)
+        result[overflow] = np.logaddexp(
+            np.log(upper[overflow]), np.log(-lower[overflow])
+        )
+    return result
+
 
 class ContinuousSemiSyntheticDataset(BaseSemiSyntheticDataset):
     column_types: ClassVar = {"t": "continuous"}
@@ -126,7 +145,9 @@ class ContinuousSemiSyntheticDataset(BaseSemiSyntheticDataset):
         if self.treatment_domain == "real":
             return latent.copy()
         if self.treatment_domain == "positive":
-            return np.exp(latent)
+            with np.errstate(over="ignore", under="ignore"):
+                treatment = np.exp(latent)
+            return np.clip(treatment, _SMALLEST_POSITIVE_FLOAT, _FLOAT_MAX)
 
         lower, upper = map(float, self.treatment_domain)
         unit = np.empty_like(latent)
@@ -134,7 +155,14 @@ class ContinuousSemiSyntheticDataset(BaseSemiSyntheticDataset):
         unit[nonnegative] = 1.0 / (1.0 + np.exp(-latent[nonnegative]))
         exponentiated = np.exp(latent[~nonnegative])
         unit[~nonnegative] = exponentiated / (1.0 + exponentiated)
-        return lower + (upper - lower) * unit
+        treatment = (1.0 - unit) * lower + unit * upper
+        interior_lower = np.nextafter(lower, upper)
+        interior_upper = np.nextafter(upper, lower)
+        if interior_lower > interior_upper:
+            raise ValueError(
+                "treatment_domain must contain a representable interior value."
+            )
+        return np.clip(treatment, interior_lower, interior_upper)
 
     def _inverse_transform(self, treatment):
         treatment = np.asarray(treatment, dtype=float)
@@ -144,8 +172,9 @@ class ContinuousSemiSyntheticDataset(BaseSemiSyntheticDataset):
             return np.log(treatment)
 
         lower, upper = map(float, self.treatment_domain)
-        unit = (treatment - lower) / (upper - lower)
-        return np.log(unit) - np.log1p(-unit)
+        return _log_positive_difference(treatment, lower) - _log_positive_difference(
+            upper, treatment
+        )
 
     def _log_abs_inverse_jacobian(self, treatment):
         treatment = np.asarray(treatment, dtype=float)
@@ -155,8 +184,11 @@ class ContinuousSemiSyntheticDataset(BaseSemiSyntheticDataset):
             return -np.log(treatment)
 
         lower, upper = map(float, self.treatment_domain)
-        unit = (treatment - lower) / (upper - lower)
-        return -np.log(upper - lower) - np.log(unit) - np.log1p(-unit)
+        return (
+            _log_positive_difference(upper, lower)
+            - _log_positive_difference(treatment, lower)
+            - _log_positive_difference(upper, treatment)
+        )
 
     def _valid_treatment(self, treatment):
         treatment = np.asarray(treatment, dtype=float)

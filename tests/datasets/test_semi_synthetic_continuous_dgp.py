@@ -98,6 +98,95 @@ def test_bounded_log_density_matches_exact_latent_mixture_and_jacobian():
     )
 
 
+def test_bounded_log_density_is_exact_at_representable_support_edges():
+    lower, upper = -2.0, 3.0
+    dataset = ContinuousSemiSyntheticDataset(
+        ToyRealDataset(),
+        treatment_domain=(lower, upper),
+        randomized_weight=0.25,
+        treatment_noise_scale=1.3,
+        random_state=17,
+    )
+    X, _, _ = dataset.load()
+    treatment_values = np.array(
+        [np.nextafter(lower, np.inf), np.nextafter(upper, -np.inf)]
+    )
+    repeated_X = np.repeat(X.to_numpy()[:1], treatment_values.size, axis=0)
+
+    left_distance = treatment_values - lower
+    right_distance = upper - treatment_values
+    latent = np.log(left_distance) - np.log(right_distance)
+    inverse_log_jacobian = (
+        np.log(upper - lower) - np.log(left_distance) - np.log(right_distance)
+    )
+    confounded_location = np.repeat(
+        dataset.confounding_strength * dataset.source_confounding_signal_[0]
+        + dataset.treatment_only_strength
+        * (
+            dataset.source_scores_.treatment_only[0]
+            @ dataset.treatment_only_coefficients_
+        ),
+        treatment_values.size,
+    )
+    log_normalizer = np.log(dataset.treatment_noise_scale) + 0.5 * np.log(2.0 * np.pi)
+    confounded_log_density = (
+        -0.5 * ((latent - confounded_location) / dataset.treatment_noise_scale) ** 2
+        - log_normalizer
+    )
+    randomized_log_density = (
+        -0.5 * (latent / dataset.treatment_noise_scale) ** 2 - log_normalizer
+    )
+    expected = (
+        np.logaddexp(
+            np.log1p(-dataset.randomized_weight) + confounded_log_density,
+            np.log(dataset.randomized_weight) + randomized_log_density,
+        )
+        + inverse_log_jacobian
+    )
+
+    actual = dataset.log_prob(repeated_X, treatment_values.reshape(-1, 1))[:, 0]
+
+    assert np.isfinite(actual).all()
+    np.testing.assert_allclose(actual, expected)
+
+
+@pytest.mark.parametrize(
+    ("treatment_domain", "treatment_noise_scale", "confounding_strength"),
+    [
+        ((-2.0, 3.0), 100.0, 1.0),
+        ((-np.finfo(float).max, np.finfo(float).max), 1.0, 1.0),
+        ("positive", 1000.0, 1.0),
+        ("positive", 1.0, 10000.0),
+    ],
+)
+def test_extreme_finite_parameters_keep_samples_and_grid_in_representable_support(
+    treatment_domain, treatment_noise_scale, confounding_strength
+):
+    dataset = ContinuousSemiSyntheticDataset(
+        ToyRealDataset(),
+        treatment_domain=treatment_domain,
+        treatment_noise_scale=treatment_noise_scale,
+        confounding_strength=confounding_strength,
+        random_state=7,
+    )
+    X, treatment, _ = dataset.load()
+    grid = dataset.get_grid(11)
+    values = np.concatenate(
+        (treatment.get_column("t").to_numpy(), grid.get_column("t").to_numpy())
+    )
+
+    assert np.isfinite(values).all()
+    if treatment_domain == "positive":
+        assert (values > 0.0).all()
+    else:
+        lower, upper = treatment_domain
+        assert (values > lower).all()
+        assert (values < upper).all()
+    assert np.isfinite(dataset.log_prob(X, treatment)).all()
+    repeated_X = np.repeat(X.to_numpy()[:1], grid.height, axis=0)
+    assert np.isfinite(dataset.log_prob(repeated_X, grid.to_numpy())).all()
+
+
 def test_continuous_randomized_assignment_density_is_independent_of_x():
     dataset = ContinuousSemiSyntheticDataset(
         ToyRealDataset(), randomized_weight=1.0, random_state=10

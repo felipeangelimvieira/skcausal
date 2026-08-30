@@ -26,9 +26,11 @@ The ledger `progress.md` was read but not modified or staged.
   existing stable `_log_mixture` helper. Positive and bounded log-densities add
   the exact inverse-transformation Jacobian; invalid support values return
   negative infinity.
-- Used exact real, exponential, and logistic-domain transforms without clipping.
-  The bounded forward transform uses a sign-split logistic calculation for
-  numerical stability.
+- Used exact real, exponential, and logistic-domain transforms, with saturation
+  to the nearest representable open-support Float64 value only when the
+  mathematical result overflows, underflows, or rounds to a closed bounded
+  endpoint. The bounded forward transform uses a sign-split logistic calculation
+  and overflow-safe convex interpolation.
 - Froze the intervention region at the 1% and 99% quantiles of the randomized
   latent Gaussian. Froze linear, quadratic, sinusoidal, and two hinge basis
   terms on a deterministic 1001-point latent grid; hinge knots are the latent
@@ -140,3 +142,105 @@ Result: `2 files already formatted`; `All checks passed!`; `23 passed in
   strength=...)` hook added here.
 - `ContinuousSemiSyntheticDataset` is importable from its concrete module but
   is not exported from `skcausal.datasets`; Task 8 owns that integration.
+
+## Fix round 1 — floating-point support boundaries
+
+### Review findings verified
+
+1. For bounded domain `(-2.0, 3.0)`, both
+   `np.nextafter(-2.0, np.inf)` and `np.nextafter(3.0, -np.inf)` were valid
+   treatment values but normalized to unit coordinates exactly equal to `0.0`
+   and `1.0`. The inverse and Jacobian produced opposing infinities, their sum
+   became NaN, and public `log_prob` raised `ValueError`.
+2. Finite latent values could round the bounded logistic transform to exact
+   endpoints, while the positive exponential transform could underflow to zero
+   or overflow to infinity. This made construction fail for valid large noise
+   or confounding-strength parameters.
+
+### RED evidence
+
+Bounded density at the two adjacent in-support Float64 values:
+
+```text
+uv run pytest tests/datasets/test_semi_synthetic_continuous_dgp.py::test_bounded_log_density_is_exact_at_representable_support_edges -q
+```
+
+Result before the inverse/Jacobian fix: `1 failed, 3 warnings in 2.40s`.
+The failure was the public `_log_prob must return one non-NaN value per row`
+guard after divide-by-zero and invalid-add warnings.
+
+Extreme bounded and positive-domain construction/grid cases:
+
+```text
+uv run pytest tests/datasets/test_semi_synthetic_continuous_dgp.py::test_extreme_finite_parameters_keep_samples_and_grid_in_representable_support -q
+```
+
+Result before the forward-transform fix: `4 failed, 2 warnings in 1.39s`.
+Failures covered bounded noise `100.0`, an overflow-width bounded domain,
+positive noise `1000.0`, and positive confounding strength `10000.0`.
+
+### Fix decisions
+
+- Replaced bounded unit-coordinate inversion with direct log distances:
+  `log(a - lower) - log(upper - a)`.
+- Replaced the bounded inverse-Jacobian calculation with
+  `log(upper - lower) - log(a - lower) - log(upper - a)`.
+- Added a private positive-difference log helper that uses direct subtraction
+  whenever representable and switches to `logaddexp` only when a cross-zero
+  subtraction overflows. This keeps widths such as `(-float_max, float_max)`
+  finite in log space.
+- Replaced width multiplication in the bounded forward transform with convex
+  interpolation and constrained only rounded endpoints to
+  `nextafter(lower, upper)` / `nextafter(upper, lower)`.
+- Constrained positive overflow/underflow only to the largest finite Float64 and
+  the smallest positive Float64. Ordinary representable transform values are
+  unchanged.
+- Extended the extreme-parameter test to require finite exact log-density
+  evaluation for generated treatments and all grid endpoints, in addition to
+  open-support membership.
+
+### GREEN and verification evidence
+
+Isolated regressions after each fix:
+
+```text
+uv run pytest tests/datasets/test_semi_synthetic_continuous_dgp.py::test_bounded_log_density_is_exact_at_representable_support_edges -q
+uv run pytest tests/datasets/test_semi_synthetic_continuous_dgp.py::test_extreme_finite_parameters_keep_samples_and_grid_in_representable_support -q
+```
+
+Results: `1 passed in 0.95s`; then `4 passed in 2.37s`. After adding density
+coverage to the extreme test, it remained green with `4 passed in 1.15s`.
+
+Formatting and lint:
+
+```text
+uv run ruff format src/skcausal/datasets/semi_synthetic_continuous.py tests/datasets/test_semi_synthetic_continuous_dgp.py
+uv run ruff check src/skcausal/datasets/semi_synthetic_continuous.py tests/datasets/test_semi_synthetic_continuous_dgp.py
+```
+
+Result: `1 file reformatted, 1 file left unchanged`; `All checks passed!`.
+
+Focused continuous/base/helper compatibility:
+
+```text
+uv run pytest tests/datasets/test_semi_synthetic_continuous_dgp.py tests/datasets/test_semi_synthetic_base.py tests/datasets/test_semi_synthetic_helpers.py -q
+```
+
+Result: `28 passed in 1.11s`.
+
+Dataset discovery, categorical, and legacy semi-synthetic compatibility:
+
+```text
+uv run pytest tests/datasets/test_all_datasets.py tests/datasets/test_semi_synthetic_categorical_dgp.py tests/datasets/test_semi_synthetic_regressor.py tests/datasets/test_semi_synthetic_classifier.py -q
+```
+
+Result: `137 passed in 1.52s`.
+
+Fresh full suite:
+
+```text
+uv run pytest -q
+```
+
+Result: `770 passed, 419 warnings in 4.70s`; warning classes match the existing
+baseline.
