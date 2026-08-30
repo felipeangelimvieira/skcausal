@@ -339,14 +339,24 @@ def _calibrate_confounding_strength(metric, target, initial_strength):
     if upper_metric == target:
         return upper_strength, upper_metric
 
-    for _ in range(100):
+    bisection_tolerance = 1e-6
+    bisection_iterations = max(
+        100,
+        int(
+            np.ceil(
+                np.log2(upper_strength - lower_strength) - np.log2(bisection_tolerance)
+            )
+        )
+        + 1,
+    )
+    for _ in range(bisection_iterations):
         middle_strength = (lower_strength + upper_strength) / 2.0
         middle_metric = float(metric(middle_strength))
         if not np.isfinite(middle_metric):
             raise ValueError("Confounding-strength metric must be finite.")
         if (
-            abs(middle_metric - target) < 1e-6
-            and upper_strength - lower_strength < 1e-6
+            abs(middle_metric - target) < bisection_tolerance
+            and upper_strength - lower_strength < bisection_tolerance
         ):
             return middle_strength, middle_metric
         if (

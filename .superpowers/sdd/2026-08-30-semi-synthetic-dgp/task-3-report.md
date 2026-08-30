@@ -71,3 +71,43 @@ $ uv run pytest -q
 contract, so callers must provide a scalar metric that crosses the target over
 the expanded interval. Later categorical and continuous DGPs are responsible
 for choosing their oracle metrics and validating their public parameters.
+
+## Fix round 1 — large initial bisection bracket
+
+The fixed 100-iteration bisection cap could reject a valid target when the
+already-bracketed initial upper strength was very large. The bisection budget
+now uses `ceil(log2(bracket_width / 1e-6)) + 1`, with 100 retained as a
+minimum, so it permits the stated absolute-width convergence condition to be
+checked after sufficient halvings.
+
+RED:
+
+```text
+$ uv run pytest tests/datasets/test_semi_synthetic_helpers.py -q
+1 failed, 9 passed in 2.42s
+
+ValueError: Target did not converge within the attainable metric interval
+[0.0, 7.888609052210118e+29].
+```
+
+The new regression called the real calibrator with `metric=lambda value: value`,
+`target=0.5`, and `initial_strength=1e60`.
+
+GREEN:
+
+```text
+$ uv run pytest tests/datasets/test_semi_synthetic_helpers.py -q
+10 passed in 1.99s
+
+$ uv run pytest tests/datasets/test_semi_synthetic_helpers.py tests/datasets/test_semi_synthetic_base.py -q
+16 passed in 0.95s
+
+$ uv run ruff check src/skcausal/datasets/semi_synthetic.py tests/datasets/test_semi_synthetic_helpers.py
+All checks passed!
+
+$ uv run ruff format --check src/skcausal/datasets/semi_synthetic.py tests/datasets/test_semi_synthetic_helpers.py
+2 files already formatted
+
+$ uv run pytest -q
+733 passed, 419 warnings in 4.35s
+```

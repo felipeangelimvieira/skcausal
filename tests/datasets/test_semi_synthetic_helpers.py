@@ -131,3 +131,14 @@ def test_strength_calibration_accepts_crossing_at_final_allowed_expansion():
 
     np.testing.assert_allclose(strength, 2.0**64 - 1.0, atol=1e-6)
     np.testing.assert_allclose(achieved, 64.0, atol=1e-6)
+
+
+def test_strength_calibration_bisects_a_large_valid_initial_bracket():
+    strength, achieved = _calibrate_confounding_strength(
+        metric=lambda value: value,
+        target=0.5,
+        initial_strength=1e60,
+    )
+
+    np.testing.assert_allclose(strength, 0.5, atol=1e-6)
+    np.testing.assert_allclose(achieved, 0.5, atol=1e-6)
