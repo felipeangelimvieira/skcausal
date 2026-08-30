@@ -181,8 +181,14 @@ def _fit_causal_score_map(X, rng):
     for name, dimension in role_dimensions.items():
         projection = np.zeros((library.shape[1], dimension))
         for index in range(dimension):
-            selected = rng.choice(
-                library.shape[1], size=min(5, library.shape[1]), replace=False
+            n_terms = min(5, library.shape[1])
+            nonlinear = rng.integers(n_encoded, library.shape[1])
+            remaining = np.delete(np.arange(library.shape[1]), nonlinear)
+            selected = np.concatenate(
+                (
+                    np.array([nonlinear]),
+                    rng.choice(remaining, size=n_terms - 1, replace=False),
+                )
             )
             projection[selected, index] = rng.normal(size=selected.size)
         raw_scores = library @ projection

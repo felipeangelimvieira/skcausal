@@ -39,3 +39,30 @@
 
 None. The full-suite warnings are pre-existing deprecation and estimator
 warnings; this task adds no warnings to the focused helper or base tests.
+
+## Fix round 1
+
+### Changes
+
+- Every causal-role output now selects one frozen nonlinear-library term before
+  selecting its remaining sparse terms.
+- Added regression coverage for that invariant and for pandas and NumPy
+  fit/transform support, including frozen NumPy-width validation.
+
+### RED/GREEN evidence
+
+- RED: `uv run pytest tests/datasets/test_semi_synthetic_helpers.py -q`
+  reported `1 failed, 4 passed`; the new nonlinear invariant failed because a
+  projection's first output had no coefficient beyond the encoded linear block.
+- GREEN: the same command reported `5 passed in 1.33s` after forcing one
+  nonlinear term per output.
+
+### Fix-round verification
+
+- `uv run pytest tests/datasets/test_semi_synthetic_helpers.py
+  tests/datasets/test_semi_synthetic_base.py -q` — `11 passed in 1.00s`.
+- `uv run ruff check src/skcausal/datasets/semi_synthetic.py
+  tests/datasets/test_semi_synthetic_helpers.py` — all checks passed.
+- `uv run ruff format --check src/skcausal/datasets/semi_synthetic.py
+  tests/datasets/test_semi_synthetic_helpers.py` — 2 files already formatted.
+- `uv run pytest -q` — `728 passed, 419 warnings in 4.29s`.

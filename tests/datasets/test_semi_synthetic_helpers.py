@@ -44,3 +44,32 @@ def test_score_map_rejects_changed_schema_and_all_missing_numeric_column():
             X.with_columns(pl.lit(None, dtype=pl.Float64).alias("income")),
             np.random.default_rng(2),
         )
+
+
+def test_score_map_uses_a_nonlinear_term_in_each_output_score():
+    X = ToyRealDataset().load()[0]
+    score_map, _ = _fit_causal_score_map(X, np.random.default_rng(61984))
+    n_encoded = score_map.encoder.transform(X.to_pandas()).shape[1]
+
+    for projection in score_map.projections.values():
+        assert (projection[n_encoded:] != 0).any(axis=0).all()
+
+
+def test_score_map_supports_pandas_and_numpy_covariates():
+    X = ToyRealDataset().load()[0]
+    pandas_X = X.to_pandas()
+    pandas_map, pandas_scores = _fit_causal_score_map(
+        pandas_X, np.random.default_rng(12)
+    )
+    repeated = pandas_map.transform(pandas_X)
+
+    np.testing.assert_allclose(pandas_scores.confounders, repeated.confounders)
+
+    numpy_X = pandas_X[["age", "income"]].to_numpy()
+    numpy_map, numpy_scores = _fit_causal_score_map(numpy_X, np.random.default_rng(13))
+    np.testing.assert_allclose(
+        numpy_scores.prognostic,
+        numpy_map.transform(numpy_X).prognostic,
+    )
+    with pytest.raises(ValueError, match="width"):
+        numpy_map.transform(numpy_X[:, :1])
