@@ -1,11 +1,229 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 import numpy as np
+import pandas as pd
 import polars as pl
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from skcausal.datasets.base import BaseDataset, BaseSyntheticDataset
 
 __all__ = ["BaseSemiSyntheticDataset"]
+
+
+@dataclass(frozen=True)
+class _CausalScores:
+    confounders: np.ndarray
+    prognostic: np.ndarray
+    treatment_only: np.ndarray
+    modifiers: np.ndarray
+
+
+@dataclass
+class _CausalScoreMap:
+    columns: tuple[str, ...]
+    encoder: ColumnTransformer
+    pair_indices: np.ndarray
+    projections: dict[str, np.ndarray]
+    means: dict[str, np.ndarray]
+    scales: dict[str, np.ndarray]
+
+    def transform(self, X):
+        frame = _covariates_to_pandas(X, self.columns)
+        encoded = np.asarray(self.encoder.transform(frame), dtype=float)
+        library = _nonlinear_library(encoded, self.pair_indices)
+        return _CausalScores(
+            **{
+                name: (library @ self.projections[name] - self.means[name])
+                / self.scales[name]
+                for name in self.projections
+            }
+        )
+
+
+@dataclass(frozen=True)
+class _BaselineSurface:
+    confounder_coefficients: np.ndarray
+    prognostic_coefficients: np.ndarray
+    mean: float
+    scale: float
+    signal_mean: float
+    signal_scale: float
+
+    def evaluate(self, scores):
+        confounding = scores.confounders @ self.confounder_coefficients
+        prognostic = scores.prognostic @ self.prognostic_coefficients
+        mu0 = (confounding + prognostic - self.mean) / self.scale
+        signal = (confounding - self.signal_mean) / self.signal_scale
+        return mu0, signal
+
+
+def _covariates_to_pandas(X, columns=None):
+    if isinstance(X, np.ndarray):
+        array = np.asarray(X)
+        if array.ndim != 2:
+            raise ValueError("NumPy covariates must be a two-dimensional array.")
+        if columns is None:
+            columns = tuple(f"x{index}" for index in range(array.shape[1]))
+        elif array.shape[1] != len(columns):
+            raise ValueError("NumPy covariates must match the frozen column width.")
+        return pd.DataFrame(array, columns=columns)
+
+    if isinstance(X, pl.DataFrame):
+        frame = X.to_pandas()
+    elif isinstance(X, pd.DataFrame):
+        frame = X.copy()
+    else:
+        raise TypeError(
+            "Covariates must be a NumPy array, pandas DataFrame, or Polars DataFrame."
+        )
+
+    if columns is not None and tuple(frame.columns) != tuple(columns):
+        raise ValueError("Covariate columns must match the frozen columns exactly.")
+    return frame
+
+
+def _nonlinear_library(encoded, pair_indices):
+    encoded = np.asarray(encoded, dtype=float)
+    pair_indices = np.asarray(pair_indices, dtype=int)
+    if pair_indices.size:
+        products = encoded[:, pair_indices[:, 0]] * encoded[:, pair_indices[:, 1]]
+    else:
+        products = np.empty((encoded.shape[0], 0), dtype=float)
+    return np.column_stack(
+        (
+            encoded,
+            encoded**2,
+            np.sin(encoded),
+            (encoded > 0).astype(float),
+            products,
+        )
+    )
+
+
+def _fit_causal_score_map(X, rng):
+    frame = _covariates_to_pandas(X)
+    columns = tuple(frame.columns)
+    numeric_columns = [
+        name for name in columns if pd.api.types.is_numeric_dtype(frame[name])
+    ]
+    categorical_columns = [name for name in columns if name not in numeric_columns]
+
+    for name in numeric_columns:
+        observed = frame[name].dropna().to_numpy(dtype=float)
+        if observed.size == 0 or not np.isfinite(observed).all():
+            raise ValueError(
+                f"Numeric column {name!r} must contain a finite observed value."
+            )
+
+    for name in categorical_columns:
+        values = frame[name].astype(object)
+        frame[name] = values.where(values.notna(), np.nan)
+
+    transformers = []
+    if numeric_columns:
+        transformers.append(
+            (
+                "numeric",
+                make_pipeline(
+                    SimpleImputer(strategy="median"),
+                    StandardScaler(),
+                ),
+                numeric_columns,
+            )
+        )
+    if categorical_columns:
+        transformers.append(
+            (
+                "categorical",
+                make_pipeline(
+                    SimpleImputer(strategy="constant", fill_value="__missing__"),
+                    OneHotEncoder(handle_unknown="ignore", sparse_output=False),
+                ),
+                categorical_columns,
+            )
+        )
+    if not transformers:
+        raise ValueError("Covariates must include at least one column.")
+
+    encoder = ColumnTransformer(transformers)
+    encoded = np.asarray(encoder.fit_transform(frame), dtype=float)
+    n_encoded = encoded.shape[1]
+    candidates = np.array(
+        [
+            (left, right)
+            for left in range(n_encoded)
+            for right in range(left + 1, n_encoded)
+        ],
+        dtype=int,
+    ).reshape(-1, 2)
+    n_pairs = min(16, len(candidates))
+    if n_pairs:
+        pair_indices = candidates[
+            rng.choice(len(candidates), size=n_pairs, replace=False)
+        ]
+    else:
+        pair_indices = np.empty((0, 2), dtype=int)
+    library = _nonlinear_library(encoded, pair_indices)
+
+    role_dimensions = {
+        "confounders": 3,
+        "prognostic": 2,
+        "treatment_only": 2,
+        "modifiers": 2,
+    }
+    projections = {}
+    means = {}
+    scales = {}
+    for name, dimension in role_dimensions.items():
+        projection = np.zeros((library.shape[1], dimension))
+        for index in range(dimension):
+            selected = rng.choice(
+                library.shape[1], size=min(5, library.shape[1]), replace=False
+            )
+            projection[selected, index] = rng.normal(size=selected.size)
+        raw_scores = library @ projection
+        scale = raw_scores.std(axis=0)
+        scale[scale == 0] = 1.0
+        projections[name] = projection
+        means[name] = raw_scores.mean(axis=0)
+        scales[name] = scale
+
+    score_map = _CausalScoreMap(
+        columns=columns,
+        encoder=encoder,
+        pair_indices=pair_indices,
+        projections=projections,
+        means=means,
+        scales=scales,
+    )
+    return score_map, score_map.transform(frame)
+
+
+def _fit_baseline_surface(scores, rng):
+    confounder_scale = 1.0 / np.sqrt(scores.confounders.shape[1])
+    prognostic_scale = 1.0 / np.sqrt(scores.prognostic.shape[1])
+    confounder_coefficients = rng.normal(
+        scale=confounder_scale, size=scores.confounders.shape[1]
+    )
+    prognostic_coefficients = rng.normal(
+        scale=prognostic_scale, size=scores.prognostic.shape[1]
+    )
+    confounding = scores.confounders @ confounder_coefficients
+    total = confounding + scores.prognostic @ prognostic_coefficients
+    scale = total.std()
+    signal_scale = confounding.std()
+    return _BaselineSurface(
+        confounder_coefficients=confounder_coefficients,
+        prognostic_coefficients=prognostic_coefficients,
+        mean=float(total.mean()),
+        scale=float(scale if scale != 0 else 1.0),
+        signal_mean=float(confounding.mean()),
+        signal_scale=float(signal_scale if signal_scale != 0 else 1.0),
+    )
 
 
 class BaseSemiSyntheticDataset(BaseSyntheticDataset, ABC):
