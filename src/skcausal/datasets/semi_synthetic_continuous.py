@@ -1,3 +1,4 @@
+import math
 from statistics import NormalDist
 from typing import ClassVar
 
@@ -14,8 +15,8 @@ from skcausal.datasets.semi_synthetic import (
 
 __all__ = ["ContinuousSemiSyntheticDataset"]
 
-_FLOAT_MAX = np.finfo(float).max
 _SMALLEST_POSITIVE_FLOAT = np.nextafter(0.0, 1.0)
+_HALF_LOG_2PI = 0.5 * np.log(2.0 * np.pi)
 
 
 def _log_positive_difference(upper, lower):
@@ -32,6 +33,110 @@ def _log_positive_difference(upper, lower):
             np.log(upper[overflow]), np.log(-lower[overflow])
         )
     return result
+
+
+def _standard_normal_logcdf(value):
+    value = float(value)
+    if value == -np.inf:
+        return -np.inf
+    if value == np.inf:
+        return 0.0
+    if value > 0.0:
+        log_survival = _standard_normal_logcdf(-value)
+        return float(np.log1p(-np.exp(log_survival)))
+    if value > -8.0:
+        return math.log(0.5 * math.erfc(-value / math.sqrt(2.0)))
+
+    inverse_square = 1.0 / (value * value)
+    series = 1.0
+    term = 1.0
+    previous = np.inf
+    for index in range(1, 100):
+        term *= -(2 * index - 1) * inverse_square
+        if abs(term) >= previous:
+            break
+        series += term
+        if abs(term) <= np.finfo(float).eps * abs(series):
+            break
+        previous = abs(term)
+    return -0.5 * value * value - math.log(-value) - _HALF_LOG_2PI + math.log(series)
+
+
+def _log_difference(log_larger, log_smaller):
+    if log_smaller == -np.inf:
+        return log_larger
+    difference = log_smaller - log_larger
+    if difference >= 0.0:
+        return -np.inf
+    return log_larger + float(np.log(-np.expm1(difference)))
+
+
+def _standard_normal_log_interval(lower, upper):
+    lower = float(lower)
+    upper = float(upper)
+    if not lower < upper:
+        return -np.inf
+    if lower == -np.inf:
+        return _standard_normal_logcdf(upper)
+    if upper == np.inf:
+        return _standard_normal_logcdf(-lower)
+    if upper <= 0.0:
+        return _log_difference(
+            _standard_normal_logcdf(upper), _standard_normal_logcdf(lower)
+        )
+    if lower >= 0.0:
+        return _log_difference(
+            _standard_normal_logcdf(-lower), _standard_normal_logcdf(-upper)
+        )
+
+    excluded_probability = np.exp(_standard_normal_logcdf(lower)) + np.exp(
+        _standard_normal_logcdf(-upper)
+    )
+    return float(np.log1p(-excluded_probability))
+
+
+def _truncated_normal_logpdf(value, location, scale, lower, upper):
+    value, location = np.broadcast_arrays(
+        np.asarray(value, dtype=float), np.asarray(location, dtype=float)
+    )
+    normalizers = np.array(
+        [
+            _standard_normal_log_interval(
+                (lower - row_location) / scale,
+                (upper - row_location) / scale,
+            )
+            for row_location in location.flat
+        ]
+    ).reshape(location.shape)
+    return _normal_logpdf(value, location, scale) - normalizers
+
+
+def _sample_truncated_normal(location, scale, lower, upper, rng):
+    location = np.asarray(location, dtype=float)
+    uniforms = np.maximum(rng.random(location.size), _SMALLEST_POSITIVE_FLOAT)
+    samples = np.empty(location.size, dtype=float)
+    for index, (row_location, uniform) in enumerate(zip(location.flat, uniforms)):
+        standardized_lower = (lower - row_location) / scale
+        standardized_upper = (upper - row_location) / scale
+        log_normalizer = _standard_normal_log_interval(
+            standardized_lower, standardized_upper
+        )
+        target_log_mass = math.log(uniform) + log_normalizer
+        left = lower
+        right = upper
+        for _ in range(100):
+            middle = 0.5 * left + 0.5 * right
+            standardized_middle = (middle - row_location) / scale
+            log_mass = _standard_normal_log_interval(
+                standardized_lower, standardized_middle
+            )
+            if log_mass < target_log_mass:
+                left = middle
+            else:
+                right = middle
+        samples[index] = 0.5 * left + 0.5 * right
+
+    return samples.reshape(location.shape)
 
 
 class ContinuousSemiSyntheticDataset(BaseSemiSyntheticDataset):
@@ -108,11 +213,18 @@ class ContinuousSemiSyntheticDataset(BaseSemiSyntheticDataset):
             scale=self.effect_heterogeneity_scale, size=(5, 2)
         )
         self.confounding_strength_ = self.confounding_strength
+        self.latent_support_bounds_ = self._latent_support_bounds()
 
         standard_normal = NormalDist()
-        self.latent_grid_bounds_ = np.array(
+        central_bounds = np.array(
             [standard_normal.inv_cdf(0.01), standard_normal.inv_cdf(0.99)]
         ) * float(self.treatment_noise_scale)
+        self.latent_grid_bounds_ = np.array(
+            [
+                max(central_bounds[0], self.latent_support_bounds_[0]),
+                min(central_bounds[1], self.latent_support_bounds_[1]),
+            ]
+        )
         self.hinge_knots_ = np.array(
             [standard_normal.inv_cdf(1.0 / 3.0), standard_normal.inv_cdf(2.0 / 3.0)]
         ) * float(self.treatment_noise_scale)
@@ -145,9 +257,7 @@ class ContinuousSemiSyntheticDataset(BaseSemiSyntheticDataset):
         if self.treatment_domain == "real":
             return latent.copy()
         if self.treatment_domain == "positive":
-            with np.errstate(over="ignore", under="ignore"):
-                treatment = np.exp(latent)
-            return np.clip(treatment, _SMALLEST_POSITIVE_FLOAT, _FLOAT_MAX)
+            return np.exp(latent)
 
         lower, upper = map(float, self.treatment_domain)
         unit = np.empty_like(latent)
@@ -155,14 +265,48 @@ class ContinuousSemiSyntheticDataset(BaseSemiSyntheticDataset):
         unit[nonnegative] = 1.0 / (1.0 + np.exp(-latent[nonnegative]))
         exponentiated = np.exp(latent[~nonnegative])
         unit[~nonnegative] = exponentiated / (1.0 + exponentiated)
-        treatment = (1.0 - unit) * lower + unit * upper
-        interior_lower = np.nextafter(lower, upper)
-        interior_upper = np.nextafter(upper, lower)
-        if interior_lower > interior_upper:
+        return (1.0 - unit) * lower + unit * upper
+
+    def _latent_support_bounds(self):
+        if self.treatment_domain == "real":
+            return np.array([-np.inf, np.inf])
+        if self.treatment_domain == "positive":
+            lower = float(np.log(_SMALLEST_POSITIVE_FLOAT))
+            upper = float(np.log(np.finfo(float).max))
+            while not np.isfinite(np.exp(upper)):
+                upper = np.nextafter(upper, -np.inf)
+            return np.array([lower, upper])
+
+        domain_lower, domain_upper = map(float, self.treatment_domain)
+        treatment_lower = np.nextafter(domain_lower, domain_upper)
+        treatment_upper = np.nextafter(domain_upper, domain_lower)
+        if treatment_lower > treatment_upper:
             raise ValueError(
                 "treatment_domain must contain a representable interior value."
             )
-        return np.clip(treatment, interior_lower, interior_upper)
+        lower = float(self._inverse_transform(np.array([treatment_lower]))[0])
+        upper = float(self._inverse_transform(np.array([treatment_upper]))[0])
+        if self._forward_transform(np.array([lower]))[0] <= domain_lower:
+            unsafe = lower
+            safe = 0.0
+            for _ in range(100):
+                middle = 0.5 * unsafe + 0.5 * safe
+                if self._forward_transform(np.array([middle]))[0] > domain_lower:
+                    safe = middle
+                else:
+                    unsafe = middle
+            lower = safe
+        if self._forward_transform(np.array([upper]))[0] >= domain_upper:
+            safe = 0.0
+            unsafe = upper
+            for _ in range(100):
+                middle = 0.5 * safe + 0.5 * unsafe
+                if self._forward_transform(np.array([middle]))[0] < domain_upper:
+                    safe = middle
+                else:
+                    unsafe = middle
+            upper = safe
+        return np.array([lower, upper])
 
     def _inverse_transform(self, treatment):
         treatment = np.asarray(treatment, dtype=float)
@@ -209,7 +353,17 @@ class ContinuousSemiSyntheticDataset(BaseSemiSyntheticDataset):
     def _sample_treatment(self, X, rng):
         randomized = rng.random(X.height) < self.randomized_weight
         location = np.where(randomized, 0.0, self._latent_mean(X))
-        latent = location + rng.normal(scale=self.treatment_noise_scale, size=X.height)
+        if self.treatment_domain == "real":
+            latent = location + rng.normal(
+                scale=self.treatment_noise_scale, size=X.height
+            )
+        else:
+            latent = _sample_truncated_normal(
+                location,
+                self.treatment_noise_scale,
+                *self.latent_support_bounds_,
+                rng,
+            )
         return pl.DataFrame({"t": self._forward_transform(latent)})
 
     def _log_prob(self, X, treatment):
@@ -219,18 +373,43 @@ class ContinuousSemiSyntheticDataset(BaseSemiSyntheticDataset):
         if not valid.any():
             return log_density
 
-        latent = self._inverse_transform(values[valid])
-        confounded = _normal_logpdf(
-            latent,
-            self._latent_mean(X)[valid],
-            self.treatment_noise_scale,
-        )
-        randomized = _normal_logpdf(latent, 0.0, self.treatment_noise_scale)
-        log_density[valid] = _log_mixture(
+        valid_indices = np.flatnonzero(valid)
+        latent = self._inverse_transform(values[valid_indices])
+        if self.treatment_domain != "real":
+            lower, upper = self.latent_support_bounds_
+            supported = (latent >= lower) & (latent <= upper)
+            valid_indices = valid_indices[supported]
+            latent = latent[supported]
+            if valid_indices.size == 0:
+                return log_density
+
+        if self.treatment_domain == "real":
+            confounded = _normal_logpdf(
+                latent,
+                self._latent_mean(X)[valid_indices],
+                self.treatment_noise_scale,
+            )
+            randomized = _normal_logpdf(latent, 0.0, self.treatment_noise_scale)
+        else:
+            confounded = _truncated_normal_logpdf(
+                latent,
+                self._latent_mean(X)[valid_indices],
+                self.treatment_noise_scale,
+                lower,
+                upper,
+            )
+            randomized = _truncated_normal_logpdf(
+                latent,
+                0.0,
+                self.treatment_noise_scale,
+                lower,
+                upper,
+            )
+        log_density[valid_indices] = _log_mixture(
             confounded,
             randomized,
             self.randomized_weight,
-        ) + self._log_abs_inverse_jacobian(values[valid])
+        ) + self._log_abs_inverse_jacobian(values[valid_indices])
         return log_density
 
     def _raw_treatment_basis(self, latent):

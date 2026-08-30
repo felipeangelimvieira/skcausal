@@ -1,3 +1,5 @@
+from statistics import NormalDist
+
 import numpy as np
 import pytest
 
@@ -98,7 +100,7 @@ def test_bounded_log_density_matches_exact_latent_mixture_and_jacobian():
     )
 
 
-def test_bounded_log_density_is_exact_at_representable_support_edges():
+def test_bounded_log_density_is_exact_at_restricted_support_edges():
     lower, upper = -2.0, 3.0
     dataset = ContinuousSemiSyntheticDataset(
         ToyRealDataset(),
@@ -108,9 +110,7 @@ def test_bounded_log_density_is_exact_at_representable_support_edges():
         random_state=17,
     )
     X, _, _ = dataset.load()
-    treatment_values = np.array(
-        [np.nextafter(lower, np.inf), np.nextafter(upper, -np.inf)]
-    )
+    treatment_values = dataset._forward_transform(dataset.latent_support_bounds_)
     repeated_X = np.repeat(X.to_numpy()[:1], treatment_values.size, axis=0)
 
     left_distance = treatment_values - lower
@@ -185,6 +185,87 @@ def test_extreme_finite_parameters_keep_samples_and_grid_in_representable_suppor
     assert np.isfinite(dataset.log_prob(X, treatment)).all()
     repeated_X = np.repeat(X.to_numpy()[:1], grid.height, axis=0)
     assert np.isfinite(dataset.log_prob(repeated_X, grid.to_numpy())).all()
+
+
+@pytest.mark.parametrize(
+    ("treatment_domain", "excluded_latent"),
+    [((-2.0, 3.0), 40.0), ("positive", 710.0)],
+)
+def test_transforms_round_trip_on_restricted_invertible_latent_support(
+    treatment_domain, excluded_latent
+):
+    dataset = ContinuousSemiSyntheticDataset(
+        ToyRealDataset(),
+        treatment_domain=treatment_domain,
+        treatment_noise_scale=1000.0,
+        random_state=7,
+    )
+    lower, upper = dataset.latent_support_bounds_
+    probe = np.linspace(max(lower, -10.0), min(upper, 10.0), 21)
+
+    transformed = dataset._forward_transform(probe)
+    round_trip = dataset._inverse_transform(transformed)
+
+    assert not lower < excluded_latent < upper
+    assert np.unique(transformed).size == probe.size
+    np.testing.assert_allclose(round_trip, probe, atol=1e-10, rtol=0.0)
+
+
+def test_positive_log_density_matches_exact_truncated_latent_mixture():
+    randomized_weight = 0.25
+    noise_scale = 1000.0
+    dataset = ContinuousSemiSyntheticDataset(
+        ToyRealDataset(),
+        treatment_domain="positive",
+        randomized_weight=randomized_weight,
+        treatment_noise_scale=noise_scale,
+        random_state=17,
+    )
+    X, _, _ = dataset.load()
+    treatment = np.ones((X.height, 1))
+    latent = np.zeros(X.height)
+    lower, upper = dataset.latent_support_bounds_
+    confounded_location = (
+        dataset.confounding_strength * dataset.source_confounding_signal_
+        + dataset.treatment_only_strength
+        * (dataset.source_scores_.treatment_only @ dataset.treatment_only_coefficients_)
+    )
+    normal = NormalDist()
+
+    def component_log_density(location):
+        alpha = (lower - location) / noise_scale
+        beta = (upper - location) / noise_scale
+        normalization = np.array(
+            [
+                normal.cdf(row_beta) - normal.cdf(row_alpha)
+                for row_alpha, row_beta in zip(alpha, beta)
+            ]
+        )
+        return (
+            -0.5 * ((latent - location) / noise_scale) ** 2
+            - np.log(noise_scale)
+            - 0.5 * np.log(2.0 * np.pi)
+            - np.log(normalization)
+        )
+
+    confounded = component_log_density(confounded_location)
+    randomized = component_log_density(np.zeros(X.height))
+    expected = np.logaddexp(
+        np.log1p(-randomized_weight) + confounded,
+        np.log(randomized_weight) + randomized,
+    )
+
+    np.testing.assert_allclose(dataset.log_prob(X, treatment)[:, 0], expected)
+
+
+def test_bounded_log_density_is_negative_infinity_outside_restricted_latent_support():
+    bounded = ContinuousSemiSyntheticDataset(
+        ToyRealDataset(), treatment_domain=(-2.0, 3.0), random_state=7
+    )
+    X_bounded, _, _ = bounded.load()
+    bounded_edge = np.array([[np.nextafter(3.0, -np.inf)]])
+
+    assert np.isneginf(bounded.log_prob(X_bounded.head(1), bounded_edge)[0, 0])
 
 
 def test_continuous_randomized_assignment_density_is_independent_of_x():
