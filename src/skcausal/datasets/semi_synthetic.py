@@ -13,6 +13,8 @@ from skcausal.datasets.base import BaseDataset, BaseSyntheticDataset
 
 __all__ = ["BaseSemiSyntheticDataset"]
 
+_LOG_2PI = np.log(2.0 * np.pi)
+
 
 @dataclass(frozen=True)
 class _CausalScores:
@@ -229,6 +231,136 @@ def _fit_baseline_surface(scores, rng):
         scale=float(scale if scale != 0 else 1.0),
         signal_mean=float(confounding.mean()),
         signal_scale=float(signal_scale if signal_scale != 0 else 1.0),
+    )
+
+
+def _softmax(logits):
+    shifted = logits - np.max(logits, axis=1, keepdims=True)
+    exponentiated = np.exp(shifted)
+    return exponentiated / exponentiated.sum(axis=1, keepdims=True)
+
+
+def _calibrate_softmax_intercepts(logits, target):
+    logits = np.asarray(logits, dtype=float)
+    target = np.asarray(target, dtype=float)
+    if logits.ndim != 2 or target.shape != (logits.shape[1],):
+        raise ValueError("logits and target must have compatible category dimensions.")
+
+    n_categories = logits.shape[1]
+    intercepts = np.zeros(n_categories, dtype=float)
+    for _ in range(100):
+        probabilities = _softmax(logits + intercepts)
+        residual = probabilities.mean(axis=0)[:-1] - target[:-1]
+        if np.max(np.abs(residual)) < 1e-10:
+            return intercepts
+
+        active = probabilities[:, :-1]
+        jacobian = np.diag(active.mean(axis=0)) - active.T @ active / logits.shape[0]
+        if not np.isfinite(jacobian).all() or not np.isfinite(residual).all():
+            raise ValueError(
+                "Softmax intercept calibration received nonfinite updates."
+            )
+        try:
+            update = np.linalg.solve(jacobian, -residual)
+        except np.linalg.LinAlgError as error:
+            raise ValueError(
+                "Softmax intercept calibration has a singular update."
+            ) from error
+        if not np.isfinite(update).all():
+            raise ValueError(
+                "Softmax intercept calibration received nonfinite updates."
+            )
+
+        residual_norm = np.max(np.abs(residual))
+        for damping in 0.5 ** np.arange(20):
+            candidate = intercepts.copy()
+            candidate[:-1] += damping * update
+            candidate_residual = (
+                _softmax(logits + candidate).mean(axis=0)[:-1] - target[:-1]
+            )
+            if np.isfinite(candidate_residual).all() and (
+                np.max(np.abs(candidate_residual)) < residual_norm
+            ):
+                intercepts = candidate
+                break
+        else:
+            raise ValueError(
+                "Softmax intercept calibration could not reduce its residual."
+            )
+
+    raise ValueError(
+        "Softmax intercept calibration did not converge after 100 iterations."
+    )
+
+
+def _normal_logpdf(value, location, scale):
+    return -0.5 * ((value - location) / scale) ** 2 - np.log(scale) - 0.5 * _LOG_2PI
+
+
+def _log_mixture(left, right, weight):
+    if weight == 0.0:
+        return left
+    if weight == 1.0:
+        return right
+    return np.logaddexp(np.log1p(-weight) + left, np.log(weight) + right)
+
+
+def _normalized_log_weights(log_values):
+    shifted = log_values - np.max(log_values)
+    weights = np.exp(shifted)
+    return weights / weights.sum()
+
+
+def _calibrate_confounding_strength(metric, target, initial_strength):
+    lower_strength = 0.0
+    lower_metric = float(metric(lower_strength))
+    upper_strength = max(1.0, initial_strength)
+    upper_metric = float(metric(upper_strength))
+
+    if not np.isfinite((lower_metric, upper_metric)).all():
+        raise ValueError("Confounding-strength metric must be finite.")
+    if lower_metric == target:
+        return lower_strength, lower_metric
+
+    for _ in range(64):
+        if min(lower_metric, upper_metric) <= target <= max(lower_metric, upper_metric):
+            break
+        upper_strength *= 2.0
+        upper_metric = float(metric(upper_strength))
+        if not np.isfinite(upper_metric):
+            raise ValueError("Confounding-strength metric must be finite.")
+    if not (
+        min(lower_metric, upper_metric) <= target <= max(lower_metric, upper_metric)
+    ):
+        raise ValueError(
+            "Target is outside the attainable metric interval "
+            f"[{min(lower_metric, upper_metric)}, {max(lower_metric, upper_metric)}]."
+        )
+    if upper_metric == target:
+        return upper_strength, upper_metric
+
+    for _ in range(100):
+        middle_strength = (lower_strength + upper_strength) / 2.0
+        middle_metric = float(metric(middle_strength))
+        if not np.isfinite(middle_metric):
+            raise ValueError("Confounding-strength metric must be finite.")
+        if (
+            abs(middle_metric - target) < 1e-6
+            and upper_strength - lower_strength < 1e-6
+        ):
+            return middle_strength, middle_metric
+        if (
+            min(lower_metric, middle_metric)
+            <= target
+            <= max(lower_metric, middle_metric)
+        ):
+            upper_strength, upper_metric = middle_strength, middle_metric
+        else:
+            lower_strength, lower_metric = middle_strength, middle_metric
+
+    raise ValueError(
+        "Target did not converge within the attainable metric interval "
+        f"[{min(lower_metric, upper_metric)}, {max(lower_metric, upper_metric)}]."
     )
 
 

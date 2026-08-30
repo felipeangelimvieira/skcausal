@@ -3,8 +3,14 @@ import polars as pl
 import pytest
 
 from skcausal.datasets.semi_synthetic import (
+    _calibrate_confounding_strength,
+    _calibrate_softmax_intercepts,
     _fit_baseline_surface,
     _fit_causal_score_map,
+    _log_mixture,
+    _normal_logpdf,
+    _normalized_log_weights,
+    _softmax,
 )
 from tests.datasets._semi_synthetic_test_utils import ToyRealDataset
 
@@ -73,3 +79,55 @@ def test_score_map_supports_pandas_and_numpy_covariates():
     )
     with pytest.raises(ValueError, match="width"):
         numpy_map.transform(numpy_X[:, :1])
+
+
+def test_softmax_intercepts_match_requested_empirical_marginal():
+    logits = np.array(
+        [[-2.0, 0.0, 1.0], [-1.0, 0.5, 0.0], [2.0, -1.0, 0.5], [1.0, 1.5, -2.0]]
+    )
+    target = np.array([0.2, 0.3, 0.5])
+    intercepts = _calibrate_softmax_intercepts(logits, target)
+    probabilities = _softmax(logits + intercepts)
+
+    np.testing.assert_allclose(probabilities.mean(axis=0), target, atol=1e-9)
+
+
+def test_log_mixture_and_normalized_weights_are_stable():
+    x = np.array([-20.0, 0.0, 20.0])
+    left = _normal_logpdf(x, np.zeros(3), 1.0)
+    right = _normal_logpdf(x, np.ones(3), 2.0)
+    mixed = _log_mixture(left, right, weight=0.25)
+    weights = _normalized_log_weights(mixed)
+
+    np.testing.assert_allclose(
+        np.exp(mixed), 0.75 * np.exp(left) + 0.25 * np.exp(right)
+    )
+    np.testing.assert_allclose(weights.sum(), 1.0)
+
+
+def test_strength_calibration_finds_crossing_and_rejects_unreachable_target():
+    strength, achieved = _calibrate_confounding_strength(
+        metric=lambda value: value**2,
+        target=0.49,
+        initial_strength=0.5,
+    )
+    np.testing.assert_allclose(strength, 0.7, atol=1e-6)
+    np.testing.assert_allclose(achieved, 0.49, atol=1e-6)
+
+    with pytest.raises(ValueError, match="attainable"):
+        _calibrate_confounding_strength(
+            metric=lambda value: min(value, 0.2),
+            target=0.5,
+            initial_strength=1.0,
+        )
+
+
+def test_strength_calibration_accepts_crossing_at_final_allowed_expansion():
+    strength, achieved = _calibrate_confounding_strength(
+        metric=lambda value: np.log2(value + 1.0),
+        target=64.0,
+        initial_strength=1.0,
+    )
+
+    np.testing.assert_allclose(strength, 2.0**64 - 1.0, atol=1e-6)
+    np.testing.assert_allclose(achieved, 64.0, atol=1e-6)
