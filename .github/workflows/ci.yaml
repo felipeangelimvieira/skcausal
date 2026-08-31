@@ -54,7 +54,7 @@ jobs:
       run: python -m pytest --cov=skcausal --cov-report=xml -m "not smoke" --durations=10
 
     - name: Upload coverage reports to Codecov
-      uses: codecov/codecov-action@v5.5.2
+      uses: codecov/codecov-action@v5.5.5
       with:
         files: ./coverage.xml
         fail_ci_if_error: true
