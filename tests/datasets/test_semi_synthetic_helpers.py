@@ -10,6 +10,7 @@ from skcausal.datasets.semi_synthetic import (
     _log_mixture,
     _normal_logpdf,
     _normalized_log_weights,
+    _ridge_projections,
     _softmax,
 )
 from tests.datasets._semi_synthetic_test_utils import ToyRealDataset
@@ -127,15 +128,40 @@ def test_strength_calibration_finds_crossing_and_rejects_unreachable_target():
         )
 
 
-def test_strength_calibration_accepts_crossing_at_final_allowed_expansion():
+def test_strength_calibration_returns_smallest_crossing_of_nonmonotone_metric():
+    # Rises to 1 at strength 1, dips to 0 at strength 2, then rises again.
+    def metric(value):
+        return abs(np.sin(0.5 * np.pi * value)) * min(value, 1.0)
+
     strength, achieved = _calibrate_confounding_strength(
-        metric=lambda value: np.log2(value + 1.0),
-        target=64.0,
-        initial_strength=1.0,
+        metric=metric, target=0.5, initial_strength=1.0
     )
 
-    np.testing.assert_allclose(strength, 2.0**64 - 1.0, atol=1e-6)
-    np.testing.assert_allclose(achieved, 64.0, atol=1e-6)
+    np.testing.assert_allclose(achieved, 0.5, atol=1e-8)
+    assert strength < 1.0
+    np.testing.assert_allclose(metric(strength), 0.5, atol=1e-8)
+
+
+def test_strength_calibration_caps_the_search_and_reports_attainable_range():
+    with pytest.raises(ValueError, match="attainable.*strengths up to"):
+        _calibrate_confounding_strength(
+            metric=lambda value: np.log2(value + 1.0),
+            target=64.0,
+            initial_strength=1.0,
+        )
+
+
+def test_strength_calibration_rejects_targets_below_the_zero_strength_floor():
+    with pytest.raises(ValueError, match="below the bias floor"):
+        _calibrate_confounding_strength(
+            metric=lambda value: 0.2 + value, target=0.1, initial_strength=1.0
+        )
+
+    strength, achieved = _calibrate_confounding_strength(
+        metric=lambda value: 0.2 + value, target=0.2, initial_strength=1.0
+    )
+    assert strength == 0.0
+    assert achieved == 0.2
 
 
 def test_strength_calibration_bisects_a_large_valid_initial_bracket():
@@ -147,3 +173,129 @@ def test_strength_calibration_bisects_a_large_valid_initial_bracket():
 
     np.testing.assert_allclose(strength, 0.5, atol=1e-6)
     np.testing.assert_allclose(achieved, 0.5, atol=1e-6)
+
+
+def test_treatment_only_scores_are_orthogonal_to_outcome_score_polynomials():
+    rng = np.random.default_rng(3)
+    X = pl.DataFrame(
+        {
+            "a": rng.normal(size=400),
+            "b": rng.normal(size=400),
+            "c": rng.choice(["u", "v", "w"], size=400),
+        }
+    )
+    score_map, scores = _fit_causal_score_map(X, np.random.default_rng(4))
+    outcome_scores = np.column_stack(
+        (scores.confounders, scores.prognostic, scores.modifiers)
+    )
+    products = np.column_stack(
+        [
+            outcome_scores[:, i] * outcome_scores[:, j]
+            for i in range(outcome_scores.shape[1])
+            for j in range(i, outcome_scores.shape[1])
+        ]
+    )
+    design = np.column_stack((np.ones(X.height), outcome_scores, products))
+
+    assert score_map.residualization_order == 2
+    np.testing.assert_allclose(design.T @ scores.treatment_only, 0.0, atol=1e-8)
+    np.testing.assert_allclose(scores.treatment_only.mean(axis=0), 0.0, atol=1e-12)
+    np.testing.assert_allclose(scores.treatment_only.std(axis=0), 1.0, atol=1e-12)
+    np.testing.assert_allclose(
+        score_map.transform(X).treatment_only, scores.treatment_only
+    )
+
+
+def test_score_map_encodes_boolean_columns_with_missing_values():
+    X = pl.DataFrame(
+        {
+            "a": np.linspace(-1.0, 1.0, 12),
+            "flag": [True, False, None] * 4,
+        }
+    )
+    score_map, scores = _fit_causal_score_map(X, np.random.default_rng(5))
+
+    assert np.isfinite(scores.confounders).all()
+    assert score_map.categorical_columns == ("flag",)
+    np.testing.assert_allclose(score_map.transform(X).confounders, scores.confounders)
+
+
+def test_softmax_intercepts_converge_for_saturated_logits():
+    rng = np.random.default_rng(0)
+    logits = 40.0 * rng.normal(size=(300, 3))
+    target = np.array([0.5, 0.3, 0.2])
+    intercepts = _calibrate_softmax_intercepts(logits, target)
+
+    np.testing.assert_allclose(
+        _softmax(logits + intercepts).mean(axis=0), target, atol=1e-9
+    )
+
+
+def test_ridge_projections_recover_linear_targets_and_skip_missing_rows():
+    rng = np.random.default_rng(3)
+    library = rng.normal(size=(200, 6))
+    library[:, 5] = 2.0  # zero-variance column must get a zero coefficient
+    targets = np.column_stack(
+        (
+            3.0 * library[:, 0] - 1.5 * library[:, 2] + 0.5,
+            library[:, 1] + rng.normal(scale=0.1, size=200),
+        )
+    )
+    targets[:10, 1] = np.nan
+
+    projection, r2 = _ridge_projections(library, targets)
+
+    assert projection.shape == (6, 2)
+    assert projection[5].tolist() == [0.0, 0.0]
+    assert r2.shape == (2,)
+    assert r2[0] > 0.999
+    assert 0.9 < r2[1] <= 1.0
+    fitted = library @ projection[:, 0]
+    fitted = fitted - fitted.mean()
+    np.testing.assert_allclose(fitted, targets[:, 0] - targets[:, 0].mean(), atol=0.15)
+
+
+def test_ridge_projections_require_two_finite_targets():
+    library = np.random.default_rng(0).normal(size=(5, 2))
+    with pytest.raises(ValueError, match="at least two finite"):
+        _ridge_projections(library, np.array([1.0, np.nan, np.nan, np.nan, np.nan]))
+
+
+def test_score_map_accepts_fitted_confounders():
+    X = ToyRealDataset(include_missing=True).load()[0]
+    targets = np.column_stack(
+        (
+            np.linspace(-1.0, 1.0, X.height),
+            X.get_column("income").to_numpy().astype(float),
+        )
+    )
+    score_map, scores = _fit_causal_score_map(
+        X, np.random.default_rng(4), fitted_confounders=targets
+    )
+
+    assert scores.confounders.shape == (X.height, 2)
+    np.testing.assert_allclose(scores.confounders.mean(axis=0), 0.0, atol=1e-10)
+    np.testing.assert_allclose(scores.confounders.std(axis=0), 1.0, atol=1e-10)
+    assert score_map.fitted_confounder_r2.shape == (2,)
+    assert np.all(
+        (score_map.fitted_confounder_r2 >= 0.0)
+        & (score_map.fitted_confounder_r2 <= 1.0)
+    )
+    np.testing.assert_allclose(score_map.transform(X).confounders, scores.confounders)
+    assert scores.treatment_only.shape == (X.height, 2)
+
+
+def test_baseline_surface_accepts_fixed_confounder_coefficients():
+    X = ToyRealDataset().load()[0]
+    _, scores = _fit_causal_score_map(X, np.random.default_rng(8))
+    surface = _fit_baseline_surface(
+        scores, np.random.default_rng(9), confounder_coefficients=[1.0, 0.5, -0.25]
+    )
+    np.testing.assert_allclose(surface.confounder_coefficients, [1.0, 0.5, -0.25])
+    mean, _ = surface.evaluate(scores)
+    np.testing.assert_allclose(mean.std(ddof=0), 1.0, atol=1e-12)
+
+    with pytest.raises(ValueError, match="confounder_coefficients"):
+        _fit_baseline_surface(
+            scores, np.random.default_rng(9), confounder_coefficients=[1.0, 0.5]
+        )

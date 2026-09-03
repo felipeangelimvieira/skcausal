@@ -139,3 +139,26 @@ def test_oracle_hooks_receive_polars_for_numpy_and_pandas_inputs():
     pandas_X = pd.DataFrame({"feature": [1.0, 2.0]})
     pandas_treatment = pd.DataFrame({"t": [0.1, 0.2]})
     assert dataset.log_prob(pandas_X, pandas_treatment).shape == (2, 1)
+
+
+class SplittingSemiSyntheticDataset(ToySemiSyntheticDataset):
+    def _split_source(self, X, treatment, outcome):
+        self.seen_outcome_columns_ = list(outcome.columns)
+        return X.drop("income")
+
+    def _sample_treatment(self, X, rng):
+        return pl.DataFrame({"t": X.get_column("age").to_numpy() / 50.0})
+
+    def _log_prob(self, X, treatment):
+        return np.zeros(X.height)
+
+
+def test_base_split_source_hook_releases_reduced_covariates():
+    dataset = SplittingSemiSyntheticDataset(ToyRealDataset(), random_state=1)
+    X, treatment, _ = dataset.load()
+
+    assert list(X.columns) == ["age", "region"]
+    assert dataset.seen_outcome_columns_ == ["source_y"]
+    assert dataset.n == 8
+    assert treatment.shape == (8, 1)
+    assert dataset.log_prob(X.to_numpy(), treatment).shape == (8, 1)
