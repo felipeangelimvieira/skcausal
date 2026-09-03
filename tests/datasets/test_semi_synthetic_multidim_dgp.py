@@ -440,3 +440,83 @@ def test_correlated_noise_with_two_categorical_components_is_rejected():
     MultidimSemiSyntheticDataset(
         ToyRealDataset(), n_treatments=2, n_levels=[2, 3], treatment_correlation=0.0
     )
+
+
+def test_feature_target_is_removed_from_x_and_released_on_its_scale():
+    source = ToyRealDataset()
+    dataset = MultidimSemiSyntheticDataset(
+        source, n_treatments=2, target_columns=[None, "income"], random_state=3
+    )
+    X, treatment, _ = dataset.load()
+    income = source.load()[0].get_column("income").to_numpy().astype(float)
+
+    assert list(X.columns) == ["age", "region"]
+    assert list(source.load()[0].columns) == ["age", "income", "region"]
+    assert dataset.target_columns_ == [None, "income"]
+    assert dataset.feature_names_ == ["income"]
+    assert set(dataset.feature_fit_r2_) == {"income"}
+    np.testing.assert_allclose(dataset.released_offsets_, [0.0, income.mean()])
+    np.testing.assert_allclose(dataset.released_scales_, [1.0, income.std(ddof=0)])
+    assert dataset.feature_assignment_matrix_.shape == (1, 2)
+    assert dataset.feature_assignment_matrix_[0, 0] == 0.0
+    assert dataset.feature_assignment_matrix_[0, 1] == dataset.feature_coefficients_[0]
+
+    # Oracles accept the reduced schema, including NumPy of the reduced width.
+    assert dataset.log_prob(X.to_numpy(), treatment).shape == (8, 1)
+    with pytest.raises(ValueError):
+        dataset.log_prob(source.load()[0], treatment)
+
+    # Released value = mean + sd * latent, so log_prob at the feature mean equals
+    # the latent density at zero minus log(sd).
+    at_mean = np.zeros((8, 2))
+    at_mean[:, 1] = income.mean()
+    means = dataset._latent_means(dataset.source_scores_, dataset.confounding_strength_)
+    latent_density = dataset._log_density(
+        np.zeros((8, 2)), np.zeros((8, 0), dtype=int), means, dataset.cut_points_
+    )
+    np.testing.assert_allclose(
+        dataset.log_prob(X, at_mean)[:, 0],
+        latent_density - np.log(income.std(ddof=0)),
+    )
+
+
+def test_feature_score_enters_assignment_and_baseline():
+    dataset = MultidimSemiSyntheticDataset(
+        ToyRealDataset(),
+        n_treatments=2,
+        confounding_loadings=[1.0, 0.0],
+        target_columns=[None, "income"],
+        random_state=6,
+    )
+    means = dataset._latent_means(dataset.source_scores_, dataset.confounding_strength_)
+    assert np.std(means[:, 1]) > 0.0
+    assert dataset.score_map_.fitted_confounder_r2.shape == (2,)
+    np.testing.assert_allclose(
+        dataset.baseline_surface_.confounder_coefficients,
+        [1.0, dataset.feature_coefficients_[0]],
+    )
+
+
+def test_feature_target_validation():
+    source = ToyRealDataset()
+    with pytest.raises(ValueError, match="not a covariate"):
+        MultidimSemiSyntheticDataset(source, n_treatments=1, target_columns="height")
+    with pytest.raises(ValueError, match="must be numeric"):
+        MultidimSemiSyntheticDataset(source, n_treatments=1, target_columns="region")
+    with pytest.raises(ValueError, match="At least one covariate"):
+        MultidimSemiSyntheticDataset(
+            KangSchaferContinuous(n=50, random_state=0),
+            n_treatments=4,
+            target_columns=["x1", "x2", "x3", "x4"],
+        )
+    mixed = MultidimSemiSyntheticDataset(
+        source,
+        n_treatments=2,
+        n_levels=[None, 2],
+        target_columns=["age", "income"],
+        random_state=1,
+    )
+    X, treatment, _ = mixed.load()
+    assert list(X.columns) == ["region"]
+    assert mixed.released_scales_[1] == 1.0
+    assert treatment.get_column("t_1").cast(pl.Utf8).is_in(["0", "1"]).all()

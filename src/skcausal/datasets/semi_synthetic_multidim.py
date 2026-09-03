@@ -235,8 +235,6 @@ class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
                 "treatment_correlation must be zero when two or more components "
                 "are categorical."
             )
-        if any(entry is not None for entry in targets):
-            raise ValueError("target_columns is enabled in a later task.")
         if not np.isfinite(float(treatment_noise_scale)) or (
             float(treatment_noise_scale) <= 0.0
         ):
@@ -658,6 +656,10 @@ class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
             means[self._bias_rows],
         )
         latent = (location + self._bias_noise)[:, self.continuous_indices_]
+        if self.continuous_indices_.size == 0:
+            # With no continuous components every design point has an identical
+            # (empty) continuous latent, so one point stands in for all 1024.
+            latent = latent[:1]
         mu0 = self.source_mu0_
         modifiers = scores.modifiers
         n_rows = means.shape[0]
@@ -750,5 +752,14 @@ class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
             {
                 "real_dataset": KangSchaferContinuous(n=64, random_state=4),
                 "random_state": 7,
-            }
+            },
+            {
+                "real_dataset": KangSchaferContinuous(n=64, random_state=4),
+                "n_treatments": 3,
+                "confounding_loadings": [1.0, 0.5, 0.0],
+                "n_levels": [None, None, 3],
+                "target_columns": [None, "x2", None],
+                "treatment_correlation": 0.4,
+                "random_state": 8,
+            },
         ]
