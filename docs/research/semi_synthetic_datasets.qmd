@@ -387,6 +387,15 @@ print(
 np.corrcoef(treatment.select(["t_0", "t_1"]).to_numpy().astype(float).T)[0, 1]
 ```
 
+For this class the bias metric is a fixed 1024-point Monte Carlo estimate
+under the marginal treatment law rather than the exact quadrature used by the
+one-dimensional DGPs, so `confounding_bias_ratio_` has a relative resolution
+on the order of $1/\sqrt{1024} \approx 3\%$. The metric also need not be
+monotone in strength, so `target_confounding_bias` freezes the smallest
+crossing bracketed by the calibration search's strength ladder rather than
+guaranteeing the smallest strength that ever reaches the target; read the
+achieved strength back from `confounding_strength_`.
+
 `get_grid` returns a lattice over the continuous components crossed with the
 levels of the categorical ones, so `predict` evaluates the average response
 surface over the whole vector.

@@ -432,6 +432,14 @@ def test_unknown_level_is_unsupported_and_predict_y_rejects_it():
         dataset.predict_y(X.head(1), bad)
 
 
+def test_malformed_continuous_treatment_raises_value_error():
+    dataset = _mixed()
+    X, _, _ = dataset.load()
+    malformed = pl.DataFrame({"t_0": ["not-a-number"], "t_1": ["0"]})
+    with pytest.raises(ValueError, match="must be numeric"):
+        dataset.log_prob(X.head(1), malformed)
+
+
 def test_correlated_noise_with_two_categorical_components_is_rejected():
     with pytest.raises(ValueError, match="two or more components are categorical"):
         MultidimSemiSyntheticDataset(
@@ -544,3 +552,102 @@ def test_predict_curve_accepts_mixed_grid_rows():
         ]
     )
     np.testing.assert_allclose(actual, expected, atol=1e-12)
+
+
+def test_multidim_rejects_non_numeric_source_outcome():
+    class StringOutcomeDataset(ToyRealDataset):
+        def _load(self):
+            X, t, y = super()._load()
+            return X, t, y.with_columns(pl.lit("a").alias("source_y"))
+
+    with pytest.raises(ValueError, match="must be numeric"):
+        MultidimSemiSyntheticDataset(StringOutcomeDataset(), n_treatments=1)
+
+
+def test_single_component_continuous_and_categorical_normalize():
+    continuous = MultidimSemiSyntheticDataset(
+        ToyRealDataset(), n_treatments=1, random_state=2
+    )
+    X, _, _ = continuous.load()
+    grid = np.linspace(-12.0, 12.0, 4001)
+    repeated_X = X.head(1).to_numpy()[np.zeros(grid.size, dtype=int)]
+    density = np.exp(continuous.log_prob(repeated_X, grid.reshape(-1, 1))[:, 0])
+    integral = np.trapezoid(density, grid)
+    np.testing.assert_allclose(integral, 1.0, atol=2e-3)
+
+    categorical = MultidimSemiSyntheticDataset(
+        ToyRealDataset(), n_treatments=1, n_levels=4, random_state=2
+    )
+    grid4 = categorical.get_grid(50)
+    assert grid4.shape == (4, 1)
+    repeated_row = X.head(1).to_numpy()[np.zeros(4, dtype=int)]
+    masses = np.exp(categorical.log_prob(repeated_row, grid4)[:, 0])
+    np.testing.assert_allclose(masses.sum(), 1.0, atol=1e-10, rtol=0.0)
+    assert categorical.interaction_coefficients_ == {}
+
+
+def test_treatment_only_strength_adds_a_bias_floor_and_still_calibrates():
+    source = KangSchaferContinuous(n=300, random_state=2)
+    floor = MultidimSemiSyntheticDataset(
+        source,
+        n_treatments=2,
+        confounding_strength=0.0,
+        treatment_only_strength=1.0,
+        random_state=3,
+    )
+    assert floor.confounding_bias_ratio_ > 0.0
+    assert floor.confounding_strength_ == 0.0
+
+    calibrated = MultidimSemiSyntheticDataset(
+        source,
+        n_treatments=2,
+        treatment_only_strength=1.0,
+        target_confounding_bias=0.4,
+        random_state=3,
+    )
+    np.testing.assert_allclose(calibrated.confounding_bias_ratio_, 0.4, atol=2e-3)
+
+
+def test_confounded_categorical_sampler_matches_log_prob():
+    dataset = MultidimSemiSyntheticDataset(
+        KangSchaferContinuous(n=2000, random_state=1),
+        n_treatments=2,
+        n_levels=[None, 3],
+        treatment_correlation=0.5,
+        confounding_strength=1.0,
+        randomized_weight=0.2,
+        random_state=5,
+    )
+    _, treatment, _ = dataset.load()
+
+    def level_frequencies(t):
+        counts = t.get_column("t_1").cast(pl.Utf8).value_counts().sort("t_1")
+        return dict(
+            zip(
+                counts.get_column("t_1").to_list(),
+                (counts.get_column("count") / t.height).to_list(),
+            )
+        )
+
+    replications = [
+        treatment,
+        dataset.sample(random_state=1)[1],
+        dataset.sample(random_state=2)[1],
+    ]
+    for frame in replications:
+        frequencies = level_frequencies(frame)
+        for level in ("0", "1", "2"):
+            assert abs(frequencies.get(level, 0.0) - 1.0 / 3.0) < 0.05
+
+    means = dataset._latent_means(dataset.source_scores_, dataset.confounding_strength_)
+    correlation = np.corrcoef(means[:, 0], means[:, 1])[0, 1]
+    if correlation > 0.2:
+        t0 = treatment.get_column("t_0").to_numpy().astype(float)
+        t1 = treatment.get_column("t_1").cast(pl.Utf8).to_numpy()
+        median = np.median(t0)
+        frequency_above = np.mean(t1[t0 > median] == "2")
+        frequency_below = np.mean(t1[t0 <= median] == "2")
+        assert frequency_above > frequency_below
+    # else: the latent means of t_0 and t_1 are not positively correlated
+    # enough at this random_state to expect the directional relationship, so
+    # the conditional-frequency check is skipped.

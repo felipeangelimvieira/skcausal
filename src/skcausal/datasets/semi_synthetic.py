@@ -518,13 +518,16 @@ def _finite_metric(metric, strength):
 
 
 def _calibrate_confounding_strength(metric, target, initial_strength):
-    """Return the smallest strength at which ``metric`` reaches ``target``.
+    """Return the strength of the smallest crossing bracketed by the ladder.
 
     The metric is evaluated at zero and then along a geometric ladder of
     strengths (with ``initial_strength`` inserted) until it first reaches the
     target; the crossing is then refined by Brent's method. The search does not
-    assume monotonicity: a target reached on several intervals resolves to the
-    smallest strength.
+    assume monotonicity, but it is not exhaustive either: a target reached and
+    then left inside a bump that lies strictly between two consecutive ladder
+    strengths is invisible to the ladder scan, so the returned strength is the
+    smallest crossing the ladder actually brackets, not necessarily the
+    smallest strength at which ``metric`` reaches ``target``.
     """
 
     target = float(target)

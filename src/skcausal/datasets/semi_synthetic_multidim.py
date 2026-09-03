@@ -93,6 +93,7 @@ def _interval_log_mass(lower, upper):
         right = log_ndtr(-lower) + np.log1p(
             -np.exp(log_ndtr(-upper) - log_ndtr(-lower))
         )
+        # The sign of `upper` is a side-selection heuristic (it picks the numerically safer tail in the common cases), not an exact smallest-mass choice.
         selected = np.where(upper <= 0.0, left, right)
     return np.where(lower < upper, selected, -np.inf)
 
@@ -521,6 +522,32 @@ class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
         latent = location + rng.standard_normal(means.shape) @ self._noise_cholesky.T
         return self._release(latent)
 
+    def _check_and_transform_t(self, treatments):
+        """Reject a non-numeric continuous column before dtype enforcement casts it.
+
+        ``BaseSemiSyntheticDataset._check_and_transform_t`` enforces each
+        continuous column's dtype (via ``enforce_dtypes``) before ``_log_prob``
+        or ``_predict_y`` ever see the frame, so a string value would otherwise
+        surface as a raw Polars cast error from that earlier step rather than
+        the :class:`ValueError` raised by :meth:`_parse_treatment`.
+        """
+
+        frame = self._coerce_backend_frame(treatments, backend="polars")
+        for j in self.continuous_indices_:
+            name = self.treatment_columns_[j]
+            if name not in frame.columns:
+                continue
+            try:
+                frame.get_column(name).cast(pl.Float64)
+            except (
+                pl.exceptions.InvalidOperationError,
+                pl.exceptions.ComputeError,
+            ) as error:
+                raise ValueError(
+                    f"Continuous treatment column {name!r} must be numeric."
+                ) from error
+        return super()._check_and_transform_t(treatments)
+
     def _parse_treatment(self, treatment, *, allow_unknown):
         """Return standardized continuous latents, level indices, and a validity mask."""
 
@@ -528,12 +555,18 @@ class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
         continuous = np.empty((n_rows, self.continuous_indices_.size))
         valid = np.ones(n_rows, dtype=bool)
         for position, j in enumerate(self.continuous_indices_):
-            values = (
-                treatment.get_column(self.treatment_columns_[j])
-                .cast(pl.Float64)
-                .to_numpy()
-                .astype(float)
-            )
+            name = self.treatment_columns_[j]
+            try:
+                values = (
+                    treatment.get_column(name).cast(pl.Float64).to_numpy().astype(float)
+                )
+            except (
+                pl.exceptions.InvalidOperationError,
+                pl.exceptions.ComputeError,
+            ) as error:
+                raise ValueError(
+                    f"Continuous treatment column {name!r} must be numeric."
+                ) from error
             valid &= np.isfinite(values)
             continuous[:, position] = (
                 values - self.released_offsets_[j]
@@ -642,6 +675,19 @@ class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
     # -- confounding bias ------------------------------------------------------
 
     def _bias_at_strength(self, strength):
+        """RMS naive-curve distortion under the marginal treatment law.
+
+        Estimates ``sqrt(E_a[(mu_obs(a) - mu_do(a))^2])`` where the outer
+        expectation is over the marginal law of the treatment vector. The
+        continuous coordinates are evaluated on 1024 frozen common-random-number
+        design points (shared across strengths and reused by the calibration
+        search); the categorical levels are instead enumerated exactly, each
+        weighted by ``P(kappa | z_C)``. Main outcome effects and cross terms are
+        the same under both the observational and interventional means and
+        cancel in the difference, so only the weighted baseline ``mu0`` and the
+        weighted effect modifiers enter the distortion.
+        """
+
         if self.randomized_weight == 1.0 or (
             strength == 0.0 and self.treatment_only_strength == 0.0
         ):
