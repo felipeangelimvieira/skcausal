@@ -235,10 +235,8 @@ class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
                 "treatment_correlation must be zero when two or more components "
                 "are categorical."
             )
-        if any(entry is not None for entry in levels) or any(
-            entry is not None for entry in targets
-        ):
-            raise ValueError("n_levels and target_columns are enabled in a later task.")
+        if any(entry is not None for entry in targets):
+            raise ValueError("target_columns is enabled in a later task.")
         if not np.isfinite(float(treatment_noise_scale)) or (
             float(treatment_noise_scale) <= 0.0
         ):

@@ -327,3 +327,116 @@ def test_multidim_requires_a_single_numeric_source_outcome():
 
     with pytest.raises(ValueError, match="exactly one outcome column"):
         MultidimSemiSyntheticDataset(TwoOutcomeDataset(), n_treatments=1)
+
+
+def _mixed(**overrides):
+    parameters = {
+        "n_treatments": 2,
+        "n_levels": [None, 3],
+        "treatment_correlation": 0.6,
+        "randomized_weight": 0.3,
+        "random_state": 9,
+    }
+    parameters.update(overrides)
+    return MultidimSemiSyntheticDataset(ToyRealDataset(), **parameters)
+
+
+def test_mixed_masses_sum_to_the_continuous_marginal_and_match_brute_force():
+    dataset = _mixed()
+    X, treatment, _ = dataset.load()
+    assert dataset.column_types == {"t_0": "continuous", "t_1": "categorical"}
+    assert treatment.get_column("t_1").cast(pl.Utf8).is_in(["0", "1", "2"]).all()
+    assert dataset.cut_points_[1].shape == (2,)
+
+    row = X.head(1)
+    means = dataset._latent_means(
+        dataset.source_scores_, dataset.confounding_strength_
+    )[0]
+    weight = dataset.randomized_weight
+    covariance = dataset.noise_covariance_
+    value = 0.7
+    masses = np.array(
+        [
+            np.exp(
+                dataset.log_prob(row, pl.DataFrame({"t_0": [value], "t_1": [level]}))[
+                    0, 0
+                ]
+            )
+            for level in ("0", "1", "2")
+        ]
+    )
+    marginal = (1.0 - weight) * multivariate_normal(
+        mean=means[:1], cov=covariance[:1, :1]
+    ).pdf(value) + weight * multivariate_normal(mean=[0.0], cov=covariance[:1, :1]).pdf(
+        value
+    )
+    np.testing.assert_allclose(masses.sum(), marginal, rtol=1e-10)
+
+    bounds = np.concatenate(([-12.0], dataset.cut_points_[1], [12.0]))
+    for level in range(3):
+        z1 = np.linspace(bounds[level], bounds[level + 1], 20001)
+        points = np.column_stack((np.full(z1.size, value), z1))
+        joint = (1.0 - weight) * multivariate_normal(mean=means, cov=covariance).pdf(
+            points
+        ) + weight * multivariate_normal(mean=np.zeros(2), cov=covariance).pdf(points)
+        np.testing.assert_allclose(masses[level], np.trapezoid(joint, z1), rtol=1e-4)
+
+
+def test_categorical_levels_are_balanced_and_grid_crosses_levels():
+    dataset = MultidimSemiSyntheticDataset(
+        KangSchaferContinuous(n=4000, random_state=1),
+        n_treatments=2,
+        n_levels=[None, 4],
+        confounding_strength=0.0,
+        randomized_weight=0.0,
+        random_state=2,
+    )
+    _, treatment, _ = dataset.load()
+    counts = treatment.get_column("t_1").cast(pl.Utf8).value_counts().sort("t_1")
+    assert counts.get_column("t_1").to_list() == ["0", "1", "2", "3"]
+    assert np.all(
+        np.abs(counts.get_column("count").to_numpy().astype(np.int64) - 1000) < 120
+    )
+
+    grid = dataset.get_grid(10)
+    assert grid.shape == (40, 2)
+    assert grid.get_column("t_0").n_unique() == 10
+    assert grid.get_column("t_1").cast(pl.Utf8).n_unique() == 4
+
+
+def test_categorical_only_multidim_has_level_lattice_and_exact_calibration():
+    dataset = MultidimSemiSyntheticDataset(
+        KangSchaferContinuous(n=300, random_state=2),
+        n_treatments=2,
+        n_levels=[2, 3],
+        target_confounding_bias=0.3,
+        random_state=4,
+    )
+    X, _, _ = dataset.load()
+    grid = dataset.get_grid(100)
+    assert grid.shape == (6, 2)
+
+    repeated_X = X.head(1).to_numpy()[np.zeros(6, dtype=int)]
+    masses = np.exp(dataset.log_prob(repeated_X, grid)[:, 0])
+    np.testing.assert_allclose(masses.sum(), 1.0, rtol=1e-10)
+    np.testing.assert_allclose(dataset.confounding_bias_ratio_, 0.3, atol=2e-3)
+    assert dataset.interaction_coefficients_[(0, 1)].shape == (1, 2)
+
+
+def test_unknown_level_is_unsupported_and_predict_y_rejects_it():
+    dataset = _mixed()
+    X, _, _ = dataset.load()
+    bad = pl.DataFrame({"t_0": [0.0], "t_1": ["7"]})
+    assert np.isneginf(dataset.log_prob(X.head(1), bad)[0, 0])
+    with pytest.raises(ValueError, match="known categorical levels"):
+        dataset.predict_y(X.head(1), bad)
+
+
+def test_correlated_noise_with_two_categorical_components_is_rejected():
+    with pytest.raises(ValueError, match="two or more components are categorical"):
+        MultidimSemiSyntheticDataset(
+            ToyRealDataset(), n_treatments=2, n_levels=[2, 3], treatment_correlation=0.2
+        )
+    MultidimSemiSyntheticDataset(
+        ToyRealDataset(), n_treatments=2, n_levels=[2, 3], treatment_correlation=0.0
+    )
