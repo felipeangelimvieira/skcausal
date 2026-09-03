@@ -9,7 +9,6 @@ project:
     - "density/*.qmd"
     - "examples/*.qmd"
     - "!book/"
-    - "!superpowers/"
   post-render:
     - ./render-book.sh
 
