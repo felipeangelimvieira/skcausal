@@ -404,7 +404,7 @@ class BaseSyntheticDataset(BaseDataset):
         if isinstance(treatment_grid, pl.DataFrame):
             treatment_rows = list(treatment_grid.to_numpy())
         else:
-            treatment_array = np.asarray(treatment_grid, dtype=object)
+            treatment_array = np.asarray(treatment_grid)
             if treatment_array.ndim == 0:
                 treatment_rows = [treatment_array.item()]
             elif treatment_array.ndim == 1:

@@ -175,3 +175,78 @@ def test_categorical_inverse_cdf_closes_a_rounded_probability_undershoot(
     treatment = dataset._sample_treatment(X, MaximumUniformGenerator())
 
     assert treatment.get_column("t").to_list() == ["2"] * X.height
+
+
+def test_categorical_accepts_numpy_integer_treatment_counts():
+    dataset = CategoricalSemiSyntheticDataset(
+        ToyRealDataset(), n_treatments=np.int64(3), random_state=2
+    )
+
+    assert dataset.treatment_levels_ == ["0", "1", "2"]
+    assert dataset.get_levels().shape == (3, 1)
+
+
+def test_categorical_bias_is_monotone_in_strength_with_small_floor():
+    from skcausal.datasets.kang_schafer import KangSchaferContinuous
+
+    real = KangSchaferContinuous(n=400, random_state=1)
+    ratios = [
+        CategoricalSemiSyntheticDataset(
+            real,
+            n_treatments=3,
+            confounding_strength=strength,
+            treatment_only_strength=1.0,
+            random_state=5,
+        ).confounding_bias_ratio_
+        for strength in (0.0, 0.5, 1.0, 2.0, 4.0)
+    ]
+
+    assert ratios[0] < 0.1
+    assert np.all(np.diff(ratios) > 0.0)
+
+
+def test_categorical_default_configuration_calibrates_and_reaches_zero():
+    from skcausal.datasets.kang_schafer import KangSchaferContinuous
+
+    real = KangSchaferContinuous(n=200, random_state=1)
+    for target in (0.0, 0.2, 0.5):
+        dataset = CategoricalSemiSyntheticDataset(
+            real, target_confounding_bias=target, random_state=3
+        )
+        np.testing.assert_allclose(dataset.confounding_bias_ratio_, target, atol=1e-6)
+        X, _, _ = dataset.load()
+        np.testing.assert_allclose(
+            _all_level_probabilities(dataset, X).mean(axis=0), 0.5, atol=1e-9
+        )
+    with pytest.raises(ValueError, match="attainable"):
+        CategoricalSemiSyntheticDataset(
+            real, target_confounding_bias=50.0, random_state=3
+        )
+
+
+def test_categorical_rejects_nonfinite_sampled_outcomes():
+    dataset = CategoricalSemiSyntheticDataset(ToyRealDataset(), random_state=3)
+    dataset.outcome_noise_scale = np.finfo(float).max
+
+    with pytest.raises(ValueError, match="Sampled outcomes must be finite"):
+        dataset.sample(random_state=0)
+
+
+def test_categorical_handles_boolean_covariates_with_missing_values():
+    class BooleanDataset(ToyRealDataset):
+        def _load(self):
+            X, t, y = super()._load()
+            return (
+                X.with_columns(
+                    pl.Series("flag", [True, False, None] * 2 + [True, False])
+                ),
+                t,
+                y,
+            )
+
+    dataset = CategoricalSemiSyntheticDataset(BooleanDataset(), random_state=3)
+    X, treatment, outcome = dataset.load()
+
+    assert X.get_column("flag").null_count() == 2
+    assert np.isfinite(outcome.to_numpy()).all()
+    assert np.isfinite(dataset.log_prob(X, treatment)).all()

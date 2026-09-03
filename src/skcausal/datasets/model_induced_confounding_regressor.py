@@ -12,7 +12,7 @@ from sklearn.preprocessing import SplineTransformer
 
 from skcausal.datasets.base import BaseSyntheticDataset
 
-__all__ = ["SemiSyntheticRegressor"]
+__all__ = ["ModelInducedConfoundingRegressor"]
 
 
 def _default_test_dataset() -> tuple[np.ndarray, np.ndarray]:
@@ -91,7 +91,7 @@ def _standardize_vector(values: np.ndarray):
     return (values - mean) / scale, mean, scale
 
 
-class SemiSyntheticRegressor(BaseSyntheticDataset):
+class ModelInducedConfoundingRegressor(BaseSyntheticDataset):
     r"""Semi-synthetic continuous-treatment dataset from a regression problem.
 
     The dataset starts from a supervised regression sample ``(X, y)`` returned by
@@ -123,16 +123,56 @@ class SemiSyntheticRegressor(BaseSyntheticDataset):
         \qquad
         T_i = \hat{m}(X_i).
 
-    Let :math:`B(t) \in \mathbb{R}^K` denote the spline basis produced by
-    ``SplineTransformer`` after fitting on the realized treatments
-    :math:`T_1, \ldots, T_n`. The random spline coefficients are sampled as
+    The treatment effect is a random B-spline function of the treatment. Its
+    basis is built by scikit-learn's ``SplineTransformer``, which is an
+    unsupervised feature map: it is *not* fit to any outcome. Calling ``fit``
+    on the realized treatments :math:`T_1, \ldots, T_n` only reads their range
+    to decide where to place the knots. The basis functions
+    :math:`B_1, \ldots, B_K` are fully determined by those knot positions and
+    the degree; the outcome :math:`y` and the covariates :math:`X` play no
+    role. The transformer is configured with the following settings:
+
+    * ``degree = spline_degree`` (default 3, cubic pieces);
+    * ``n_knots = min(n_spline_knots, max(2, U))``, where :math:`U` is the
+      number of distinct realized treatment values (rounded to 12 decimals).
+      The cap keeps the basis well-posed when the regressor emits only a few
+      distinct predictions;
+    * knots placed uniformly over the observed range
+      :math:`[\min_i T_i, \max_i T_i]`;
+    * ``include_bias=False``, so the basis contains no constant column;
+    * ``extrapolation="continue"``, so the polynomial pieces at both ends are
+      extended beyond the observed range and :math:`g(t)` is defined for any
+      counterfactual treatment passed to :meth:`predict_y`.
+
+    With these settings the transformer emits
+    :math:`K = \text{n\_knots} + \text{degree} - 2` basis functions (7 under the
+    defaults), and we write :math:`B(t) = (B_1(t), \ldots, B_K(t)) \in
+    \mathbb{R}^K` for the basis evaluated at treatment :math:`t`. Each
+    :math:`B_k` is non-negative and :math:`\sum_k B_k(t) \le 1`.
+
+    The shape of the curve comes entirely from the coefficients
+    :math:`\beta`, and these are not estimated either. They are drawn once,
+    from the dataset's random generator seeded by ``random_state``, as
+    independent Gaussians with mean zero and standard deviation
+    :math:`1/\sqrt{K}`:
 
     .. math::
 
         \beta_k \stackrel{\mathrm{iid}}{\sim} \mathcal{N}\!\left(0, \frac{1}{K}\right),
         \qquad k = 1, \ldots, K,
 
-    and the treatment effect is centered over the observed treatment sample:
+    where the second argument is the variance. Because the basis functions are
+    bounded, the prior variance of the raw spline value is
+    :math:`\operatorname{Var}\!\left[B(t)^\top \beta\right] = \|B(t)\|^2 / K \le
+    1/K`, so the magnitude of the random curve does not grow with the number of
+    knots and ``treatment_effect_scale`` remains the single knob controlling
+    effect size. The coefficients are stored in ``spline_coefficients_`` and
+    the fitted transformer in ``spline_transformer_``.
+
+    Finally the treatment effect is centered over the observed treatment
+    sample, so that :math:`g(T_i)` averages to zero on the realized
+    treatments (the offset is computed once and stored in
+    ``treatment_effect_offset_``):
 
     .. math::
 
@@ -205,7 +245,7 @@ class SemiSyntheticRegressor(BaseSyntheticDataset):
     def _load_dataset(self):
         if self.load_dataset is None:
             raise NotImplementedError(
-                "SemiSyntheticRegressor requires a load_dataset callable or a "
+                "ModelInducedConfoundingRegressor requires a load_dataset callable or a "
                 "subclass override of _load_dataset()."
             )
         return self.load_dataset()
@@ -360,7 +400,7 @@ class SemiSyntheticRegressor(BaseSyntheticDataset):
     def _prepare(self, n: int = None):
         if n is not None:
             raise ValueError(
-                "SemiSyntheticRegressor derives its sample size from the loaded "
+                "ModelInducedConfoundingRegressor derives its sample size from the loaded "
                 "dataset and does not support prepare(n=...)."
             )
 
@@ -389,8 +429,9 @@ class SemiSyntheticRegressor(BaseSyntheticDataset):
 
     @classmethod
     def get_test_params(cls, parameter_set: str = "default"):
-        from sklearn.datasets import load_diabetes
         from functools import partial
+
+        from sklearn.datasets import load_diabetes
 
         _load = partial(load_diabetes, return_X_y=True, as_frame=True)
 

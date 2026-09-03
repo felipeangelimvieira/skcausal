@@ -21,7 +21,7 @@
 - Confounding and overlap remain separate: `confounding_strength` or normalized `target_confounding_bias` controls shared prognostic selection; `randomized_weight` and continuous treatment noise control overlap.
 - The real continuous domain uses the unconditioned latent Gaussian mixture. Positive and bounded domains condition each Gaussian component on the finite latent interval that round-trips to distinct representable interior float treatments; sampling and `log_prob` implement that same exact conditioned law without clipping.
 - Do not add SciPy or another dependency; use NumPy and Python's `statistics.NormalDist` for numerical work.
-- Existing `SemiSyntheticRegressor` and `SemiSyntheticClassifier` behavior must remain unchanged.
+- Existing `ModelInducedConfoundingRegressor` and `ModelInducedConfoundingClassifier` behavior must remain unchanged.
 
 ## File Map
 
@@ -1267,7 +1267,7 @@ git commit -m "feat: expose semi-synthetic observational DGPs"
 
 - [ ] **Step 1: Run legacy semi-synthetic regression tests explicitly**
 
-Run: `uv run pytest tests/datasets/test_semi_synthetic_regressor.py tests/datasets/test_semi_synthetic_classifier.py -q`
+Run: `uv run pytest tests/datasets/test_model_induced_confounding_regressor.py tests/datasets/test_model_induced_confounding_classifier.py -q`
 
 Expected: all legacy semi-synthetic tests pass unchanged.
 

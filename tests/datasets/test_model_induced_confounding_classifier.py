@@ -3,7 +3,9 @@ import pandas as pd
 import polars as pl
 from sklearn.linear_model import LogisticRegression
 
-from skcausal.datasets.semi_synthetic_classifier import SemiSyntheticClassifier
+from skcausal.datasets.model_induced_confounding_classifier import (
+    ModelInducedConfoundingClassifier,
+)
 
 
 def _toy_classification_dataset():
@@ -35,13 +37,13 @@ def _stringify(values) -> np.ndarray:
     return np.asarray(values, dtype=object).astype(str)
 
 
-class _HookedSemiSyntheticClassifier(SemiSyntheticClassifier):
+class _HookedModelInducedConfoundingClassifier(ModelInducedConfoundingClassifier):
     def _load_dataset(self):
         return _toy_classification_dataset()
 
 
 def test_semisynthetic_classifier_normalizes_dataset_and_uses_predictions_for_treatment():
-    dataset = _HookedSemiSyntheticClassifier(
+    dataset = _HookedModelInducedConfoundingClassifier(
         classifier=LogisticRegression(max_iter=2000),
         random_state=7,
         treatment_effect_scale=0.0,
@@ -76,7 +78,7 @@ def test_semisynthetic_classifier_normalizes_dataset_and_uses_predictions_for_tr
 
 
 def test_semisynthetic_classifier_predict_y_accepts_backends_and_matches_probability_plus_effect():
-    dataset = SemiSyntheticClassifier(
+    dataset = ModelInducedConfoundingClassifier(
         classifier=LogisticRegression(max_iter=2000),
         load_dataset=_toy_classification_dataset,
         random_state=3,

@@ -17,6 +17,8 @@ Datasets expose a single sample. Any train/test or cross-fitting holdout should 
 
 Use the dropdown to switch between datasets without leaving the page.
 
+For datasets built on real covariates with configurable confounding and overlap, see the [semi-synthetic datasets guide](semi_synthetic_datasets.qmd).
+
 ::: {.dataset-catalog-math-sentinel style="display:none" aria-hidden="true"}
 $$
 0

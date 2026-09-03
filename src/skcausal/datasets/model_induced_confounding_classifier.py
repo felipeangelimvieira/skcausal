@@ -10,12 +10,12 @@ from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
 
 from skcausal.datasets.base import BaseSyntheticDataset
-from skcausal.datasets.semi_synthetic_regressor import (
+from skcausal.datasets.model_induced_confounding_regressor import (
     _as_feature_matrix,
     _standardize_matrix,
 )
 
-__all__ = ["SemiSyntheticClassifier"]
+__all__ = ["ModelInducedConfoundingClassifier"]
 
 
 def _default_test_dataset() -> tuple[np.ndarray, np.ndarray]:
@@ -77,7 +77,7 @@ def _as_treatment_labels(values, *, levels: list[str] | None, name: str) -> np.n
     return labels
 
 
-class SemiSyntheticClassifier(BaseSyntheticDataset):
+class ModelInducedConfoundingClassifier(BaseSyntheticDataset):
     r"""Semi-synthetic categorical-treatment dataset from a classification task.
 
     The dataset starts from a supervised classification sample ``(X, y)``
@@ -180,7 +180,7 @@ class SemiSyntheticClassifier(BaseSyntheticDataset):
     def _load_dataset(self):
         if self.load_dataset is None:
             raise NotImplementedError(
-                "SemiSyntheticClassifier requires a load_dataset callable or a "
+                "ModelInducedConfoundingClassifier requires a load_dataset callable or a "
                 "subclass override of _load_dataset()."
             )
         return self.load_dataset()
@@ -225,7 +225,7 @@ class SemiSyntheticClassifier(BaseSyntheticDataset):
     def _predict_proba_matrix(self, covariates: np.ndarray) -> np.ndarray:
         if not hasattr(self.classifier_, "predict_proba"):
             raise ValueError(
-                "SemiSyntheticClassifier requires a classifier implementing "
+                "ModelInducedConfoundingClassifier requires a classifier implementing "
                 "predict_proba()."
             )
 
@@ -331,7 +331,7 @@ class SemiSyntheticClassifier(BaseSyntheticDataset):
         if not hasattr(self.classifier_, "classes_"):
             raise ValueError(
                 "Classifier must expose classes_ after fitting "
-                "SemiSyntheticClassifier."
+                "ModelInducedConfoundingClassifier."
             )
 
         self.treatment_levels_ = _as_string_labels(self.classifier_.classes_).tolist()
@@ -387,7 +387,7 @@ class SemiSyntheticClassifier(BaseSyntheticDataset):
     def _prepare(self, n: int = None):
         if n is not None:
             raise ValueError(
-                "SemiSyntheticClassifier derives its sample size from the loaded "
+                "ModelInducedConfoundingClassifier derives its sample size from the loaded "
                 "dataset and does not support prepare(n=...)."
             )
 
@@ -413,6 +413,7 @@ class SemiSyntheticClassifier(BaseSyntheticDataset):
     @classmethod
     def get_test_params(cls, parameter_set: str = "default"):
         from functools import partial
+
         from sklearn.datasets import load_wine
 
         _load = partial(load_wine, return_X_y=True, as_frame=True)

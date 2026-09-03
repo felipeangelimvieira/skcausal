@@ -3,7 +3,9 @@ import pandas as pd
 import polars as pl
 from sklearn.linear_model import LinearRegression
 
-from skcausal.datasets.semi_synthetic_regressor import SemiSyntheticRegressor
+from skcausal.datasets.model_induced_confounding_regressor import (
+    ModelInducedConfoundingRegressor,
+)
 
 
 def _toy_regression_dataset():
@@ -22,7 +24,7 @@ def _toy_regression_dataset():
 
 
 def test_semisynthetic_regressor_predict_y_accepts_backends_and_adds_spline_effect():
-    dataset = SemiSyntheticRegressor(
+    dataset = ModelInducedConfoundingRegressor(
         regressor=LinearRegression(),
         load_dataset=_toy_regression_dataset,
         random_state=3,

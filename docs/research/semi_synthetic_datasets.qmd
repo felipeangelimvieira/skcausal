@@ -1,0 +1,376 @@
+---
+title: "Semi-Synthetic Datasets"
+execute:
+    warning: false
+    freeze: true
+---
+
+Use this guide when you want benchmark data whose covariates are real but whose
+treatment assignment and outcome surface are known exactly.
+
+::: {.callout-note appearance="simple"}
+## What a semi-synthetic dataset is
+
+`CategoricalSemiSyntheticDataset` and `ContinuousSemiSyntheticDataset` take
+any `BaseDataset` as a source of covariates, keep its `X` untouched, and
+simulate treatment and outcome from a frozen structural model. Because the
+model is frozen, the dataset can answer questions a real dataset cannot: what
+is $\mathbb{E}[Y(a)]$, what is $g(a \mid x)$, and how biased is the naive
+observational curve.
+:::
+
+Fully synthetic datasets such as `SyntheticDataset2` control everything but
+use Gaussian covariates. Real datasets have realistic covariate structure but no
+ground truth. Semi-synthetic datasets sit in between: the covariate dependence,
+categorical levels, and missingness come from real data, while confounding
+strength, overlap, effect size, and noise are configuration knobs.
+
+## Step 1: Imports and a covariate source
+
+Any dataset object works as a source. Here we use the IHDP covariates: 747
+rows and 25 mixed binary and continuous columns.
+
+```{python}
+import numpy as np
+import polars as pl
+import matplotlib.pyplot as plt
+
+from sklearn.compose import ColumnTransformer, make_column_selector
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import OneHotEncoder
+
+from skcausal.causal_estimators import DirectNoCovariates, DirectRegressor
+from skcausal.datasets import (
+    CategoricalSemiSyntheticDataset,
+    ContinuousSemiSyntheticDataset,
+    IHDPContinuous,
+)
+from skcausal.plotting import use_theme
+
+use_theme()
+
+source = IHDPContinuous()
+X_source, _, _ = source.load()
+X_source.shape
+```
+
+The source treatment and outcome are ignored. Only the covariate frame is
+used, and it is released exactly as loaded.
+
+```{python}
+# | code-fold: true
+def make_regressor(random_state: int = 0):
+    """Random forest that one-hot encodes any string or categorical column."""
+    encoder = ColumnTransformer(
+        [
+            (
+                "categorical",
+                OneHotEncoder(handle_unknown="ignore"),
+                make_column_selector(dtype_include=["object", "category", "string"]),
+            )
+        ],
+        remainder="passthrough",
+    )
+    forest = RandomForestRegressor(
+        n_estimators=100, min_samples_leaf=10, random_state=random_state
+    )
+    return make_pipeline(encoder, forest)
+```
+
+## Step 2: A binary treatment with a calibrated amount of confounding
+
+The most common benchmark need is "a binary treatment whose naive comparison
+is off by a known amount". `target_confounding_bias` asks for that directly:
+the value is the naive treated-minus-control distortion in units of the
+baseline-outcome standard deviation.
+
+```{python}
+binary = CategoricalSemiSyntheticDataset(
+    source,
+    n_treatments=2,
+    target_probabilities=[0.7, 0.3],
+    target_confounding_bias=0.5,
+    randomized_weight=0.1,
+    random_state=0,
+)
+X, t, y = binary.load()
+
+pl.concat([X.select(X.columns[:4]).head(5), t.head(5), y.head(5)], how="horizontal")
+```
+
+The released `X` is the IHDP frame, `t` is a categorical column with levels
+`"0"` and `"1"`, and `y` is Gaussian around the frozen outcome surface.
+
+Preparation calibrates the assignment strength until the oracle bias matches
+the target, and stores what it found:
+
+```{python}
+pl.DataFrame(
+    {
+        "confounding_strength_": [binary.confounding_strength_],
+        "confounding_bias_ratio_": [binary.confounding_bias_ratio_],
+        "share treated": [float((t["t"] == "1").mean())],
+    }
+)
+```
+
+The marginal treated share matches `target_probabilities` because the softmax
+intercepts are recalibrated at every candidate strength. Compare the naive
+group means to the true average potential outcomes:
+
+```{python}
+levels = binary.get_levels()
+truth = np.asarray(binary.predict(X, levels)).reshape(-1)
+naive = (
+    pl.concat([t, y], how="horizontal")
+    .group_by("t")
+    .agg(pl.col("y").mean())
+    .sort("t")
+)
+pl.DataFrame(
+    {
+        "level": levels["t"].cast(pl.Utf8),
+        "true E[Y(a)]": truth,
+        "naive E[Y | A=a]": naive["y"],
+    }
+).with_columns((pl.col("naive E[Y | A=a]") - pl.col("true E[Y(a)]")).alias("distortion"))
+```
+
+The difference between the two distortions is the calibrated bias, up to the
+sampling noise of one draw of `y`.
+
+## Step 3: Sweep confounding strength for a continuous treatment
+
+For dose-response benchmarks the same knob controls the root-mean-square gap
+between the naive curve $\mathbb{E}[Y \mid A=a]$ and the causal curve
+$\mathbb{E}[Y(a)]$, averaged over the treatment distribution. Sweeping it shows
+how fast a naive estimator degrades.
+
+```{python}
+targets = [0.0, 0.25, 0.5, 1.0]
+sweep = {
+    target: ContinuousSemiSyntheticDataset(
+        source,
+        treatment_domain="real",
+        target_confounding_bias=target,
+        randomized_weight=0.1,
+        random_state=1,
+    )
+    for target in targets
+}
+pl.DataFrame(
+    {
+        "target": targets,
+        "confounding_strength_": [d.confounding_strength_ for d in sweep.values()],
+        "confounding_bias_ratio_": [d.confounding_bias_ratio_ for d in sweep.values()],
+    }
+)
+```
+
+All four datasets share the same score definitions, coefficients, and outcome
+surface: only the assignment strength differs. That makes the curves directly
+comparable.
+
+```{python}
+# | code-fold: true
+fig, axes = plt.subplots(1, len(targets), figsize=(14, 3.4))
+for ax, (target, dataset) in zip(axes, sweep.items()):
+    X, t, y = dataset.load()
+    grid = dataset.get_grid(40)
+    truth_curve = np.asarray(dataset.predict(X, grid)).reshape(-1)
+    naive_model = DirectNoCovariates(make_regressor()).fit(X, t, y)
+    naive_curve = np.asarray(naive_model.predict(grid)).reshape(-1)
+
+    ax.plot(grid["t"], truth_curve, label="true E[Y(a)]", linewidth=2)
+    ax.plot(grid["t"], naive_curve, label="naive E[Y | A=a]", linestyle="--")
+    ax.set_title(f"target bias = {target}")
+    ax.set_xlabel("treatment")
+axes[0].set_ylabel("outcome")
+axes[0].legend(loc="lower left")
+plt.tight_layout()
+```
+
+At a target of zero the naive curve tracks the truth up to regression noise;
+at one baseline standard deviation it is visibly wrong.
+
+## Step 4: Control overlap separately from confounding
+
+Confounding and overlap are different properties. Two datasets can have the
+same oracle bias while one has treatment densities that nearly separate by
+covariate profile. Overlap is set by `randomized_weight` (the share of
+assignments that ignore covariates) and, for continuous treatments,
+`treatment_noise_scale`.
+
+Bounded domains are useful here. A `(lower, upper)` tuple gives a dose that
+lives strictly inside the interval, with the exact density available from
+`log_prob`.
+
+```{python}
+overlap_configs = {
+    "good overlap": dict(randomized_weight=0.3, treatment_noise_scale=1.5),
+    "poor overlap": dict(randomized_weight=0.02, treatment_noise_scale=0.5),
+}
+overlap = {
+    name: ContinuousSemiSyntheticDataset(
+        source,
+        treatment_domain=(0.0, 100.0),
+        confounding_strength=1.5,
+        random_state=2,
+        **config,
+    )
+    for name, config in overlap_configs.items()
+}
+pl.DataFrame(
+    {
+        "configuration": list(overlap),
+        "confounding_bias_ratio_": [d.confounding_bias_ratio_ for d in overlap.values()],
+    }
+)
+```
+
+To visualise overlap, split units by their frozen baseline risk `source_mu0_`
+(the outcome they would have at the reference treatment) and compare the dose
+distributions of the lowest and highest tertiles.
+
+```{python}
+# | code-fold: true
+fig, axes = plt.subplots(1, 2, figsize=(11, 3.4), sharey=True)
+for ax, (name, dataset) in zip(axes, overlap.items()):
+    X, t, y = dataset.load()
+    doses = t["t"].to_numpy()
+    tertiles = np.quantile(dataset.source_mu0_, [1 / 3, 2 / 3])
+    low = dataset.source_mu0_ <= tertiles[0]
+    high = dataset.source_mu0_ >= tertiles[1]
+    bins = np.linspace(0.0, 100.0, 30)
+    ax.hist(doses[low], bins=bins, alpha=0.6, label="low baseline risk")
+    ax.hist(doses[high], bins=bins, alpha=0.6, label="high baseline risk")
+    ax.set_title(name)
+    ax.set_xlabel("dose")
+axes[0].set_ylabel("units")
+axes[0].legend()
+plt.tight_layout()
+```
+
+With poor overlap the high-risk group almost never receives low doses, so any
+estimator has to extrapolate there. `log_prob(X, t)` returns the exact
+conditional log-density of each observed dose, which is the quantity
+propensity-style diagnostics need:
+
+```{python}
+X, t, _ = overlap["poor overlap"].load()
+log_density = overlap["poor overlap"].log_prob(X, t)[:, 0]
+pl.DataFrame({"quantile": ["1%", "50%", "99%"], "log g(a|x)": np.quantile(log_density, [0.01, 0.5, 0.99])})
+```
+
+## Step 5: Multi-level treatments with treatment-only predictors
+
+Categorical treatments can have any number of levels and any target marginal.
+The optional `treatment_only_strength` adds covariate signal that predicts the
+treatment but is orthogonal, to second order, to the outcome surface. That
+makes assignment more predictable without adding bias, which is what tests
+whether an estimator over-adjusts for instrument-like covariates.
+
+```{python}
+three_level = CategoricalSemiSyntheticDataset(
+    source,
+    n_treatments=3,
+    target_probabilities=[0.5, 0.3, 0.2],
+    confounding_strength=0.0,
+    treatment_only_strength=1.0,
+    random_state=3,
+)
+_, t, _ = three_level.load()
+t["t"].value_counts().sort("t")
+```
+
+Because real covariates are dependent, a small residual bias floor remains at
+zero confounding strength when treatment-only predictors are on. It is stored
+so you can report it:
+
+```{python}
+pl.DataFrame(
+    {
+        "treatment_only_strength": [0.0, 1.0],
+        "bias ratio at strength 0": [
+            CategoricalSemiSyntheticDataset(
+                source, n_treatments=3, confounding_strength=0.0,
+                treatment_only_strength=value, random_state=3,
+            ).confounding_bias_ratio_
+            for value in (0.0, 1.0)
+        ],
+    }
+)
+```
+
+Leave `treatment_only_strength` at its default of zero when you need an
+exactly unconfounded baseline. Requesting a `target_confounding_bias` below the
+floor raises an error naming the floor.
+
+## Step 6: Replications for Monte Carlo studies
+
+`load()` always returns the same initial draw. `sample(random_state)` draws
+fresh treatment and outcome noise while keeping `X`, the assignment law, and
+the outcome surface fixed, so replications differ only by sampling noise.
+
+```{python}
+dataset = sweep[0.5]
+grid = dataset.get_grid(30)
+X, _, _ = dataset.load()
+truth_curve = np.asarray(dataset.predict(X, grid)).reshape(-1)
+
+errors = {"naive": [], "direct": []}
+for replication in range(5):
+    X_rep, t_rep, y_rep = dataset.sample(random_state=replication)
+    for name, estimator in {
+        "naive": DirectNoCovariates(make_regressor()),
+        "direct": DirectRegressor(make_regressor()),
+    }.items():
+        curve = np.asarray(estimator.fit(X_rep, t_rep, y_rep).predict(grid)).reshape(-1)
+        errors[name].append(float(np.sqrt(np.mean((curve - truth_curve) ** 2))))
+
+pl.DataFrame(
+    {
+        "estimator": list(errors),
+        "mean RMSE": [np.mean(values) for values in errors.values()],
+        "sd RMSE": [np.std(values) for values in errors.values()],
+    }
+)
+```
+
+For sweeps over the structural draw itself (different score definitions and
+coefficients), change `random_state` in the constructor instead, or pass the
+dataset to `evaluate_multiple_dataset_seeds` from the
+[benchmarking guide](benchmarking.qmd).
+
+## Configuration reference
+
+| Parameter | Applies to | What it controls |
+| --- | --- | --- |
+| `real_dataset` | both | Source of covariates; cloned, only `X` is used. |
+| `confounding_strength` | both | Scale $\lambda$ of the outcome-predictive assignment signal. Zero means no confounding. |
+| `target_confounding_bias` | both | Calibrates $\lambda$ so the oracle bias, in baseline-outcome standard deviations, equals this value. Overrides `confounding_strength`. |
+| `treatment_only_strength` | both | Scale of residualized treatment-only predictors. Opt-in; adds a small bias floor. |
+| `randomized_weight` | both | Share of covariate-independent assignments; the main overlap knob. |
+| `n_treatments`, `target_probabilities` | categorical | Number of levels and the empirical marginal the intercepts are calibrated to. |
+| `treatment_domain` | continuous | `"real"`, `"positive"`, or a finite `(lower, upper)` interval. |
+| `treatment_noise_scale` | continuous | Latent Gaussian standard deviation; smaller values sharpen assignment. |
+| `outcome_effect_scale` | both | Size of treatment main effects relative to the unit-variance baseline outcome. |
+| `effect_heterogeneity_scale` | both | Size of treatment-by-covariate interactions. |
+| `outcome_noise_scale` | both | Gaussian outcome noise. |
+| `random_state` | both | Seeds both the frozen structure and the initial sample. |
+
+Fitted attributes worth reporting alongside benchmark results are
+`confounding_strength_`, `confounding_bias_`, `confounding_bias_ratio_`, and
+`baseline_standard_deviation_`.
+
+## Extending the family
+
+Both classes subclass `BaseSemiSyntheticDataset`, which owns the lifecycle and
+the public `load`, `sample`, `predict`, `predict_y`, `log_prob`, and `get_grid`
+methods. A new DGP implements six hooks: `_prepare_dgp`, `_sample_treatment`,
+`_log_prob`, `_predict_y`, `_sample_outcome`, and `_get_grid`. The base class
+also provides the frozen causal score map, the standardized baseline outcome
+surface, and confounding-strength calibration against any bias metric you
+supply, so vector, ordinal, count, or non-Gaussian outcome variants only need
+to write the assignment and outcome mathematics.

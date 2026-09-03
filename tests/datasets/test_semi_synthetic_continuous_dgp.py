@@ -405,7 +405,7 @@ def test_bounded_domain_requires_distinct_representable_interior_treatments(
 
 
 def test_extreme_finite_continuous_configuration_rejects_nonfinite_log_weights():
-    with pytest.raises(ValueError, match="at least one finite log weight"):
+    with pytest.raises(ValueError, match="not representable"):
         ContinuousSemiSyntheticDataset(
             ToyRealDataset(),
             treatment_domain="real",
@@ -423,12 +423,17 @@ def test_continuous_latent_mean_rejects_nonrepresentable_derived_values():
         dataset._latent_mean(X, strength=np.finfo(float).max)
 
 
-def test_continuous_treatment_basis_rejects_nonrepresentable_derived_values():
+def test_continuous_treatment_basis_grows_at_most_linearly():
     dataset = ContinuousSemiSyntheticDataset(ToyRealDataset(), random_state=7)
     X, _, _ = dataset.load()
+    far = np.array([[1e6]])
+    near = np.array([[10.0]])
 
-    with pytest.raises(ValueError, match="treatment basis must be finite"):
-        dataset.predict_y(X.head(1), np.array([[1e200]]))
+    far_mean = dataset.predict_y(X.head(1), far)[0, 0]
+    near_mean = dataset.predict_y(X.head(1), near)[0, 0]
+
+    assert np.isfinite(far_mean)
+    assert abs(far_mean) <= 1e6 / 10.0 * abs(near_mean) + 1e6
 
 
 def test_continuous_oracle_rejects_nonrepresentable_outcome_means():
@@ -443,15 +448,9 @@ def test_continuous_oracle_rejects_nonrepresentable_outcome_means():
 def test_continuous_outcome_sampler_rejects_nonrepresentable_samples():
     dataset = ContinuousSemiSyntheticDataset(ToyRealDataset(), random_state=7)
     dataset.outcome_noise_scale = np.finfo(float).max
-    largest_finite_mean = np.full((1, 1), np.finfo(float).max)
 
     with pytest.raises(ValueError, match="Sampled outcomes must be finite"):
-        dataset._sample_outcome(
-            largest_finite_mean,
-            None,
-            None,
-            np.random.default_rng(0),
-        )
+        dataset.sample(random_state=0)
 
 
 def test_continuous_target_bias_calibrates_strength():
@@ -482,7 +481,7 @@ def test_continuous_zero_target_selects_zero_strength():
     assert dataset.confounding_bias_ratio_ == 0.0
 
 
-def test_continuous_fixed_strength_bias_uses_frozen_grid_rms_discrepancy():
+def test_continuous_fixed_strength_bias_is_marginal_weighted_rms_discrepancy():
     dataset = ContinuousSemiSyntheticDataset(
         ToyRealDataset(),
         confounding_strength=0.75,
@@ -491,22 +490,90 @@ def test_continuous_fixed_strength_bias_uses_frozen_grid_rms_discrepancy():
         random_state=19,
     )
     X, _, _ = dataset.load()
+    means = dataset._latent_mean(X)
+    lower = min(means.min(), 0.0) - 6.0 * dataset.treatment_noise_scale
+    upper = max(means.max(), 0.0) + 6.0 * dataset.treatment_noise_scale
+    grid = np.linspace(lower, upper, 4001)
+    marginal = []
     distortions = []
-    for intervention in dataset.get_grid(31).get_column("t"):
+    for intervention in grid:
         repeated_treatment = np.full((X.height, 1), intervention)
         outcome_means = dataset.predict_y(X, repeated_treatment)[:, 0]
-        log_density = dataset.log_prob(X, repeated_treatment)[:, 0]
-        weights = np.exp(log_density - np.max(log_density))
-        weights /= weights.sum()
+        density = np.exp(dataset.log_prob(X, repeated_treatment)[:, 0])
+        marginal.append(density.mean())
+        weights = density / density.sum()
         distortions.append(weights @ outcome_means - outcome_means.mean())
-    expected_bias = np.sqrt(np.mean(np.square(distortions)))
+    marginal = np.asarray(marginal)
+    distortions = np.asarray(distortions)
+    expected_bias = np.sqrt(
+        np.trapezoid(marginal * distortions**2, grid) / np.trapezoid(marginal, grid)
+    )
 
     np.testing.assert_allclose(dataset.confounding_strength_, 0.75)
-    np.testing.assert_allclose(dataset.confounding_bias_, expected_bias)
+    np.testing.assert_allclose(dataset.confounding_bias_, expected_bias, rtol=1e-3)
     np.testing.assert_allclose(
         dataset.confounding_bias_ratio_,
-        expected_bias / dataset.baseline_standard_deviation_,
+        dataset.confounding_bias_ / dataset.baseline_standard_deviation_,
     )
+
+
+def test_continuous_bias_is_monotone_in_strength_with_small_floor():
+    from skcausal.datasets.kang_schafer import KangSchaferContinuous
+
+    real = KangSchaferContinuous(n=400, random_state=1)
+    ratios = [
+        ContinuousSemiSyntheticDataset(
+            real,
+            confounding_strength=strength,
+            treatment_only_strength=1.0,
+            random_state=5,
+        ).confounding_bias_ratio_
+        for strength in (0.0, 0.5, 1.0, 2.0, 4.0)
+    ]
+
+    assert ratios[0] < 0.1
+    assert np.all(np.diff(ratios) > 0.0)
+
+
+def test_continuous_default_configuration_calibrates_and_reaches_zero():
+    from skcausal.datasets.kang_schafer import KangSchaferContinuous
+
+    real = KangSchaferContinuous(n=200, random_state=1)
+    for target in (0.0, 0.2, 0.6):
+        dataset = ContinuousSemiSyntheticDataset(
+            real, target_confounding_bias=target, random_state=3
+        )
+        np.testing.assert_allclose(dataset.confounding_bias_ratio_, target, atol=1e-6)
+    zero = ContinuousSemiSyntheticDataset(
+        real, target_confounding_bias=0.0, random_state=3
+    )
+    assert zero.confounding_strength_ == 0.0
+
+    with pytest.raises(ValueError, match="below the bias floor"):
+        ContinuousSemiSyntheticDataset(
+            real,
+            target_confounding_bias=0.0,
+            treatment_only_strength=1.0,
+            random_state=3,
+        )
+
+
+def test_continuous_grid_covers_the_central_marginal_and_basis_region():
+    from skcausal.datasets.kang_schafer import KangSchaferContinuous
+
+    dataset = ContinuousSemiSyntheticDataset(
+        KangSchaferContinuous(n=300, random_state=2),
+        confounding_strength=3.0,
+        random_state=4,
+    )
+    _, treatment, _ = dataset.load()
+    grid = dataset.get_grid(50).get_column("t").to_numpy()
+    observed = treatment.get_column("t").to_numpy()
+
+    assert grid[0] <= np.quantile(observed, 0.05)
+    assert grid[-1] >= np.quantile(observed, 0.95)
+    assert grid[0] <= dataset.latent_basis_bounds_[0]
+    assert grid[-1] >= dataset.latent_basis_bounds_[1]
 
 
 def test_fully_randomized_continuous_assignment_has_zero_oracle_bias():
