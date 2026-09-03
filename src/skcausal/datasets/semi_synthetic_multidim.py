@@ -173,7 +173,14 @@ class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
     confounding_strength : float, default=1.0
         Nonnegative scale of the outcome-predictive assignment signal.
     target_confounding_bias : float or None, default=None
-        Optional nonnegative normalized oracle-bias calibration target.
+        Optional nonnegative normalized oracle-bias calibration target. The
+        bias metric need not be monotone in ``confounding_strength``, so the
+        frozen strength is the smallest crossing bracketed by the search
+        ladder; a target that falls inside a local bump may therefore resolve
+        to a larger strength than the first crossing of the underlying curve.
+        The metric itself is a fixed 1024-point Monte Carlo estimate under the
+        marginal treatment law, so its resolution is of order ``1/sqrt(1024)``
+        relative.
     treatment_only_strength : float, default=0.0
         Nonnegative scale of the residualized treatment-only predictors.
     randomized_weight : float, default=0.1
@@ -491,8 +498,12 @@ class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
                     )
             return value
 
+        # The randomized component has no row dependence, so evaluate it once per
+        # design point and let ``_log_mixture`` broadcast it against the confounded
+        # term rather than materializing an identical value for every row.
+        randomized_location = np.zeros((1,) * (means.ndim - 1) + (means.shape[-1],))
         return _log_mixture(
-            component(means), component(np.zeros_like(means)), self.randomized_weight
+            component(means), component(randomized_location), self.randomized_weight
         )
 
     def _release(self, latent):

@@ -1,7 +1,7 @@
 import numpy as np
 import polars as pl
 import pytest
-from scipy.special import ndtr
+from scipy.special import ndtr, ndtri
 from scipy.stats import multivariate_normal
 
 from skcausal.datasets.kang_schafer import KangSchaferContinuous
@@ -60,7 +60,8 @@ def test_exchangeable_correlation_is_symmetric_with_unit_diagonal():
 def test_interval_log_mass_matches_direct_formula_and_tails():
     lower = np.array([-np.inf, -1.0, 0.5, -np.inf, 30.0, -0.2])
     upper = np.array([-0.5, 0.25, np.inf, np.inf, np.inf, 0.2])
-    expected = np.log(ndtr(upper) - ndtr(lower))
+    with np.errstate(divide="ignore"):
+        expected = np.log(ndtr(upper) - ndtr(lower))
     expected[4] = np.log(ndtr(-30.0))
     np.testing.assert_allclose(_interval_log_mass(lower, upper), expected, rtol=1e-12)
     # Deep tail below the double range of ndtr differences.
@@ -155,6 +156,42 @@ def test_multidim_releases_named_continuous_columns_and_density_integrates():
     density = np.exp(dataset.log_prob(repeated_X, lattice)[:, 0]).reshape(241, 241)
     integral = np.trapezoid(np.trapezoid(density, axis, axis=1), axis)
     np.testing.assert_allclose(integral, 1.0, atol=2e-3)
+
+
+def test_multidim_honors_a_nonunit_treatment_noise_scale():
+    dataset = _two_continuous(
+        treatment_noise_scale=2.0, treatment_correlation=0.4, randomized_weight=0.3
+    )
+    X, _, _ = dataset.load()
+    np.testing.assert_allclose(np.diag(dataset.noise_covariance_), 4.0)
+
+    axis = np.linspace(-24.0, 24.0, 481)
+    lattice = np.array(np.meshgrid(axis, axis, indexing="ij")).reshape(2, -1).T
+    repeated_X = X.to_numpy()[np.zeros(lattice.shape[0], dtype=int)]
+    density = np.exp(dataset.log_prob(repeated_X, lattice)[:, 0]).reshape(481, 481)
+    integral = np.trapezoid(np.trapezoid(density, axis, axis=1), axis)
+    np.testing.assert_allclose(integral, 1.0, atol=2e-3)
+
+    at_reference = dataset.predict_y(X, np.zeros((X.height, 2)))[:, 0]
+    np.testing.assert_allclose(at_reference, dataset.source_mu0_)
+
+    # The outcome basis reads latent / sigma, so doubling sigma and the treatment
+    # together must leave the dose-response untouched. Every structural draw is
+    # seeded identically, so the two datasets differ only in sigma.
+    unit_scale = _two_continuous(
+        treatment_noise_scale=1.0, treatment_correlation=0.4, randomized_weight=0.3
+    )
+    treatment = np.tile([0.7, -1.3], (X.height, 1))
+    np.testing.assert_allclose(
+        dataset.predict_y(X, 2.0 * treatment), unit_scale.predict_y(X, treatment)
+    )
+
+    central = ndtri(np.array([0.01, 0.99])) * 2.0
+    grid = dataset.get_grid(9)
+    assert grid.shape == (9, 2)
+    for name in ("t_0", "t_1"):
+        column = grid.get_column(name)
+        assert column.min() <= central[0] and column.max() >= central[1]
 
 
 def test_multidim_log_prob_is_the_exact_gaussian_mixture():
