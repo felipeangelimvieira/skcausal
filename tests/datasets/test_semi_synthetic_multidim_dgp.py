@@ -65,6 +65,14 @@ def test_interval_log_mass_matches_direct_formula_and_tails():
     assert np.isfinite(_interval_log_mass(np.array([-np.inf]), np.array([-40.0])))[0]
 
 
+def test_interval_log_mass_returns_negative_infinity_for_zero_mass_bounds():
+    lower = np.array([-np.inf, np.inf, 1.0, -np.inf, 0.5])
+    upper = np.array([-np.inf, np.inf, -1.0, -np.inf, 0.5])
+    result = _interval_log_mass(lower, upper)
+    assert np.all(result == -np.inf)
+    assert not np.any(np.isnan(result))
+
+
 def test_gaussian_logpdf_matches_scipy_and_handles_empty_dimension():
     covariance = np.array([[2.0, 0.6], [0.6, 1.0]])
     cholesky = np.linalg.cholesky(covariance)

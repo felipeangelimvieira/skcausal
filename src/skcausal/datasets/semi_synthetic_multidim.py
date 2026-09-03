@@ -63,7 +63,11 @@ def _exchangeable_correlation(n_components, correlation):
 
 
 def _interval_log_mass(lower, upper):
-    """``log(Phi(upper) - Phi(lower))`` evaluated on the side with small mass."""
+    """``log(Phi(upper) - Phi(lower))`` evaluated on the side with small mass.
+
+    Any pair with ``lower >= upper`` (including equal or equal-infinite
+    bounds) has zero mass and returns ``-inf``.
+    """
 
     lower = np.asarray(lower, dtype=float)
     upper = np.asarray(upper, dtype=float)
@@ -72,7 +76,8 @@ def _interval_log_mass(lower, upper):
         right = log_ndtr(-lower) + np.log1p(
             -np.exp(log_ndtr(-upper) - log_ndtr(-lower))
         )
-    return np.where(upper <= 0.0, left, right)
+        selected = np.where(upper <= 0.0, left, right)
+    return np.where(lower < upper, selected, -np.inf)
 
 
 def _gaussian_logpdf(residual, cholesky):
