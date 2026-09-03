@@ -1,12 +1,15 @@
 import numpy as np
 import polars as pl
 import pytest
+from scipy.special import ndtr
 
 from skcausal.datasets.semi_synthetic import (
+    _bisect_marginal_quantiles,
     _calibrate_confounding_strength,
     _calibrate_softmax_intercepts,
     _fit_baseline_surface,
     _fit_causal_score_map,
+    _gaussian_mixture_marginal_cdf,
     _log_mixture,
     _normal_logpdf,
     _normalized_log_weights,
@@ -299,3 +302,30 @@ def test_baseline_surface_accepts_fixed_confounder_coefficients():
         _fit_baseline_surface(
             scores, np.random.default_rng(9), confounder_coefficients=[1.0, 0.5]
         )
+
+
+def test_gaussian_mixture_marginal_cdf_and_quantiles_agree_with_closed_form():
+    means = np.array([-1.0, 0.5, 2.0])
+    scale, weight = 1.5, 0.25
+    latent = np.array([-3.0, 0.0, 1.0, 4.0])
+
+    expected = (1.0 - weight) * ndtr((latent[:, None] - means[None, :]) / scale).mean(
+        axis=1
+    ) + weight * ndtr(latent / scale)
+    np.testing.assert_allclose(
+        _gaussian_mixture_marginal_cdf(latent, means, scale, weight), expected
+    )
+
+    probabilities = np.array([0.1, 0.5, 0.9])
+    quantiles = _bisect_marginal_quantiles(
+        lambda value: _gaussian_mixture_marginal_cdf(value, means, scale, weight),
+        probabilities,
+        -20.0,
+        20.0,
+    )
+    np.testing.assert_allclose(
+        _gaussian_mixture_marginal_cdf(quantiles, means, scale, weight),
+        probabilities,
+        atol=1e-9,
+    )
+    assert np.all(np.diff(quantiles) > 0.0)

@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import polars as pl
 from scipy.optimize import brentq
-from scipy.special import logsumexp
+from scipy.special import logsumexp, ndtr
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import make_pipeline
@@ -468,6 +468,44 @@ def _normalized_log_weights(log_values):
     if not np.isfinite(total) or total <= 0.0:
         raise ValueError("Normalized log weights must have a finite positive sum.")
     return weights / total
+
+
+def _log_mixture_probability(confounded, randomized, weight):
+    if weight == 0.0:
+        return confounded
+    if weight == 1.0:
+        return randomized
+    return (1.0 - weight) * confounded + weight * randomized
+
+
+def _gaussian_mixture_marginal_cdf(latent, means, scale, weight):
+    """CDF of the row-averaged latent mixture at each ``latent`` value.
+
+    The marginal is ``(1 - weight) * mean_i N(means_i, scale^2)`` plus
+    ``weight * N(0, scale^2)``.
+    """
+
+    latent = np.asarray(latent, dtype=float)
+    means = np.asarray(means, dtype=float)
+    confounded = ndtr((latent[:, None] - means[None, :]) / scale).mean(axis=1)
+    randomized = ndtr(latent / scale)
+    return _log_mixture_probability(confounded, randomized, weight)
+
+
+def _bisect_marginal_quantiles(cdf, probabilities, lower, upper):
+    """Vectorized bisection of a monotone ``cdf`` on ``[lower, upper]``."""
+
+    probabilities = np.asarray(probabilities, dtype=float)
+    low = np.full(probabilities.shape, float(lower))
+    high = np.full(probabilities.shape, float(upper))
+    for _ in range(200):
+        middle = 0.5 * low + 0.5 * high
+        below = cdf(middle) < probabilities
+        low = np.where(below, middle, low)
+        high = np.where(below, high, middle)
+        if np.all(high - low <= 1e-12 * np.maximum(1.0, np.abs(middle))):
+            break
+    return 0.5 * low + 0.5 * high
 
 
 def _finite_metric(metric, strength):

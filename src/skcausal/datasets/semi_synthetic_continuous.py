@@ -6,7 +6,10 @@ from scipy.special import expit, log_ndtr, logsumexp, ndtr, ndtri, ndtri_exp
 
 from skcausal.datasets.semi_synthetic import (
     BaseSemiSyntheticDataset,
+    _bisect_marginal_quantiles,
+    _gaussian_mixture_marginal_cdf,
     _log_mixture,
+    _log_mixture_probability,
     _normal_logpdf,
     _validate_shared_dgp_parameters,
 )
@@ -478,26 +481,25 @@ class ContinuousSemiSyntheticDataset(BaseSemiSyntheticDataset):
 
     def _latent_marginal_cdf(self, latent, means):
         scale = self.treatment_noise_scale
-        latent = np.asarray(latent, dtype=float)[:, None]
         if self.treatment_domain == "real":
-            confounded = ndtr((latent - means[None, :]) / scale)
-            randomized = ndtr(latent / scale)
-        else:
-            lower, upper = self.latent_support_bounds_
-            confounded_mass, randomized_mass = self._component_log_masses(means)
-            confounded = _interval_cdf(
-                (latent - means[None, :]) / scale,
-                ((lower - means) / scale)[None, :],
-                ((upper - means) / scale)[None, :],
-                confounded_mass[None, :],
+            return _gaussian_mixture_marginal_cdf(
+                latent, means, scale, self.randomized_weight
             )
-            randomized = _interval_cdf(
-                latent / scale, lower / scale, upper / scale, randomized_mass
-            )
-        mixture = _log_mixture_probability(
+        latent = np.asarray(latent, dtype=float)[:, None]
+        lower, upper = self.latent_support_bounds_
+        confounded_mass, randomized_mass = self._component_log_masses(means)
+        confounded = _interval_cdf(
+            (latent - means[None, :]) / scale,
+            ((lower - means) / scale)[None, :],
+            ((upper - means) / scale)[None, :],
+            confounded_mass[None, :],
+        )
+        randomized = _interval_cdf(
+            latent / scale, lower / scale, upper / scale, randomized_mass
+        )
+        return _log_mixture_probability(
             confounded.mean(axis=1), randomized[:, 0], self.randomized_weight
         )
-        return mixture
 
     def _latent_marginal_range(self, means):
         scale = self.treatment_noise_scale
@@ -512,16 +514,12 @@ class ContinuousSemiSyntheticDataset(BaseSemiSyntheticDataset):
 
     def _latent_marginal_quantiles(self, probabilities, means):
         lower, upper = self._latent_marginal_range(means)
-        low = np.full(probabilities.shape, lower)
-        high = np.full(probabilities.shape, upper)
-        for _ in range(200):
-            middle = 0.5 * low + 0.5 * high
-            below = self._latent_marginal_cdf(middle, means) < probabilities
-            low = np.where(below, middle, low)
-            high = np.where(below, high, middle)
-            if np.all(high - low <= 1e-12 * np.maximum(1.0, np.abs(middle))):
-                break
-        return 0.5 * low + 0.5 * high
+        return _bisect_marginal_quantiles(
+            lambda value: self._latent_marginal_cdf(value, means),
+            probabilities,
+            lower,
+            upper,
+        )
 
     def _latent_quadrature(self, means):
         """Latent grid and normalized marginal-density weights."""
@@ -671,11 +669,3 @@ class ContinuousSemiSyntheticDataset(BaseSemiSyntheticDataset):
                 "random_state": 8,
             },
         ]
-
-
-def _log_mixture_probability(confounded, randomized, weight):
-    if weight == 0.0:
-        return confounded
-    if weight == 1.0:
-        return randomized
-    return (1.0 - weight) * confounded + weight * randomized
