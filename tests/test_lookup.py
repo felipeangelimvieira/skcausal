@@ -2,6 +2,7 @@ from skcausal.datasets import (
     BaseSemiSyntheticDataset,
     CategoricalSemiSyntheticDataset,
     ContinuousSemiSyntheticDataset,
+    MultidimSemiSyntheticDataset,
 )
 from skcausal.utils.lookup import (
     all_causal_average_response_estimators,
@@ -29,5 +30,7 @@ def test_semi_synthetic_datasets_are_public_and_discoverable():
     assert BaseSemiSyntheticDataset.__name__ == "BaseSemiSyntheticDataset"
     assert CategoricalSemiSyntheticDataset.__name__ == "CategoricalSemiSyntheticDataset"
     assert ContinuousSemiSyntheticDataset.__name__ == "ContinuousSemiSyntheticDataset"
+    assert MultidimSemiSyntheticDataset.__name__ == "MultidimSemiSyntheticDataset"
     assert "CategoricalSemiSyntheticDataset" in names
     assert "ContinuousSemiSyntheticDataset" in names
+    assert "MultidimSemiSyntheticDataset" in names

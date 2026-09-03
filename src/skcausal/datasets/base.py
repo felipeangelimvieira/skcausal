@@ -401,37 +401,45 @@ class BaseSyntheticDataset(BaseDataset):
         covariates = self._check_and_transform_X(covariates)
         treatment_grid = self._check_and_transform_t(treatment_grid)
 
-        if isinstance(treatment_grid, pl.DataFrame):
-            treatment_rows = list(treatment_grid.to_numpy())
-        else:
-            treatment_array = np.asarray(treatment_grid)
-            if treatment_array.ndim == 0:
-                treatment_rows = [treatment_array.item()]
-            elif treatment_array.ndim == 1:
-                treatment_rows = list(treatment_array)
-            else:
-                treatment_rows = list(treatment_array)
-
         covariate_count = (
             covariates.height
             if isinstance(covariates, pl.DataFrame)
             else covariates.shape[0]
         )
 
-        curve = []
-        for treatment in treatment_rows:
-            treatment_array = np.asarray(treatment)
-            if treatment_array.ndim == 0:
-                tiled_treatments = np.full(covariate_count, treatment_array.item())
-            else:
-                tiled_treatments = np.tile(
-                    treatment_array.reshape(1, -1), (covariate_count, 1)
+        tiled_treatments = []
+        if isinstance(treatment_grid, pl.DataFrame):
+            # Tiling a mixed continuous/categorical grid through NumPy would
+            # collapse it into an object array, so repeat each row inside Polars
+            # to keep every column's dtype intact.
+            for row_index in range(treatment_grid.height):
+                tiled_treatments.append(
+                    treatment_grid.slice(row_index, 1).select(
+                        pl.all().repeat_by(covariate_count).explode()
+                    )
                 )
+        else:
+            treatment_array = np.asarray(treatment_grid)
+            if treatment_array.ndim == 0:
+                treatment_rows = [treatment_array.item()]
+            else:
+                treatment_rows = list(treatment_array)
 
-            outcomes = self.predict_y(covariates, tiled_treatments)
-            curve.append(np.asarray(outcomes, dtype=float).mean(axis=0))
+            for treatment in treatment_rows:
+                row = np.asarray(treatment)
+                if row.ndim == 0:
+                    tiled_treatments.append(np.full(covariate_count, row.item()))
+                else:
+                    tiled_treatments.append(
+                        np.tile(row.reshape(1, -1), (covariate_count, 1))
+                    )
 
-        return self._coerce_curve_predictions(curve, n_rows=len(treatment_rows))
+        curve = [
+            np.asarray(self.predict_y(covariates, tiled), dtype=float).mean(axis=0)
+            for tiled in tiled_treatments
+        ]
+
+        return self._coerce_curve_predictions(curve, n_rows=len(tiled_treatments))
 
     def predict(self, covariates: np.ndarray, treatment_list: pl.DataFrame):
         """

@@ -13,6 +13,7 @@ from .nurse_staffing import NurseStaffing
 from .semi_synthetic import BaseSemiSyntheticDataset
 from .semi_synthetic_categorical import CategoricalSemiSyntheticDataset
 from .semi_synthetic_continuous import ContinuousSemiSyntheticDataset
+from .semi_synthetic_multidim import MultidimSemiSyntheticDataset
 from .synthetic2 import SyntheticDataset2, SyntheticDataset2Discrete
 from .synthetic2_multidim import Synthetic2MultidimDataset
 from .synthetic_vcnet import SyntheticVCNet
@@ -30,6 +31,7 @@ __all__ = [
     "MetaMultidimDataset",
     "ModelInducedConfoundingClassifier",
     "ModelInducedConfoundingRegressor",
+    "MultidimSemiSyntheticDataset",
     "NurseStaffing",
     "Synthetic2MultidimDataset",
     "SyntheticDataset2",

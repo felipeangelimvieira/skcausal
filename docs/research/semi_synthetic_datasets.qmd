@@ -343,6 +343,54 @@ coefficients), change `random_state` in the constructor instead, or pass the
 dataset to `evaluate_multiple_dataset_seeds` from the
 [benchmarking guide](benchmarking.qmd).
 
+## Step 7: Multi-dimensional and mixed treatments
+
+`MultidimSemiSyntheticDataset` releases a vector of treatments. A ridge
+prognostic score fitted on the real outcome is the shared confounder; each
+component loads on it with its own weight, so one dataset can hold strongly,
+mildly, and un-confounded components. `treatment_correlation` adds latent noise
+correlation that covariates do not explain. A component can mimic a numeric
+covariate, which is then removed from `X`, and any component can be released
+as ordered levels by thresholding its latent at equal-mass quantiles. The joint
+`log_prob` stays exact, and `target_confounding_bias` calibrates one strength
+for the whole vector.
+
+```{python}
+from skcausal.datasets import MultidimSemiSyntheticDataset
+
+target = next(
+    name
+    for name in X_source.columns
+    if X_source.get_column(name).dtype.is_numeric()
+    and X_source.get_column(name).n_unique() > 2
+)
+multidim = MultidimSemiSyntheticDataset(
+    source,
+    n_treatments=3,
+    confounding_loadings=[1.0, 0.5, 0.0],
+    n_levels=[None, None, 3],
+    target_columns=[None, target, None],
+    treatment_correlation=0.4,
+    target_confounding_bias=0.5,
+    random_state=0,
+)
+X, treatment, outcome = multidim.load()
+print(treatment.head())
+print(
+    {
+        "mimicked column": target,
+        "prognostic R2": round(multidim.prognostic_fit_r2_, 3),
+        "feature R2": {k: round(v, 3) for k, v in multidim.feature_fit_r2_.items()},
+        "bias ratio": round(multidim.confounding_bias_ratio_, 3),
+    }
+)
+np.corrcoef(treatment.select(["t_0", "t_1"]).to_numpy().astype(float).T)[0, 1]
+```
+
+`get_grid` returns a lattice over the continuous components crossed with the
+levels of the categorical ones, so `predict` evaluates the average response
+surface over the whole vector.
+
 ## Configuration reference
 
 | Parameter | Applies to | What it controls |
@@ -354,7 +402,11 @@ dataset to `evaluate_multiple_dataset_seeds` from the
 | `randomized_weight` | both | Share of covariate-independent assignments; the main overlap knob. |
 | `n_treatments`, `target_probabilities` | categorical | Number of levels and the empirical marginal the intercepts are calibrated to. |
 | `treatment_domain` | continuous | `"real"`, `"positive"`, or a finite `(lower, upper)` interval. |
-| `treatment_noise_scale` | continuous | Latent Gaussian standard deviation; smaller values sharpen assignment. |
+| `treatment_noise_scale` | continuous, multidim | Latent Gaussian standard deviation; smaller values sharpen assignment. |
+| `n_treatments`, `confounding_loadings` | multidim | Number of components and each component's loading on the prognostic score. |
+| `n_levels`, `target_columns` | multidim | Per-component discretization into ordered levels and the numeric covariate a component mimics (removed from `X`). |
+| `treatment_correlation` | multidim | Exchangeable latent noise correlation in `[0, 1)`; zero when two or more components are categorical. |
+| `treatment_interaction_scale` | multidim | Size of bounded cross-component effects. |
 | `outcome_effect_scale` | both | Size of treatment main effects relative to the unit-variance baseline outcome. |
 | `effect_heterogeneity_scale` | both | Size of treatment-by-covariate interactions. |
 | `outcome_noise_scale` | both | Gaussian outcome noise. |

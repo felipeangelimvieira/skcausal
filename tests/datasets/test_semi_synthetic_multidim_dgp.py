@@ -520,3 +520,27 @@ def test_feature_target_validation():
     assert list(X.columns) == ["region"]
     assert mixed.released_scales_[1] == 1.0
     assert treatment.get_column("t_1").cast(pl.Utf8).is_in(["0", "1"]).all()
+
+
+def test_predict_curve_accepts_mixed_grid_rows():
+    dataset = MultidimSemiSyntheticDataset(
+        ToyRealDataset(), n_treatments=2, n_levels=[None, 3], random_state=9
+    )
+    X, _, _ = dataset.load()
+    grid = dataset.get_grid(4)
+    assert grid.height == 12
+
+    actual = np.asarray(dataset.predict(X, grid), dtype=float).ravel()
+
+    assert actual.shape == (12,)
+    assert np.isfinite(actual).all()
+    expected = np.array(
+        [
+            dataset.predict_y(
+                X,
+                grid.slice(row_index, 1).select(pl.all().repeat_by(X.height).explode()),
+            ).mean()
+            for row_index in range(grid.height)
+        ]
+    )
+    np.testing.assert_allclose(actual, expected, atol=1e-12)
