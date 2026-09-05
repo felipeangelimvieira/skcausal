@@ -2,11 +2,12 @@ import numpy as np
 import polars as pl
 import pytest
 from scipy.special import ndtr, ndtri
-from scipy.stats import multivariate_normal
+from scipy.stats import multivariate_normal, rankdata
 
 from skcausal.datasets.kang_schafer import KangSchaferContinuous
 from skcausal.datasets.semi_synthetic_multidim import (
     MultidimSemiSyntheticDataset,
+    _coupled_orders,
     _conditional_gaussian,
     _exchangeable_correlation,
     _gaussian_logpdf,
@@ -64,11 +65,39 @@ def test_component_validators():
         _validate_source_list([single, object()])
 
 
-def test_exchangeable_correlation_is_symmetric_with_unit_diagonal():
-    matrix = _exchangeable_correlation(3, 0.4)
-    np.testing.assert_allclose(np.diag(matrix), 1.0)
-    np.testing.assert_allclose(matrix[np.triu_indices(3, 1)], 0.4)
-    np.linalg.cholesky(matrix)
+def test_exchangeable_correlation_validates_the_positive_definite_range():
+    np.testing.assert_allclose(
+        _exchangeable_correlation(3, -0.49),
+        [[1.0, -0.49, -0.49], [-0.49, 1.0, -0.49], [-0.49, -0.49, 1.0]],
+    )
+    with pytest.raises(ValueError, match="-0.5 < treatment_correlation < 1"):
+        _exchangeable_correlation(3, -0.5)
+    with pytest.raises(ValueError, match="must be zero"):
+        _exchangeable_correlation(1, 0.1)
+
+
+@pytest.mark.parametrize("rho, direction", [(0.9, 1), (-0.9, -1)])
+def test_coupled_orders_are_permutations_with_the_requested_rank_direction(
+    rho, direction
+):
+    targets = [np.linspace(-2.0, 2.0, 2000), np.linspace(7.0, -1.0, 2000)]
+    orders, latent = _coupled_orders(targets, rho, np.random.default_rng(9))
+    coupled = np.column_stack(
+        [target[order] for target, order in zip(targets, orders)]
+    )
+
+    for order in orders:
+        np.testing.assert_array_equal(np.sort(order), np.arange(2000))
+    assert latent.shape == (2000, 2)
+    achieved = np.corrcoef(rankdata(coupled, axis=0), rowvar=False)[0, 1]
+    assert direction * achieved > 0.8
+
+
+def test_coupled_orders_break_target_ties_reproducibly():
+    targets = [np.repeat([0.0, 1.0], 10), np.arange(20.0)]
+    first, _ = _coupled_orders(targets, 0.2, np.random.default_rng(5))
+    second, _ = _coupled_orders(targets, 0.2, np.random.default_rng(5))
+    assert all(np.array_equal(left, right) for left, right in zip(first, second))
 
 
 def test_interval_log_mass_matches_direct_formula_and_tails():

@@ -72,9 +72,42 @@ def _source_prefix(index):
 
 
 def _exchangeable_correlation(n_components, correlation):
-    matrix = np.full((n_components, n_components), float(correlation))
+    rho = float(correlation)
+    if not np.isfinite(rho):
+        raise ValueError("treatment_correlation must be finite.")
+    if n_components == 1:
+        if rho != 0.0:
+            raise ValueError(
+                "treatment_correlation must be zero with one source dataset."
+            )
+        return np.ones((1, 1))
+    lower = -1.0 / (n_components - 1)
+    if not lower < rho < 1.0:
+        raise ValueError(
+            "treatment_correlation must satisfy "
+            f"{lower:g} < treatment_correlation < 1 for {n_components} sources."
+        )
+    matrix = np.full((n_components, n_components), rho)
     np.fill_diagonal(matrix, 1.0)
     return matrix
+
+
+def _coupled_orders(targets, correlation, rng):
+    arrays = [np.asarray(target, dtype=float).reshape(-1) for target in targets]
+    if not arrays or len({array.size for array in arrays}) != 1:
+        raise ValueError("Coupling requires equally sized source targets.")
+    covariance = _exchangeable_correlation(len(arrays), correlation)
+    latent = rng.multivariate_normal(
+        np.zeros(len(arrays)), covariance, size=arrays[0].size
+    ).reshape(arrays[0].size, len(arrays))
+    orders = []
+    for index, target in enumerate(arrays):
+        latent_order = np.argsort(latent[:, index], kind="stable")
+        source_order = np.lexsort((rng.random(target.size), target))
+        order = np.empty(target.size, dtype=int)
+        order[latent_order] = source_order
+        orders.append(order)
+    return orders, latent
 
 
 def _interval_log_mass(lower, upper):
