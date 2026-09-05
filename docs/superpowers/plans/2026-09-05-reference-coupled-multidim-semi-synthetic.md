@@ -358,7 +358,11 @@ def _combine_sources(self, sources, rng):
     selected_X, selected_y, selected_rows = [], [], []
     for index, (X, _, outcome) in enumerate(sources):
         outcome = self._coerce_backend_frame(outcome, backend="polars")
-        if outcome.width != 1 or outcome.height != X.height:
+        if outcome.width != 1:
+            raise ValueError(
+                f"Source dataset {index} must provide exactly one outcome column."
+            )
+        if outcome.height != X.height:
             raise ValueError(
                 f"Source dataset {index} must provide one outcome per covariate row."
             )
@@ -368,6 +372,11 @@ def _combine_sources(self, sources, rng):
             if X.height == n_rows
             else np.sort(rng.choice(X.height, n_rows, replace=False))
         )
+        if np.unique(y[rows]).size < 2:
+            raise ValueError(
+                f"Selected outcome of source dataset {index} must have at least "
+                "two distinct values."
+            )
         selected_X.append(X[rows])
         selected_y.append(y[rows])
         selected_rows.append(rows)
@@ -678,31 +687,40 @@ def test_multidim_disables_resampling_and_treatment_density():
 
 
 class InvalidOutcomeSource(BaseDataset):
-    def __init__(self, outcome):
-        self.outcome = outcome
+    def __init__(self, kind):
+        self.kind = kind
         super().__init__()
 
     def _load(self):
+        outcomes = {
+            "wide": pl.DataFrame(
+                {"a": [0., 1., 2., 3.], "b": [3., 2., 1., 0.]}
+            ),
+            "string": pl.DataFrame({"y": ["a", "b", "c", "d"]}),
+            "nan": pl.DataFrame({"y": [0., 1., np.nan, 3.]}),
+            "constant": pl.DataFrame({"y": [1., 1., 1., 1.]}),
+            "short": pl.DataFrame({"y": [0., 1., 2.]}),
+        }
         return (
             pl.DataFrame({"x": [0.0, 1.0, 2.0, 3.0]}),
             pl.DataFrame({"unused_t": [0.0, 0.0, 0.0, 0.0]}),
-            self.outcome,
+            outcomes[self.kind],
         )
 
 
 @pytest.mark.parametrize(
-    "outcome, message",
+    "kind, message",
     [
-        (pl.DataFrame({"a": [0., 1., 2., 3.], "b": [3., 2., 1., 0.]}), "exactly one outcome"),
-        (pl.DataFrame({"y": ["a", "b", "c", "d"]}), "must be numeric"),
-        (pl.DataFrame({"y": [0., 1., np.nan, 3.]}), "must be finite"),
-        (pl.DataFrame({"y": [1., 1., 1., 1.]}), "at least two distinct"),
-        (pl.DataFrame({"y": [0., 1., 2.]}), "one outcome per covariate row"),
+        ("wide", "exactly one outcome"),
+        ("string", "must be numeric"),
+        ("nan", "must be finite"),
+        ("constant", "at least two distinct"),
+        ("short", "one outcome per covariate row"),
     ],
 )
-def test_multidim_rejects_invalid_source_outcomes(outcome, message):
+def test_multidim_rejects_invalid_source_outcomes(kind, message):
     with pytest.raises(ValueError, match=message):
-        _dataset(real_datasets=[InvalidOutcomeSource(outcome)])
+        _dataset(real_datasets=[InvalidOutcomeSource(kind)])
 
 
 def test_single_source_requires_zero_correlation_and_has_matrix_diagnostics():
