@@ -13,7 +13,9 @@ treatment assignment and outcome surface are known exactly.
 
 `CategoricalSemiSyntheticDataset` and `ContinuousSemiSyntheticDataset` take
 any `BaseDataset` as a source of covariates, keep its `X` untouched, and
-simulate treatment and outcome from a frozen structural model. Because the
+simulate treatment and outcome from a frozen structural model.
+`MultidimSemiSyntheticDataset` takes several sources and turns each source's
+real outcome into one treatment component. Because the
 model is frozen, the dataset can answer questions a real dataset cannot: what
 is $\mathbb{E}[Y(a)]$, what is $g(a \mid x)$, and how biased is the naive
 observational curve.
@@ -343,48 +345,60 @@ coefficients), change `random_state` in the constructor instead, or pass the
 dataset to `evaluate_multiple_dataset_seeds` from the
 [benchmarking guide](benchmarking.qmd).
 
-## Step 7: Multi-dimensional and mixed treatments
+## Step 7: Multi-dimensional treatments from several sources
 
-`MultidimSemiSyntheticDataset` releases a vector of treatments. A ridge
-prognostic score fitted on the real outcome is the shared confounder; each
-component loads on it with its own weight, so one dataset can hold strongly,
-mildly, and un-confounded components. `treatment_correlation` adds latent noise
-correlation that covariates do not explain. A component can mimic a numeric
-covariate, which is then removed from `X`, and any component can be released
-as ordered levels by thresholding its latent at equal-mass quantiles. The joint
-`log_prob` stays exact, and `target_confounding_bias` calibrates one strength
-for the whole vector.
+`MultidimSemiSyntheticDataset` takes a list of source datasets and creates one
+treatment component per source. The outcome of source $k$ is fitted with a
+ridge prognostic score on that source's own covariates; the score drives the
+assignment of component $t_k$ and enters the baseline outcome, so $t_k$ is
+confounded through the real outcome it mimics. Sources that are unrelated
+have independent scores, and `treatment_correlation` is then the only channel
+that ties the components together: it correlates the latent noise. A
+continuous component is released on the mean and standard deviation of its
+source outcome, and any component can instead be released as ordered levels
+by thresholding its latent at equal-mass quantiles. The joint `log_prob` stays
+exact, and `target_confounding_bias` calibrates one strength for the whole
+vector.
+
+Rows are aligned by position: the sample size is the smallest source, larger
+sources are subsampled without replacement with a seeded stream, and the
+covariates are concatenated with a `d{k}_` prefix per source.
 
 ```{python}
-from skcausal.datasets import MultidimSemiSyntheticDataset
+from skcausal.datasets import KangSchaferContinuous, MultidimSemiSyntheticDataset
 
-target = next(
-    name
-    for name in X_source.columns
-    if X_source.get_column(name).dtype.is_numeric()
-    and X_source.get_column(name).n_unique() > 2
-)
 multidim = MultidimSemiSyntheticDataset(
-    source,
-    n_treatments=3,
-    confounding_loadings=[1.0, 0.5, 0.0],
-    n_levels=[None, None, 3],
-    target_columns=[None, target, None],
+    [source, KangSchaferContinuous(n=2000, random_state=1)],
     treatment_correlation=0.4,
     target_confounding_bias=0.5,
     random_state=0,
 )
 X, treatment, outcome = multidim.load()
+print(X.shape, X.columns[:2], X.columns[-2:])
 print(treatment.head())
 print(
     {
-        "mimicked column": target,
-        "prognostic R2": round(multidim.prognostic_fit_r2_, 3),
-        "feature R2": {k: round(v, 3) for k, v in multidim.feature_fit_r2_.items()},
+        "prognostic R2 per source": multidim.prognostic_fit_r2_.round(3).tolist(),
+        "rows kept from source 1": len(multidim.source_row_indices_[1]),
         "bias ratio": round(multidim.confounding_bias_ratio_, 3),
+        "strength": round(multidim.confounding_strength_, 3),
     }
 )
-np.corrcoef(treatment.select(["t_0", "t_1"]).to_numpy().astype(float).T)[0, 1]
+np.corrcoef(treatment.to_numpy().astype(float).T)[0, 1]
+```
+
+Setting `n_levels` for a component discretizes it into balanced ordered
+levels while the other component stays continuous:
+
+```{python}
+mixed = MultidimSemiSyntheticDataset(
+    [source, KangSchaferContinuous(n=2000, random_state=1)],
+    n_levels=[None, 3],
+    treatment_correlation=0.4,
+    random_state=0,
+)
+_, t_mixed, _ = mixed.load()
+t_mixed["t_1"].value_counts().sort("t_1")
 ```
 
 For this class the bias metric is a fixed 1024-point Monte Carlo estimate
@@ -400,38 +414,335 @@ achieved strength back from `confounding_strength_`.
 levels of the categorical ones, so `predict` evaluates the average response
 surface over the whole vector.
 
+## Mathematical description
+
+This section states the data-generating processes exactly as the code
+implements them. Throughout, $x_1, \dots, x_n$ are the released covariate
+rows, "standardized" means centered and scaled to unit variance over those
+rows, and every random coefficient is drawn once from the structural stream
+of `random_state` and then frozen.
+
+### Covariate encoding and causal-role scores
+
+Numeric columns are median-imputed and standardized; every other column is
+one-hot encoded with missing values as their own category. The encoded vector
+$e(x) \in \mathbb{R}^p$ is expanded into a nonlinear library
+
+$$
+\ell(x) = \bigl(e,\; e^2,\; \sin e,\; \mathbf{1}\{e > 0\},\; e_a e_b \text{ for 16 random pairs } (a, b)\bigr) \in \mathbb{R}^L .
+$$
+
+Four blocks of standardized scores are read off this library:
+confounders $q_C \in \mathbb{R}^3$, prognostic $q_P \in \mathbb{R}^2$,
+treatment-only $q_Z \in \mathbb{R}^2$, and effect modifiers
+$q_M \in \mathbb{R}^2$. Each coordinate is a sparse projection
+$\tilde q(x) = \ell(x)^\top w$ whose weight vector $w$ has five nonzero
+$\mathcal{N}(0, 1)$ entries, at least one of them on a nonlinear term, and is
+then standardized. The treatment-only block is residualized before
+standardization: with $S = (q_C, q_P, q_M) \in \mathbb{R}^7$ and the
+polynomial design $D(S) = (1, S, S \otimes S)$ (order 2 when
+$n \ge 2 \dim D$, otherwise order 1 or 0),
+
+$$
+q_Z \propto \tilde q_Z - D(S)\,\hat B, \qquad \hat B = \arg\min_B \sum_i \bigl\| \tilde q_Z(x_i) - D(S_i) B \bigr\|^2 ,
+$$
+
+so $q_Z$ is orthogonal in-sample to every quadratic function of the outcome
+scores. It predicts assignment without predicting potential outcomes to that
+order, which is why `treatment_only_strength` only adds a small bias floor.
+
+The baseline outcome and the confounding signal are
+
+$$
+\mu_0(x) = \frac{q_C(x)^\top \gamma_C + q_P(x)^\top \gamma_P - c}{s}, \qquad
+s(x) = \frac{q_C(x)^\top \gamma_C - c_C}{s_C},
+$$
+
+with $\gamma_C \sim \mathcal{N}(0, \tfrac{1}{3} I)$,
+$\gamma_P \sim \mathcal{N}(0, \tfrac{1}{2} I)$, and $c, s, c_C, s_C$ the
+in-sample means and standard deviations. Both $\mu_0$ and $s$ are therefore
+standardized, and the bias ratio reported by every class is a bias measured
+in units of $s_0 = \operatorname{sd}(\mu_0) = 1$.
+
+### Outcome model
+
+All three classes share the outcome surface
+
+$$
+m(a, x) = \mu_0(x) + b(a)^\top \beta + b(a)^\top \Gamma\, q_M(x), \qquad
+Y = m(A, X) + \sigma_Y \varepsilon, \quad \varepsilon \sim \mathcal{N}(0, 1),
+$$
+
+where $b(a)$ is the treatment basis of the class, $\beta \sim \mathcal{N}(0,
+\tau_\beta^2 I)$ with $\tau_\beta$ = `outcome_effect_scale`, the rows of
+$\Gamma$ are $\mathcal{N}(0, \tau_\Gamma^2 I)$ with $\tau_\Gamma$ =
+`effect_heterogeneity_scale`, and $\sigma_Y$ = `outcome_noise_scale`. The
+basis vanishes at a reference treatment, so $m(a_{\text{ref}}, x) = \mu_0(x)$.
+Because covariates are the finite source rows, the causal curve is the
+empirical average $\mu_{\mathrm{do}}(a) = \frac{1}{n} \sum_i m(a, x_i)$, which
+is what `predict` returns.
+
+Every assignment law is a mixture with a covariate-independent component of
+weight $\omega$ = `randomized_weight`, which guarantees overlap: with
+probability $\omega$ the treatment is drawn from a fixed marginal that ignores
+$x$. Two shared parameters scale the confounded signal: $\lambda$ =
+`confounding_strength` multiplies the outcome-predictive part and $\zeta$ =
+`treatment_only_strength` multiplies the treatment-only part.
+
+### Categorical treatment
+
+For $K$ = `n_treatments` levels with target marginal $\pi$ =
+`target_probabilities`, the confounded logits are
+
+$$
+\eta_k(x) = \alpha_k + \lambda\, l_k\, s(x) + \zeta\, q_Z(x)^\top b_k, \qquad k = 0, \dots, K-1,
+$$
+
+with loadings $l_k$ equally spaced on $[-1, 1]$ and centered, and $b_k$ the
+columns of a $2 \times K$ matrix of $\mathcal{N}(0, \tfrac{1}{2})$ entries
+centered across levels. The assignment probabilities are
+
+$$
+p_k(x) = (1 - \omega)\, \operatorname{softmax}_k\bigl(\eta(x)\bigr) + \omega\, \pi_k .
+$$
+
+The intercepts $\alpha$ (with $\alpha_{K-1} = 0$) are the minimizer of the
+convex function $\frac{1}{n} \sum_i \operatorname{logsumexp}(\eta(x_i) +
+\alpha) - \alpha^\top \pi$, whose gradient is the marginal residual, so the
+confounded component reproduces $\pi$ on average:
+$\frac{1}{n} \sum_i \operatorname{softmax}(\eta(x_i)) = \pi$. The basis is
+the one-hot vector of levels $1, \dots, K-1$, so level $0$ is the reference.
+
+The oracle bias compares naive level means with causal means. With
+$m_k(x) = m(k, x)$,
+
+$$
+\Delta_k = \frac{\sum_i p_k(x_i)\, m_k(x_i)}{\sum_i p_k(x_i)} - \frac{1}{n} \sum_i m_k(x_i), \qquad
+\text{bias} = \max_k \Delta_k - \min_k \Delta_k ,
+$$
+
+and `confounding_bias_ratio_` is this bias divided by $s_0$.
+
+### Continuous treatment
+
+A scalar latent $Z$ has confounded mean
+$\eta(x) = \lambda\, s(x) + \zeta\, q_Z(x)^\top b$ with
+$b \sim \mathcal{N}(0, \tfrac{1}{2} I_2)$ and noise scale $\sigma$ =
+`treatment_noise_scale`:
+
+$$
+Z \mid x \sim (1 - \omega)\, \mathcal{N}\bigl(\eta(x), \sigma^2\bigr) + \omega\, \mathcal{N}(0, \sigma^2),
+$$
+
+each component truncated to the latent support $[L, U]$ of the domain. The
+released treatment is $A = T(Z)$ with $T$ the identity for
+`treatment_domain="real"`, $T(z) = e^z$ for `"positive"`, and
+$T(z) = \ell + (u - \ell)\,\operatorname{logistic}(z)$ for a finite interval
+$(\ell, u)$. The support $[L, U]$ is the whole line for the real domain and
+otherwise the largest latent interval whose image under $T$ is representable
+in floating point, so the truncation only matters numerically. The density
+follows by change of variables,
+$g(a \mid x) = f_Z\bigl(T^{-1}(a) \mid x\bigr)\, \bigl| \tfrac{d}{da} T^{-1}(a) \bigr|$,
+and is what `log_prob` evaluates.
+
+The treatment basis is built in standardized latent units $v = Z / \sigma$
+from five bounded-growth terms,
+
+$$
+\tilde b(v) = \Bigl(v,\; 1 - e^{-v^2/2},\; \sin v,\; (v - \kappa_1)_+,\; (v - \kappa_2)_+\Bigr), \qquad
+\kappa_1 = \Phi^{-1}(\tfrac{1}{3}),\ \kappa_2 = \Phi^{-1}(\tfrac{2}{3}),
+$$
+
+each term centered and scaled by its mean and standard deviation over a
+uniform grid of 1001 points on $\sigma\,[\Phi^{-1}(0.01), \Phi^{-1}(0.99)]$
+(clipped to the support), and finally reference-subtracted so that
+$b(T(0)) = 0$. No term grows faster than linearly in $v$, which keeps the
+dose-response, and hence the bias, from being dominated by the tails.
+
+The oracle bias is the root-mean-square distortion of the naive curve under
+the marginal treatment law. With the normalized weights
+$w_i(a) = g(a \mid x_i) / \sum_j g(a \mid x_j)$,
+
+$$
+\mu_{\mathrm{obs}}(a) = \sum_i w_i(a)\, m(a, x_i), \qquad
+\Delta(a) = \mu_{\mathrm{obs}}(a) - \mu_{\mathrm{do}}(a)
+= \Bigl[\textstyle\sum_i w_i(a) \mu_0(x_i) - \bar\mu_0\Bigr]
++ b(a)^\top \Gamma \Bigl[\textstyle\sum_i w_i(a) q_M(x_i) - \bar q_M\Bigr],
+$$
+
+because the main effect $b(a)^\top \beta$ is the same under both weightings
+and cancels. The metric is
+
+$$
+\text{bias} = \sqrt{\int \Delta(a)^2\, f_A(a)\, da}, \qquad f_A(a) = \frac{1}{n} \sum_i g(a \mid x_i),
+$$
+
+evaluated by the trapezoid rule on a latent grid with spacing $\sigma / 6$
+that covers $[\min_i \eta(x_i) - 6\sigma,\ \max_i \eta(x_i) + 6\sigma]$
+(between 65 and 8193 points). Weighting by the marginal density is what makes
+the metric increase with strength instead of decaying once the assignment
+law moves off a fixed grid.
+
+### Multi-dimensional treatment from several sources
+
+Given sources $(X_k, y_k)$, $k = 1, \dots, m$, with $n_k$ rows, the shared
+sample size is $n = \min_k n_k$; each larger source keeps a sorted random
+subset of $n$ rows drawn without replacement from the alignment stream, and a
+source with exactly $n$ rows keeps its order. The released covariates are the
+row-wise concatenation $x = (x_1, \dots, x_m)$ with a `d{k}_` prefix on each
+source's column names. Pairing rows by position encodes the assumption that
+distinct sources are independent.
+
+The encoding and library are built on the joint $x$ as above. The confounder
+block is not random here: its $k$-th coordinate is the ridge prognostic score
+of $y_k$ on the library terms built only from the columns of $X_k$ (products
+that cross sources are excluded),
+
+$$
+\hat w_k = \arg\min_w \sum_{i:\, y_{ki} \text{ observed}} \bigl(y_{ki} - \bar y_k - \tilde\ell_k(x_{ki})^\top w\bigr)^2 + 0.01\, n_k^{\mathrm{obs}}\, \|w\|^2,
+\qquad
+q_{C,k}(x) \propto \tilde\ell_k(x_k)^\top \hat w_k \ \text{(standardized)},
+$$
+
+where $\tilde\ell_k$ denotes the selected library columns scaled to unit
+variance. `prognostic_fit_r2_` reports the in-sample $R^2$ of each fit. The
+prognostic, treatment-only, and modifier scores are drawn on the joint
+library as before and may mix sources. The baseline outcome loads on every
+source with unit weight,
+
+$$
+\mu_0(x) = \frac{\sum_k q_{C,k}(x) + q_P(x)^\top \gamma_P - c}{s} .
+$$
+
+The latent treatment vector $Z \in \mathbb{R}^m$ has component means
+
+$$
+\eta_j(x) = \lambda\, c_j\, q_{C,j}(x) + \zeta\, q_Z(x)^\top b_j ,
+$$
+
+with $c_j$ = `confounding_loadings[j]` and $b_j$ the columns of a
+$2 \times m$ matrix of $\mathcal{N}(0, \tfrac{1}{2})$ entries, and
+exchangeable noise
+
+$$
+Z \mid x \sim (1 - \omega)\, \mathcal{N}\bigl(\eta(x), \Sigma\bigr) + \omega\, \mathcal{N}(0, \Sigma), \qquad
+\Sigma = \sigma^2 R, \quad R = (1 - \rho) I + \rho\, \mathbf{1}\mathbf{1}^\top ,
+$$
+
+with $\rho$ = `treatment_correlation`. Component $j$ is thus confounded only
+through the outcome of its own source, and for independent sources $\rho$ is
+the sole link between components. A continuous component is released as
+$A_j = \bar y_j + \operatorname{sd}(y_j)\, Z_j$ so that it lives on the scale
+of the outcome it mimics. A component with $K_j$ = `n_levels[j]` levels is
+released as $A_j = \kappa$ when $c_{j,\kappa} < Z_j \le c_{j,\kappa+1}$, with
+$c_{j,0} = -\infty$, $c_{j,K_j} = +\infty$, and interior cut points at the
+equal-mass quantiles of the marginal latent law
+$F_j(z) = \frac{1}{n} \sum_i \bigl[(1 - \omega)\, \Phi\bigl((z - \eta_j(x_i)) / \sigma\bigr) + \omega\, \Phi(z / \sigma)\bigr]$.
+
+Writing $C$ and $D$ for the continuous and categorical index sets, the joint
+density of released values $(a_C, \kappa_D)$ is
+
+$$
+g(a_C, \kappa_D \mid x) = \prod_{j \in C} \frac{1}{\operatorname{sd}(y_j)}
+\Bigl[(1 - \omega)\, h\bigl(z_C, \kappa_D; \eta(x)\bigr) + \omega\, h\bigl(z_C, \kappa_D; 0\bigr)\Bigr],
+\qquad
+h(z_C, \kappa_D; \eta) = \varphi_{\Sigma_{CC}}(z_C - \eta_C)\;
+\mathbb{P}\bigl(Z_D \in \text{cell}(\kappa_D) \mid Z_C = z_C, \eta\bigr),
+$$
+
+where the conditional law of $Z_D$ given $Z_C = z_C$ is Gaussian with mean
+$\eta_D + \Sigma_{DC} \Sigma_{CC}^{-1}(z_C - \eta_C)$ and covariance
+$\Sigma_{DD} - \Sigma_{DC} \Sigma_{CC}^{-1} \Sigma_{CD}$. With $\rho > 0$ that
+conditional cell probability is a univariate normal interval, which is why the
+class allows at most one categorical component when $\rho > 0$; with
+$\rho = 0$ the categorical components are independent and the cell
+probability factorizes.
+
+The outcome adds cross-component effects to the shared surface:
+
+$$
+m(a, x) = \mu_0(x) + \sum_j b_j(a_j)^\top \beta_j + \sum_j b_j(a_j)^\top \Gamma_j\, q_M(x)
++ \sum_{j < l} \phi_j(a_j)^\top \Theta_{jl}\, \phi_l(a_l),
+$$
+
+where $b_j$ is the five-term bounded basis in $v_j = Z_j / \sigma$ for a
+continuous component and the one-hot vector of levels $1, \dots, K_j - 1$ for
+a categorical one, $\phi_j = \tanh(v_j)$ for a continuous component and the
+same one-hot vector for a categorical one, and the entries of $\Theta_{jl}$
+are $\mathcal{N}(0, \tau_\Theta^2)$ with $\tau_\Theta$ =
+`treatment_interaction_scale`. Outcomes depend only on released values: a
+categorical component enters through its level, never through its latent.
+
+The oracle bias keeps the form of the continuous case, since main effects and
+cross terms are identical under both weightings and cancel:
+
+$$
+\Delta(a) = \Bigl[\textstyle\sum_i w_i(a) \mu_0(x_i) - \bar\mu_0\Bigr]
++ \sum_j b_j(a_j)^\top \Gamma_j \Bigl[\textstyle\sum_i w_i(a) q_M(x_i) - \bar q_M\Bigr],
+\qquad
+\text{bias}^2 = \mathbb{E}_{a \sim f_A}\bigl[\Delta(a)^2\bigr].
+$$
+
+The expectation over the marginal law $f_A$ is estimated by Monte Carlo on
+1024 design points for the continuous coordinates, drawn once from the
+mixture (a frozen row index, mixture indicator, and noise vector per point,
+shared across every strength the calibration visits), while the categorical
+levels are enumerated exactly at each design point with weights
+$\mathbb{P}(\kappa_D \mid z_C) \propto f_A(z_C, \kappa_D)$. When every
+component is categorical a single design point enumerates all level
+combinations and the metric is exact.
+
+### Calibrating the confounding strength
+
+Let $M(\lambda)$ be the bias ratio of a class as a function of
+`confounding_strength` with every other frozen quantity held fixed. The
+floor $M(0)$ is zero unless treatment-only predictors are on. Given
+`target_confounding_bias` $= \tau$, the search rejects $\tau < M(0)$,
+evaluates $M$ along the ladder $\{0.05 \cdot 2^k : k = 0, \dots, 10\}$ with
+the configured strength inserted, stops at the first ladder point where
+$M \ge \tau$, and refines the crossing between that point and its predecessor
+with Brent's method. The frozen strength is therefore the smallest crossing
+the ladder brackets; because $M$ need not be monotone, a bump lying strictly
+between two ladder points is invisible to the search. The achieved
+`confounding_bias_ratio_` is always recomputed at the frozen strength.
+
 ## Configuration reference
 
 | Parameter | Applies to | What it controls |
 | --- | --- | --- |
-| `real_dataset` | both | Source of covariates; cloned, only `X` is used. |
-| `confounding_strength` | both | Scale $\lambda$ of the outcome-predictive assignment signal. Zero means no confounding. |
-| `target_confounding_bias` | both | Calibrates $\lambda$ so the oracle bias, in baseline-outcome standard deviations, equals this value. Overrides `confounding_strength`. |
-| `treatment_only_strength` | both | Scale of residualized treatment-only predictors. Opt-in; adds a small bias floor. |
-| `randomized_weight` | both | Share of covariate-independent assignments; the main overlap knob. |
+| `real_dataset` | categorical, continuous | Source of covariates; cloned, only `X` is used. |
+| `real_datasets` | multidim | Source datasets; one treatment component per source, each mimicking that source's outcome. |
+| `confounding_strength` | all | Scale $\lambda$ of the outcome-predictive assignment signal. Zero means no confounding. |
+| `target_confounding_bias` | all | Calibrates $\lambda$ so the oracle bias, in baseline-outcome standard deviations, equals this value. Overrides `confounding_strength`. |
+| `treatment_only_strength` | all | Scale $\zeta$ of residualized treatment-only predictors. Opt-in; adds a small bias floor. |
+| `randomized_weight` | all | Share $\omega$ of covariate-independent assignments; the main overlap knob. |
 | `n_treatments`, `target_probabilities` | categorical | Number of levels and the empirical marginal the intercepts are calibrated to. |
 | `treatment_domain` | continuous | `"real"`, `"positive"`, or a finite `(lower, upper)` interval. |
-| `treatment_noise_scale` | continuous, multidim | Latent Gaussian standard deviation; smaller values sharpen assignment. |
-| `n_treatments`, `confounding_loadings` | multidim | Number of components and each component's loading on the prognostic score. |
-| `n_levels`, `target_columns` | multidim | Per-component discretization into ordered levels and the numeric covariate a component mimics (removed from `X`). |
-| `treatment_correlation` | multidim | Exchangeable latent noise correlation in `[0, 1)`; zero when two or more components are categorical. |
+| `treatment_noise_scale` | continuous, multidim | Latent Gaussian standard deviation $\sigma$; smaller values sharpen assignment. |
+| `confounding_loadings` | multidim | Each component's loading $c_j$ on its own prognostic score. |
+| `n_levels` | multidim | Per-component discretization into ordered levels; `None` keeps a component continuous. |
+| `treatment_correlation` | multidim | Exchangeable latent noise correlation $\rho$ in `[0, 1)`; zero when two or more components are categorical. |
 | `treatment_interaction_scale` | multidim | Size of bounded cross-component effects. |
-| `outcome_effect_scale` | both | Size of treatment main effects relative to the unit-variance baseline outcome. |
-| `effect_heterogeneity_scale` | both | Size of treatment-by-covariate interactions. |
-| `outcome_noise_scale` | both | Gaussian outcome noise. |
-| `random_state` | both | Seeds both the frozen structure and the initial sample. |
+| `outcome_effect_scale` | all | Size of treatment main effects relative to the unit-variance baseline outcome. |
+| `effect_heterogeneity_scale` | all | Size of treatment-by-covariate interactions. |
+| `outcome_noise_scale` | all | Gaussian outcome noise $\sigma_Y$. |
+| `random_state` | all | Seeds the frozen structure, the source alignment, and the initial sample. |
 
 Fitted attributes worth reporting alongside benchmark results are
 `confounding_strength_`, `confounding_bias_`, `confounding_bias_ratio_`, and
-`baseline_standard_deviation_`.
+`baseline_standard_deviation_`; the multidim class adds
+`prognostic_fit_r2_` and `source_row_indices_`.
 
 ## Extending the family
 
-Both classes subclass `BaseSemiSyntheticDataset`, which owns the lifecycle and
-the public `load`, `sample`, `predict`, `predict_y`, `log_prob`, and `get_grid`
-methods. A new DGP implements six hooks: `_prepare_dgp`, `_sample_treatment`,
-`_log_prob`, `_predict_y`, `_sample_outcome`, and `_get_grid`. The base class
-also provides the frozen causal score map, the standardized baseline outcome
+All three classes subclass `BaseSemiSyntheticDataset`, which owns the
+lifecycle and the public `load`, `sample`, `predict`, `predict_y`, `log_prob`,
+and `get_grid` methods. A new DGP implements six hooks: `_prepare_dgp`,
+`_sample_treatment`, `_log_prob`, `_predict_y`, `_sample_outcome`, and
+`_get_grid`. A DGP that needs several source datasets overrides
+`_combine_sources`, which receives every loaded source and a seeded stream for
+row alignment and returns the covariates to release. The base class also
+provides the frozen causal score map, the standardized baseline outcome
 surface, and confounding-strength calibration against any bias metric you
 supply, so vector, ordinal, count, or non-Gaussian outcome variants only need
 to write the assignment and outcome mathematics.

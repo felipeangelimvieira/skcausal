@@ -1,4 +1,4 @@
-"""Multi-dimensional semi-synthetic DGP driven by a real-outcome prognostic score."""
+"""Multi-dimensional semi-synthetic DGP with one treatment per source outcome."""
 
 import itertools
 
@@ -13,6 +13,7 @@ from skcausal.datasets.semi_synthetic import (
     _log_mixture,
     _validate_nonnegative,
     _validate_shared_dgp_parameters,
+    _validate_source_datasets,
 )
 
 __all__ = ["MultidimSemiSyntheticDataset"]
@@ -34,8 +35,8 @@ def _per_component(name, value, n_components, *, default=None):
     values = list(value)
     if len(values) != n_components:
         raise ValueError(
-            f"{name} must be a scalar or a sequence of length "
-            f"n_treatments={n_components}."
+            f"{name} must be a scalar or a sequence with one entry per source "
+            f"dataset (expected length {n_components})."
         )
     return values
 
@@ -62,15 +63,12 @@ def _validate_levels(value, n_components):
     return [None if entry is None else int(entry) for entry in levels]
 
 
-def _validate_targets(value, n_components):
-    targets = _per_component("target_columns", value, n_components)
-    for entry in targets:
-        if entry is not None and not isinstance(entry, str):
-            raise TypeError("target_columns entries must be None or column names.")
-    named = [entry for entry in targets if entry is not None]
-    if len(set(named)) != len(named):
-        raise ValueError("target_columns must not repeat a column.")
-    return targets
+def _validate_source_list(value):
+    return _validate_source_datasets(value, name="real_datasets")
+
+
+def _source_prefix(index):
+    return f"d{index}_"
 
 
 def _exchangeable_correlation(n_components, correlation):
@@ -142,32 +140,37 @@ def _numeric_column(frame, name, label):
 
 
 class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
-    r"""Semi-synthetic DGP with a vector of continuous and categorical treatments.
+    r"""Semi-synthetic DGP with one treatment component per source outcome.
 
-    A ridge prognostic score fitted on the real outcome ``y`` is the
-    confounding backbone: it enters the baseline outcome with unit weight and
-    the latent mean of component ``j`` with loading ``confounding_loadings[j]``
-    times ``confounding_strength``. Components share exchangeable latent noise
-    with correlation ``treatment_correlation``. A component may additionally
-    mimic a numeric covariate named in ``target_columns``; that column is
-    removed from the released ``X`` and its ridge prediction enters both the
-    baseline outcome and that component's assignment. A component with
-    ``n_levels`` set is released as ordered levels ``"0"`` to ``"K-1"`` by
-    thresholding its latent at equal-mass marginal quantiles.
+    Each source dataset contributes its covariates and one numeric outcome.
+    A ridge prognostic score fitted on that outcome, using only that source's
+    covariates, drives the assignment of the matching treatment component
+    (with loading ``confounding_loadings[j]`` times ``confounding_strength``)
+    and enters the baseline outcome with unit weight. Components share
+    exchangeable latent noise with correlation ``treatment_correlation``, which
+    is how outcomes from unrelated sources become correlated treatments. A
+    continuous component is released on the mean and standard deviation of
+    the outcome it mimics; a component with ``n_levels`` set is released as
+    ordered levels ``"0"`` to ``"K-1"`` by thresholding its latent at
+    equal-mass marginal quantiles.
+
+    Sources are aligned by row position: the shared sample size is the
+    smallest source size and larger sources are subsampled without
+    replacement using the alignment stream of ``random_state``. Covariates
+    are concatenated horizontally with column ``name`` of source ``k``
+    released as ``d{k}_name``; each source's own treatment column is
+    discarded.
 
     Parameters
     ----------
-    real_dataset : BaseDataset
-        Source of covariates and of the outcome used for the prognostic score.
-    n_treatments : int, default=2
-        Number of treatment components, released as ``t_0`` to ``t_{k-1}``.
+    real_datasets : BaseDataset or sequence of BaseDataset
+        Source datasets; one treatment component ``t_j`` is created per
+        source ``j``. A single dataset is treated as a one-element sequence.
     confounding_loadings : float or sequence, default=None
-        Per-component loading on the prognostic score; ``None`` means ``1.0``.
+        Per-component loading on its prognostic score; ``None`` means ``1.0``.
     n_levels : int, sequence, or None, default=None
         Per-component level count for discretized components; ``None`` keeps
         a component continuous.
-    target_columns : str, sequence, or None, default=None
-        Per-component numeric covariate to mimic; ``None`` mimics nothing.
     treatment_correlation : float, default=0.0
         Exchangeable latent noise correlation in ``[0, 1)``. Must be zero when
         two or more components are categorical.
@@ -197,16 +200,15 @@ class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
     outcome_noise_scale : float, default=1.0
         Nonnegative Gaussian outcome-noise standard deviation.
     random_state : int, default=42
-        Seed controlling frozen structure and the initial sample.
+        Seed controlling frozen structure, row alignment, and the initial
+        sample.
     """
 
     def __init__(
         self,
-        real_dataset,
-        n_treatments=2,
+        real_datasets,
         confounding_loadings=None,
         n_levels=None,
-        target_columns=None,
         treatment_correlation=0.0,
         confounding_strength=1.0,
         target_confounding_bias=None,
@@ -219,15 +221,10 @@ class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
         outcome_noise_scale=1.0,
         random_state=42,
     ):
-        if isinstance(n_treatments, bool) or not isinstance(
-            n_treatments, (int, np.integer)
-        ):
-            raise TypeError("n_treatments must be an integer.")
-        if n_treatments < 1:
-            raise ValueError("n_treatments must be at least 1.")
-        loadings = _validate_loadings(confounding_loadings, n_treatments)
-        levels = _validate_levels(n_levels, n_treatments)
-        targets = _validate_targets(target_columns, n_treatments)
+        datasets = _validate_source_list(real_datasets)
+        n_components = len(datasets)
+        loadings = _validate_loadings(confounding_loadings, n_components)
+        levels = _validate_levels(n_levels, n_components)
         correlation = float(treatment_correlation)
         if not np.isfinite(correlation) or not 0.0 <= correlation < 1.0:
             raise ValueError("treatment_correlation must lie in [0, 1).")
@@ -252,10 +249,9 @@ class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
             effect_heterogeneity_scale=effect_heterogeneity_scale,
             outcome_noise_scale=outcome_noise_scale,
         )
-        self.n_treatments = n_treatments
+        self.real_datasets = real_datasets
         self.confounding_loadings = confounding_loadings
         self.n_levels = n_levels
-        self.target_columns = target_columns
         self.treatment_correlation = treatment_correlation
         self.confounding_strength = confounding_strength
         self.target_confounding_bias = target_confounding_bias
@@ -268,42 +264,45 @@ class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
         self.outcome_noise_scale = outcome_noise_scale
         self._validated_loadings = loadings
         self._validated_levels = levels
-        self._validated_targets = targets
-        super().__init__(real_dataset=real_dataset, random_state=random_state)
+        super().__init__(real_dataset=datasets, random_state=random_state)
 
-    # -- source split ----------------------------------------------------------
+    # -- source alignment ------------------------------------------------------
 
-    def _split_source(self, X, treatment, outcome):
-        outcome = self._coerce_backend_frame(outcome, backend="polars")
-        if outcome.width != 1:
-            raise ValueError("real_dataset must provide exactly one outcome column.")
-        self._source_outcome = _numeric_column(
-            outcome, outcome.columns[0], "source outcome"
-        )
-        feature_names = [name for name in self._validated_targets if name is not None]
-        self._source_features = {}
-        for name in feature_names:
-            if name not in X.columns:
+    def _combine_sources(self, sources, rng):
+        n_rows = min(X.height for X, _, _ in sources)
+        self.source_row_indices_ = []
+        self.source_columns_ = []
+        self._source_outcomes = []
+        frames = []
+        for index, (X, _, outcome) in enumerate(sources):
+            outcome = self._coerce_backend_frame(outcome, backend="polars")
+            if outcome.width != 1:
                 raise ValueError(
-                    f"target column {name!r} is not a covariate of real_dataset."
+                    f"Source dataset {index} must provide exactly one outcome column."
                 )
-            self._source_features[name] = _numeric_column(
-                X, name, f"target column {name!r}"
+            if X.height == n_rows:
+                rows = np.arange(n_rows)
+            else:
+                rows = np.sort(rng.choice(X.height, size=n_rows, replace=False))
+            values = _numeric_column(
+                outcome[rows], outcome.columns[0], f"outcome of source dataset {index}"
             )
-        released = X.drop(feature_names)
-        if released.width == 0:
-            raise ValueError(
-                "At least one covariate must remain after removing target_columns."
+            renamed = X[rows].rename(
+                {name: _source_prefix(index) + name for name in X.columns}
             )
-        return released
+            self.source_row_indices_.append(rows)
+            self.source_columns_.append(list(renamed.columns))
+            self._source_outcomes.append(values)
+            frames.append(renamed)
+        return pl.concat(frames, how="horizontal")
 
     # -- structural preparation ------------------------------------------------
 
     def _prepare_dgp(self, X, rng):
-        n_components = int(self.n_treatments)
+        n_components = len(self._source_outcomes)
+        self.n_treatments_ = n_components
         self.treatment_columns_ = [f"t_{index}" for index in range(n_components)]
         self.n_levels_ = list(self._validated_levels)
-        self.target_columns_ = list(self._validated_targets)
         self.confounding_loadings_ = self._validated_loadings.copy()
         self.continuous_indices_ = np.array(
             [j for j, levels in enumerate(self.n_levels_) if levels is None], dtype=int
@@ -321,37 +320,21 @@ class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
             for j in self.categorical_indices_
         }
 
-        self.feature_names_ = [
-            name for name in self.target_columns_ if name is not None
-        ]
-        self.feature_coefficients_ = rng.normal(size=len(self.feature_names_))
-        fitted = np.column_stack(
-            [self._source_outcome]
-            + [self._source_features[name] for name in self.feature_names_]
-        )
+        fitted = np.column_stack(self._source_outcomes)
         scores = self._fit_causal_structure(
             X,
             rng,
             fitted_confounders=fitted,
-            confounder_coefficients=np.concatenate(([1.0], self.feature_coefficients_)),
+            fitted_confounder_columns=self.source_columns_,
+            confounder_coefficients=np.ones(n_components),
         )
-        r2 = self.score_map_.fitted_confounder_r2
-        self.prognostic_fit_r2_ = float(r2[0])
-        self.feature_fit_r2_ = dict(zip(self.feature_names_, r2[1:].tolist()))
-        self.feature_assignment_matrix_ = np.zeros(
-            (len(self.feature_names_), n_components)
-        )
+        self.prognostic_fit_r2_ = np.asarray(
+            self.score_map_.fitted_confounder_r2, dtype=float
+        ).copy()
         self.released_offsets_ = np.zeros(n_components)
         self.released_scales_ = np.ones(n_components)
-        for j, name in enumerate(self.target_columns_):
-            if name is None:
-                continue
-            position = self.feature_names_.index(name)
-            self.feature_assignment_matrix_[position, j] = self.feature_coefficients_[
-                position
-            ]
+        for j, values in enumerate(self._source_outcomes):
             if self.n_levels_[j] is None:
-                values = self._source_features[name]
                 finite = values[np.isfinite(values)]
                 self.released_offsets_[j] = float(finite.mean())
                 self.released_scales_[j] = float(finite.std(ddof=0))
@@ -437,10 +420,7 @@ class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
     # -- assignment law --------------------------------------------------------
 
     def _latent_means(self, scores, strength):
-        confounders = scores.confounders
-        signal = confounders[:, :1] * self.confounding_loadings_[None, :]
-        if self.feature_names_:
-            signal = signal + confounders[:, 1:] @ self.feature_assignment_matrix_
+        signal = scores.confounders * self.confounding_loadings_[None, :]
         treatment_only = scores.treatment_only @ self.treatment_only_coefficients_
         means = strength * signal + self.treatment_only_strength * treatment_only
         if not np.isfinite(means).all():
@@ -630,7 +610,7 @@ class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
         scale = float(self.treatment_noise_scale)
         bases, features = [], []
         continuous_position = categorical_position = 0
-        for j in range(int(self.n_treatments)):
+        for j in range(self.n_treatments_):
             if self.n_levels_[j] is None:
                 v = latent_continuous[:, continuous_position] / scale
                 continuous_position += 1
@@ -796,15 +776,20 @@ class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
 
         return [
             {
-                "real_dataset": KangSchaferContinuous(n=64, random_state=4),
+                "real_datasets": [
+                    KangSchaferContinuous(n=64, random_state=4),
+                    KangSchaferContinuous(n=80, random_state=5),
+                ],
                 "random_state": 7,
             },
             {
-                "real_dataset": KangSchaferContinuous(n=64, random_state=4),
-                "n_treatments": 3,
+                "real_datasets": [
+                    KangSchaferContinuous(n=64, random_state=4),
+                    KangSchaferContinuous(n=64, random_state=5),
+                    KangSchaferContinuous(n=96, random_state=6),
+                ],
                 "confounding_loadings": [1.0, 0.5, 0.0],
                 "n_levels": [None, None, 3],
-                "target_columns": [None, "x2", None],
                 "treatment_correlation": 0.4,
                 "random_state": 8,
             },

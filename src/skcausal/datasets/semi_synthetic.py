@@ -174,7 +174,7 @@ def _residualization_order(n_rows, n_scores):
 _RIDGE_PENALTY_FRACTION = 0.01
 
 
-def _ridge_projections(library, targets):
+def _ridge_projections(library, targets, column_masks=None):
     """Ridge-fit each target column on the nonlinear library.
 
     Returns a ``(p, d)`` projection that maps the raw library to a prediction
@@ -182,13 +182,19 @@ def _ridge_projections(library, targets):
     in-sample R² of each fit. Rows whose target is not finite are excluded from
     the fit. The penalty is ``0.01 * n_observed`` on library columns
     standardized to unit variance, so shrinkage is scale-free; zero-variance
-    columns receive a zero coefficient.
+    columns receive a zero coefficient. ``column_masks`` optionally restricts
+    each fit to a boolean subset of the library columns; the excluded columns
+    receive a zero coefficient.
     """
 
     library = np.asarray(library, dtype=float)
     targets = np.asarray(targets, dtype=float)
     if targets.ndim == 1:
         targets = targets[:, None]
+    if column_masks is None:
+        column_masks = [np.ones(library.shape[1], dtype=bool)] * targets.shape[1]
+    if len(column_masks) != targets.shape[1]:
+        raise ValueError("column_masks must provide one mask per target column.")
     projection = np.zeros((library.shape[1], targets.shape[1]))
     r2 = np.zeros(targets.shape[1])
     for index in range(targets.shape[1]):
@@ -200,7 +206,10 @@ def _ridge_projections(library, targets):
         design = library[observed]
         center = design.mean(axis=0)
         scale = design.std(axis=0)
-        active = scale > 0.0
+        mask = np.asarray(column_masks[index], dtype=bool)
+        if mask.shape != (library.shape[1],):
+            raise ValueError("Each column mask must cover every library column.")
+        active = (scale > 0.0) & mask
         standardized = (design[:, active] - center[active]) / scale[active]
         target = targets[observed, index]
         target = target - target.mean()
@@ -214,7 +223,42 @@ def _ridge_projections(library, targets):
     return projection, r2
 
 
-def _fit_causal_score_map(X, rng, fitted_confounders=None):
+def _encoded_column_origins(encoder, numeric_columns, categorical_columns):
+    """Name the source covariate behind each encoded column, in encoder order."""
+
+    origins = []
+    if numeric_columns:
+        origins.extend(numeric_columns)
+    if categorical_columns:
+        one_hot = encoder.named_transformers_["categorical"][-1]
+        for name, categories in zip(categorical_columns, one_hot.categories_):
+            origins.extend([name] * len(categories))
+    return tuple(origins)
+
+
+def _library_column_masks(origins, pair_indices, column_groups):
+    """Boolean library masks selecting the terms built only from each column group.
+
+    The library stacks four elementwise blocks over the encoded columns and
+    then the pairwise products. A block term belongs to a group when its source
+    column does; a product belongs to a group only when both factors do, so
+    cross-group products are excluded from every mask.
+    """
+
+    origins = tuple(origins)
+    pair_indices = np.asarray(pair_indices, dtype=int).reshape(-1, 2)
+    masks = []
+    for group in column_groups:
+        members = set(group)
+        block = np.array([name in members for name in origins], dtype=bool)
+        products = block[pair_indices[:, 0]] & block[pair_indices[:, 1]]
+        masks.append(np.concatenate((np.tile(block, 4), products)))
+    return masks
+
+
+def _fit_causal_score_map(
+    X, rng, fitted_confounders=None, fitted_confounder_columns=None
+):
     frame = _covariates_to_pandas(X)
     columns = tuple(frame.columns)
     numeric_columns = [
@@ -275,13 +319,30 @@ def _fit_causal_score_map(X, rng, fitted_confounders=None):
     else:
         pair_indices = np.empty((0, 2), dtype=int)
     library = _nonlinear_library(encoded, pair_indices)
+    column_masks = None
+    if fitted_confounder_columns is not None:
+        if fitted_confounders is None:
+            raise ValueError("fitted_confounder_columns requires fitted_confounders.")
+        for group in fitted_confounder_columns:
+            unknown = set(group) - set(columns)
+            if unknown:
+                raise ValueError(
+                    f"fitted_confounder_columns names unknown covariates {unknown}."
+                )
+        column_masks = _library_column_masks(
+            _encoded_column_origins(encoder, numeric_columns, categorical_columns),
+            pair_indices,
+            fitted_confounder_columns,
+        )
 
     projections = {}
     raw = {}
     fitted_r2 = None
     for name, dimension in _ROLE_DIMENSIONS.items():
         if name == "confounders" and fitted_confounders is not None:
-            projection, fitted_r2 = _ridge_projections(library, fitted_confounders)
+            projection, fitted_r2 = _ridge_projections(
+                library, fitted_confounders, column_masks=column_masks
+            )
             projections[name] = projection
             raw[name] = library @ projection
             continue
@@ -574,6 +635,26 @@ def _calibrate_confounding_strength(metric, target, initial_strength):
     return float(root), _finite_metric(metric, root)
 
 
+def _validate_source_datasets(real_dataset, name="real_dataset"):
+    """Return the configured source datasets as a non-empty list."""
+
+    message = (
+        f"{name} must be a BaseDataset instance or a non-empty sequence of "
+        "BaseDataset instances."
+    )
+    if isinstance(real_dataset, BaseDataset):
+        return [real_dataset]
+    if isinstance(real_dataset, (str, bytes)):
+        raise TypeError(message)
+    try:
+        datasets = list(real_dataset)
+    except TypeError as error:
+        raise TypeError(message) from error
+    if not datasets or not all(isinstance(item, BaseDataset) for item in datasets):
+        raise TypeError(message)
+    return datasets
+
+
 def _validate_nonnegative(name, value):
     if not np.isfinite(float(value)) or float(value) < 0.0:
         raise ValueError(f"{name} must be finite and nonnegative.")
@@ -620,9 +701,8 @@ class BaseSemiSyntheticDataset(BaseSyntheticDataset, ABC):
 
     outcome_columns = ("y",)
 
-    def __init__(self, real_dataset: BaseDataset, random_state: int = 42):
-        if not isinstance(real_dataset, BaseDataset):
-            raise TypeError("real_dataset must be an instance of BaseDataset.")
+    def __init__(self, real_dataset, random_state: int = 42):
+        _validate_source_datasets(real_dataset)
         self.real_dataset = real_dataset
         super().__init__(n=0, random_state=random_state)
         self._prepare()
@@ -633,25 +713,33 @@ class BaseSemiSyntheticDataset(BaseSyntheticDataset, ABC):
                 "BaseSemiSyntheticDataset derives its sample size from real_dataset "
                 "and does not accept a sample size."
             )
-        self.real_dataset_ = self.real_dataset.clone()
-        X, treatment, outcome = self.real_dataset_.load()
-        X = self._coerce_backend_frame(X, backend="polars")
-        if X.height == 0 or len(set(X.columns)) != X.width:
-            raise ValueError(
-                "real_dataset must provide nonempty covariates with unique columns."
-            )
+        self.real_datasets_ = [
+            dataset.clone() for dataset in _validate_source_datasets(self.real_dataset)
+        ]
+        self.real_dataset_ = self.real_datasets_[0]
+        sources = []
+        for dataset in self.real_datasets_:
+            X, treatment, outcome = dataset.load()
+            X = self._coerce_backend_frame(X, backend="polars")
+            if X.height == 0 or len(set(X.columns)) != X.width:
+                raise ValueError(
+                    "real_dataset must provide nonempty covariates with unique columns."
+                )
+            sources.append((X, treatment, outcome))
+        structural_seed, sample_seed, alignment_seed = np.random.SeedSequence(
+            self.random_state
+        ).spawn(3)
         X = self._coerce_backend_frame(
-            self._split_source(X, treatment, outcome), backend="polars"
+            self._combine_sources(sources, np.random.default_rng(alignment_seed)),
+            backend="polars",
         )
-        if X.width == 0:
+        if X.width == 0 or X.height == 0:
             raise ValueError(
-                "At least one covariate column must remain after the source split."
+                "At least one covariate column and one row must remain after the "
+                "source split."
             )
         self.n = X.height
         self._covariates = X
-        structural_seed, sample_seed = np.random.SeedSequence(self.random_state).spawn(
-            2
-        )
         self._prepare_dgp(X, np.random.default_rng(structural_seed))
         treatment, outcome = self._draw_sample(X, sample_seed)
         self._treatments = treatment
@@ -684,6 +772,22 @@ class BaseSemiSyntheticDataset(BaseSyntheticDataset, ABC):
         return pl.DataFrame(
             {name: array[:, index] for index, name in enumerate(self.outcome_columns)}
         )
+
+    def _combine_sources(self, sources, rng):
+        """Return the covariates to release from the loaded source datasets.
+
+        ``sources`` lists one ``(X, treatment, outcome)`` triple per configured
+        source dataset with ``X`` already coerced to Polars; ``rng`` is a
+        dedicated stream for row alignment between sources. The default accepts
+        exactly one source and delegates to :meth:`_split_source`.
+        """
+
+        if len(sources) != 1:
+            raise ValueError(
+                f"{type(self).__name__} accepts exactly one source dataset; "
+                f"received {len(sources)}."
+            )
+        return self._split_source(*sources[0])
 
     def _split_source(self, X, treatment, outcome):
         """Return the covariates to release; subclasses may keep source columns.
@@ -741,12 +845,21 @@ class BaseSemiSyntheticDataset(BaseSyntheticDataset, ABC):
     # -- shared machinery for score-based DGPs ---------------------------------
 
     def _fit_causal_structure(
-        self, X, rng, *, fitted_confounders=None, confounder_coefficients=None
+        self,
+        X,
+        rng,
+        *,
+        fitted_confounders=None,
+        fitted_confounder_columns=None,
+        confounder_coefficients=None,
     ):
         """Freeze the score map and standardized baseline outcome surface."""
 
         self.score_map_, self.source_scores_ = _fit_causal_score_map(
-            X, rng, fitted_confounders=fitted_confounders
+            X,
+            rng,
+            fitted_confounders=fitted_confounders,
+            fitted_confounder_columns=fitted_confounder_columns,
         )
         self.baseline_surface_ = _fit_baseline_surface(
             self.source_scores_, rng, confounder_coefficients=confounder_coefficients

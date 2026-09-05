@@ -15,9 +15,20 @@ from skcausal.datasets.semi_synthetic_multidim import (
     _per_component,
     _validate_levels,
     _validate_loadings,
-    _validate_targets,
+    _validate_source_list,
 )
-from tests.datasets._semi_synthetic_test_utils import ToyRealDataset
+from tests.datasets._semi_synthetic_test_utils import (
+    SecondToyRealDataset,
+    ToyRealDataset,
+)
+
+
+def _toy_sources():
+    return [ToyRealDataset(), SecondToyRealDataset()]
+
+
+def _kang_schafer_sources(n, seeds=(1, 2)):
+    return [KangSchaferContinuous(n=n, random_state=seed) for seed in seeds]
 
 
 def test_per_component_broadcasts_scalars_and_checks_lengths():
@@ -25,7 +36,7 @@ def test_per_component_broadcasts_scalars_and_checks_lengths():
     assert _per_component("x", None, 2, default=1.0) == [1.0, 1.0]
     assert _per_component("x", "income", 2) == ["income", "income"]
     assert _per_component("x", [None, "a"], 2) == [None, "a"]
-    with pytest.raises(ValueError, match="length n_treatments=2"):
+    with pytest.raises(ValueError, match="one entry per source"):
         _per_component("x", [1.0, 2.0, 3.0], 2)
 
 
@@ -42,12 +53,15 @@ def test_component_validators():
     with pytest.raises(TypeError, match="integers"):
         _validate_levels([True, None], 2)
 
-    assert _validate_targets(None, 2) == [None, None]
-    assert _validate_targets([None, "income"], 2) == [None, "income"]
-    with pytest.raises(ValueError, match="repeat"):
-        _validate_targets(["age", "age"], 2)
-    with pytest.raises(TypeError, match="column names"):
-        _validate_targets([1, None], 2)
+    single = ToyRealDataset()
+    assert _validate_source_list(single) == [single]
+    assert _validate_source_list((single,)) == [single]
+    with pytest.raises(TypeError, match="non-empty sequence"):
+        _validate_source_list([])
+    with pytest.raises(TypeError, match="non-empty sequence"):
+        _validate_source_list("dataset")
+    with pytest.raises(TypeError, match="non-empty sequence"):
+        _validate_source_list([single, object()])
 
 
 def test_exchangeable_correlation_is_symmetric_with_unit_diagonal():
@@ -131,29 +145,47 @@ def test_numeric_column_extracts_floats_and_rejects_bad_columns():
 
 def _two_continuous(**overrides):
     parameters = {
-        "n_treatments": 2,
         "treatment_correlation": 0.6,
         "randomized_weight": 0.3,
         "random_state": 5,
     }
     parameters.update(overrides)
-    return MultidimSemiSyntheticDataset(ToyRealDataset(), **parameters)
+    return MultidimSemiSyntheticDataset(_toy_sources(), **parameters)
+
+
+def _standardized_treatment(dataset, latent):
+    """Map standardized latent coordinates to released continuous values."""
+
+    return dataset.released_offsets_ + dataset.released_scales_ * np.asarray(latent)
 
 
 def test_multidim_releases_named_continuous_columns_and_density_integrates():
     dataset = _two_continuous()
     X, treatment, outcome = dataset.load()
 
-    assert list(X.columns) == ["age", "income", "region"]
+    assert list(X.columns) == [
+        "d0_age",
+        "d0_income",
+        "d0_region",
+        "d1_height",
+        "d1_score",
+        "d1_group",
+    ]
     assert list(treatment.columns) == ["t_0", "t_1"]
+    assert dataset.n_treatments_ == 2
     assert dataset.column_types == {"t_0": "continuous", "t_1": "continuous"}
     assert outcome.shape == (8, 1)
-    assert 0.0 <= dataset.prognostic_fit_r2_ <= 1.0
+    assert dataset.prognostic_fit_r2_.shape == (2,)
+    assert np.all(
+        (dataset.prognostic_fit_r2_ >= 0.0) & (dataset.prognostic_fit_r2_ <= 1.0)
+    )
 
     axis = np.linspace(-12.0, 12.0, 241)
     lattice = np.array(np.meshgrid(axis, axis, indexing="ij")).reshape(2, -1).T
     repeated_X = X.to_numpy()[np.zeros(lattice.shape[0], dtype=int)]
-    density = np.exp(dataset.log_prob(repeated_X, lattice)[:, 0]).reshape(241, 241)
+    released = _standardized_treatment(dataset, lattice)
+    density = np.exp(dataset.log_prob(repeated_X, released)[:, 0]).reshape(241, 241)
+    density = density * np.prod(dataset.released_scales_)
     integral = np.trapezoid(np.trapezoid(density, axis, axis=1), axis)
     np.testing.assert_allclose(integral, 1.0, atol=2e-3)
 
@@ -168,39 +200,46 @@ def test_multidim_honors_a_nonunit_treatment_noise_scale():
     axis = np.linspace(-24.0, 24.0, 481)
     lattice = np.array(np.meshgrid(axis, axis, indexing="ij")).reshape(2, -1).T
     repeated_X = X.to_numpy()[np.zeros(lattice.shape[0], dtype=int)]
-    density = np.exp(dataset.log_prob(repeated_X, lattice)[:, 0]).reshape(481, 481)
+    released = _standardized_treatment(dataset, lattice)
+    density = np.exp(dataset.log_prob(repeated_X, released)[:, 0]).reshape(481, 481)
+    density = density * np.prod(dataset.released_scales_)
     integral = np.trapezoid(np.trapezoid(density, axis, axis=1), axis)
     np.testing.assert_allclose(integral, 1.0, atol=2e-3)
 
-    at_reference = dataset.predict_y(X, np.zeros((X.height, 2)))[:, 0]
+    reference = np.tile(dataset.released_offsets_, (X.height, 1))
+    at_reference = dataset.predict_y(X, reference)[:, 0]
     np.testing.assert_allclose(at_reference, dataset.source_mu0_)
 
-    # The outcome basis reads latent / sigma, so doubling sigma and the treatment
-    # together must leave the dose-response untouched. Every structural draw is
-    # seeded identically, so the two datasets differ only in sigma.
+    # The outcome basis reads latent / sigma, so doubling sigma and the latent
+    # treatment together must leave the dose-response untouched. Every
+    # structural draw is seeded identically, so the two datasets differ only in
+    # sigma.
     unit_scale = _two_continuous(
         treatment_noise_scale=1.0, treatment_correlation=0.4, randomized_weight=0.3
     )
-    treatment = np.tile([0.7, -1.3], (X.height, 1))
+    latent = np.tile([0.7, -1.3], (X.height, 1))
     np.testing.assert_allclose(
-        dataset.predict_y(X, 2.0 * treatment), unit_scale.predict_y(X, treatment)
+        dataset.predict_y(X, _standardized_treatment(dataset, 2.0 * latent)),
+        unit_scale.predict_y(X, _standardized_treatment(unit_scale, latent)),
     )
 
-    central = ndtri(np.array([0.01, 0.99])) * 2.0
+    central = _standardized_treatment(dataset, ndtri(np.array([[0.01], [0.99]])) * 2.0)
     grid = dataset.get_grid(9)
     assert grid.shape == (9, 2)
-    for name in ("t_0", "t_1"):
+    for j, name in enumerate(("t_0", "t_1")):
         column = grid.get_column(name)
-        assert column.min() <= central[0] and column.max() >= central[1]
+        assert column.min() <= central[0, j] and column.max() >= central[1, j]
 
 
 def test_multidim_log_prob_is_the_exact_gaussian_mixture():
     dataset = _two_continuous()
     X, treatment, _ = dataset.load()
     means = dataset._latent_means(dataset.source_scores_, dataset.confounding_strength_)
-    values = treatment.to_numpy().astype(float)
+    values = (
+        treatment.to_numpy().astype(float) - dataset.released_offsets_
+    ) / dataset.released_scales_
     weight = dataset.randomized_weight
-    expected = np.log(
+    expected = -np.log(dataset.released_scales_).sum() + np.log(
         (1.0 - weight)
         * np.array(
             [
@@ -226,7 +265,8 @@ def test_multidim_predict_y_matches_noise_free_outcome_and_reference():
     X, treatment, outcome = dataset.load()
     np.testing.assert_allclose(dataset.predict_y(X, treatment), outcome.to_numpy())
 
-    at_reference = dataset.predict_y(X, np.zeros((X.height, 2)))[:, 0]
+    reference = np.tile(dataset.released_offsets_, (X.height, 1))
+    at_reference = dataset.predict_y(X, reference)[:, 0]
     np.testing.assert_allclose(at_reference, dataset.source_mu0_)
     assert len(dataset.interaction_coefficients_) == 1
     assert dataset.interaction_coefficients_[(0, 1)].shape == (1, 1)
@@ -241,8 +281,7 @@ def test_multidim_zero_loading_component_is_independent_of_x():
 
 def test_multidim_sampled_correlation_tracks_rho():
     dataset = MultidimSemiSyntheticDataset(
-        KangSchaferContinuous(n=4000, random_state=1),
-        n_treatments=2,
+        _kang_schafer_sources(4000),
         treatment_correlation=0.6,
         confounding_strength=0.0,
         randomized_weight=0.0,
@@ -265,17 +304,17 @@ def test_multidim_bias_increases_with_strength_and_calibrates():
     # The oracle bias is an RMS of a signed pointwise distortion whose baseline
     # and effect-modifier channels anti-correlate at large strengths, so the
     # metric is only monotone over the operating range probed here.
-    source = KangSchaferContinuous(n=300, random_state=2)
+    sources = _kang_schafer_sources(300, seeds=(2, 3))
     biases = [
         MultidimSemiSyntheticDataset(
-            source, n_treatments=2, confounding_strength=strength, random_state=3
+            sources, confounding_strength=strength, random_state=3
         ).confounding_bias_ratio_
         for strength in (0.25, 0.5, 1.0)
     ]
     assert biases[0] < biases[1] < biases[2]
 
     calibrated = MultidimSemiSyntheticDataset(
-        source, n_treatments=2, target_confounding_bias=0.5, random_state=3
+        sources, target_confounding_bias=0.5, random_state=3
     )
     np.testing.assert_allclose(calibrated.confounding_bias_ratio_, 0.5, atol=2e-3)
     assert calibrated.confounding_strength_ > 0.0
@@ -304,19 +343,21 @@ def test_multidim_sample_is_reproducible_and_load_is_unchanged():
 
 
 def test_multidim_rejects_invalid_parameters():
-    source = ToyRealDataset()
-    with pytest.raises(ValueError, match="at least 1"):
-        MultidimSemiSyntheticDataset(source, n_treatments=0)
-    with pytest.raises(TypeError, match="integer"):
-        MultidimSemiSyntheticDataset(source, n_treatments=2.0)
+    sources = _toy_sources()
+    with pytest.raises(TypeError, match="non-empty sequence"):
+        MultidimSemiSyntheticDataset([])
+    with pytest.raises(TypeError, match="non-empty sequence"):
+        MultidimSemiSyntheticDataset([ToyRealDataset(), 3])
     with pytest.raises(ValueError, match=r"\[0, 1\)"):
-        MultidimSemiSyntheticDataset(source, treatment_correlation=1.0)
+        MultidimSemiSyntheticDataset(sources, treatment_correlation=1.0)
     with pytest.raises(ValueError, match="positive"):
-        MultidimSemiSyntheticDataset(source, treatment_noise_scale=0.0)
+        MultidimSemiSyntheticDataset(sources, treatment_noise_scale=0.0)
     with pytest.raises(ValueError, match="treatment_interaction_scale"):
-        MultidimSemiSyntheticDataset(source, treatment_interaction_scale=-1.0)
-    with pytest.raises(ValueError, match="length n_treatments=2"):
-        MultidimSemiSyntheticDataset(source, confounding_loadings=[1.0, 2.0, 3.0])
+        MultidimSemiSyntheticDataset(sources, treatment_interaction_scale=-1.0)
+    with pytest.raises(ValueError, match="expected length 2"):
+        MultidimSemiSyntheticDataset(sources, confounding_loadings=[1.0, 2.0, 3.0])
+    with pytest.raises(ValueError, match="expected length 2"):
+        MultidimSemiSyntheticDataset(sources, n_levels=[None, 3, 2])
 
 
 def test_multidim_requires_a_single_numeric_source_outcome():
@@ -325,20 +366,115 @@ def test_multidim_requires_a_single_numeric_source_outcome():
             X, t, y = super()._load()
             return X, t, y.with_columns(pl.lit(1.0).alias("extra"))
 
-    with pytest.raises(ValueError, match="exactly one outcome column"):
-        MultidimSemiSyntheticDataset(TwoOutcomeDataset(), n_treatments=1)
+    with pytest.raises(ValueError, match="Source dataset 1 must provide exactly one"):
+        MultidimSemiSyntheticDataset([ToyRealDataset(), TwoOutcomeDataset()])
+
+
+def test_sources_are_aligned_prefixed_and_released_on_their_outcome_scale():
+    sources = _toy_sources()
+    dataset = MultidimSemiSyntheticDataset(sources, random_state=3)
+    X, treatment, _ = dataset.load()
+    X_first, _, y_first = sources[0].load()
+    X_second, _, y_second = sources[1].load()
+
+    assert dataset.n == 8
+    assert dataset.source_columns_ == [
+        ["d0_age", "d0_income", "d0_region"],
+        ["d1_height", "d1_score", "d1_group"],
+    ]
+    first_rows, second_rows = dataset.source_row_indices_
+    np.testing.assert_array_equal(first_rows, np.arange(8))
+    assert second_rows.shape == (8,)
+    assert np.all(np.diff(second_rows) > 0) and second_rows.max() < 10
+    np.testing.assert_array_equal(
+        X.select(["d1_height", "d1_score"]).to_numpy(),
+        X_second.select(["height", "score"]).to_numpy()[second_rows],
+    )
+    np.testing.assert_array_equal(
+        X.select(["d0_age", "d0_income"]).to_numpy(),
+        X_first.select(["age", "income"]).to_numpy(),
+    )
+    assert list(X_first.columns) == ["age", "income", "region"]
+
+    y0 = y_first.get_column("source_y").to_numpy().astype(float)
+    y1 = y_second.get_column("other_y").to_numpy().astype(float)[second_rows]
+    np.testing.assert_allclose(dataset.released_offsets_, [y0.mean(), y1.mean()])
+    np.testing.assert_allclose(
+        dataset.released_scales_, [y0.std(ddof=0), y1.std(ddof=0)]
+    )
+    np.testing.assert_allclose(dataset.baseline_surface_.confounder_coefficients, 1.0)
+
+    # Oracles accept the concatenated schema, including NumPy of that width.
+    assert dataset.log_prob(X.to_numpy(), treatment).shape == (8, 1)
+    with pytest.raises(ValueError):
+        dataset.log_prob(X_first, treatment)
+
+    # Released value = mean + sd * latent, so log_prob at the outcome means
+    # equals the latent density at zero minus the log of both scales.
+    at_mean = np.tile(dataset.released_offsets_, (8, 1))
+    means = dataset._latent_means(dataset.source_scores_, dataset.confounding_strength_)
+    latent_density = dataset._log_density(
+        np.zeros((8, 2)), np.zeros((8, 0), dtype=int), means, dataset.cut_points_
+    )
+    np.testing.assert_allclose(
+        dataset.log_prob(X, at_mean)[:, 0],
+        latent_density - np.log(dataset.released_scales_).sum(),
+    )
+
+
+def test_subsampling_is_seeded_and_reproducible():
+    same = [
+        MultidimSemiSyntheticDataset(
+            _toy_sources(), random_state=3
+        ).source_row_indices_[1]
+        for _ in range(2)
+    ]
+    np.testing.assert_array_equal(same[0], same[1])
+    other = MultidimSemiSyntheticDataset(
+        _toy_sources(), random_state=4
+    ).source_row_indices_[1]
+    assert not np.array_equal(same[0], other)
+
+
+def test_prognostic_score_of_a_source_ignores_the_other_source():
+    dataset = MultidimSemiSyntheticDataset(_toy_sources(), random_state=6)
+    X, _, _ = dataset.load()
+    permuted = np.random.default_rng(0).permutation(X.height)
+    shuffled = X.with_columns(
+        [
+            X.get_column(name)[permuted].alias(name)
+            for name in dataset.source_columns_[1]
+        ]
+    )
+    original = dataset.score_map_.transform(X).confounders
+    altered = dataset.score_map_.transform(shuffled).confounders
+    np.testing.assert_allclose(altered[:, 0], original[:, 0])
+    assert not np.allclose(altered[:, 1], original[:, 1])
+
+    means = dataset._latent_means(dataset.source_scores_, dataset.confounding_strength_)
+    assert np.std(means[:, 0]) > 0.0 and np.std(means[:, 1]) > 0.0
+    assert dataset.score_map_.fitted_confounder_r2.shape == (2,)
+
+
+def test_single_dataset_is_one_source():
+    dataset = MultidimSemiSyntheticDataset(ToyRealDataset(), n_levels=2, random_state=1)
+    X, treatment, _ = dataset.load()
+    assert list(X.columns) == ["d0_age", "d0_income", "d0_region"]
+    assert list(treatment.columns) == ["t_0"]
+    assert dataset.released_scales_[0] == 1.0
+    assert treatment.get_column("t_0").cast(pl.Utf8).is_in(["0", "1"]).all()
+    assert len(dataset.real_datasets_) == 1
 
 
 def _mixed(**overrides):
     parameters = {
-        "n_treatments": 2,
         "n_levels": [None, 3],
         "treatment_correlation": 0.6,
         "randomized_weight": 0.3,
         "random_state": 9,
     }
     parameters.update(overrides)
-    return MultidimSemiSyntheticDataset(ToyRealDataset(), **parameters)
+    return MultidimSemiSyntheticDataset(_toy_sources(), **parameters)
 
 
 def test_mixed_masses_sum_to_the_continuous_marginal_and_match_brute_force():
@@ -355,15 +491,19 @@ def test_mixed_masses_sum_to_the_continuous_marginal_and_match_brute_force():
     weight = dataset.randomized_weight
     covariance = dataset.noise_covariance_
     value = 0.7
-    masses = np.array(
-        [
-            np.exp(
-                dataset.log_prob(row, pl.DataFrame({"t_0": [value], "t_1": [level]}))[
-                    0, 0
-                ]
-            )
-            for level in ("0", "1", "2")
-        ]
+    released = dataset.released_offsets_[0] + dataset.released_scales_[0] * value
+    masses = (
+        np.array(
+            [
+                np.exp(
+                    dataset.log_prob(
+                        row, pl.DataFrame({"t_0": [released], "t_1": [level]})
+                    )[0, 0]
+                )
+                for level in ("0", "1", "2")
+            ]
+        )
+        * dataset.released_scales_[0]
     )
     marginal = (1.0 - weight) * multivariate_normal(
         mean=means[:1], cov=covariance[:1, :1]
@@ -384,8 +524,7 @@ def test_mixed_masses_sum_to_the_continuous_marginal_and_match_brute_force():
 
 def test_categorical_levels_are_balanced_and_grid_crosses_levels():
     dataset = MultidimSemiSyntheticDataset(
-        KangSchaferContinuous(n=4000, random_state=1),
-        n_treatments=2,
+        _kang_schafer_sources(4000),
         n_levels=[None, 4],
         confounding_strength=0.0,
         randomized_weight=0.0,
@@ -406,8 +545,7 @@ def test_categorical_levels_are_balanced_and_grid_crosses_levels():
 
 def test_categorical_only_multidim_has_level_lattice_and_exact_calibration():
     dataset = MultidimSemiSyntheticDataset(
-        KangSchaferContinuous(n=300, random_state=2),
-        n_treatments=2,
+        _kang_schafer_sources(300, seeds=(2, 3)),
         n_levels=[2, 3],
         target_confounding_bias=0.3,
         random_state=4,
@@ -426,7 +564,7 @@ def test_categorical_only_multidim_has_level_lattice_and_exact_calibration():
 def test_unknown_level_is_unsupported_and_predict_y_rejects_it():
     dataset = _mixed()
     X, _, _ = dataset.load()
-    bad = pl.DataFrame({"t_0": [0.0], "t_1": ["7"]})
+    bad = pl.DataFrame({"t_0": [dataset.released_offsets_[0]], "t_1": ["7"]})
     assert np.isneginf(dataset.log_prob(X.head(1), bad)[0, 0])
     with pytest.raises(ValueError, match="known categorical levels"):
         dataset.predict_y(X.head(1), bad)
@@ -443,96 +581,16 @@ def test_malformed_continuous_treatment_raises_value_error():
 def test_correlated_noise_with_two_categorical_components_is_rejected():
     with pytest.raises(ValueError, match="two or more components are categorical"):
         MultidimSemiSyntheticDataset(
-            ToyRealDataset(), n_treatments=2, n_levels=[2, 3], treatment_correlation=0.2
+            _toy_sources(), n_levels=[2, 3], treatment_correlation=0.2
         )
     MultidimSemiSyntheticDataset(
-        ToyRealDataset(), n_treatments=2, n_levels=[2, 3], treatment_correlation=0.0
+        _toy_sources(), n_levels=[2, 3], treatment_correlation=0.0
     )
-
-
-def test_feature_target_is_removed_from_x_and_released_on_its_scale():
-    source = ToyRealDataset()
-    dataset = MultidimSemiSyntheticDataset(
-        source, n_treatments=2, target_columns=[None, "income"], random_state=3
-    )
-    X, treatment, _ = dataset.load()
-    income = source.load()[0].get_column("income").to_numpy().astype(float)
-
-    assert list(X.columns) == ["age", "region"]
-    assert list(source.load()[0].columns) == ["age", "income", "region"]
-    assert dataset.target_columns_ == [None, "income"]
-    assert dataset.feature_names_ == ["income"]
-    assert set(dataset.feature_fit_r2_) == {"income"}
-    np.testing.assert_allclose(dataset.released_offsets_, [0.0, income.mean()])
-    np.testing.assert_allclose(dataset.released_scales_, [1.0, income.std(ddof=0)])
-    assert dataset.feature_assignment_matrix_.shape == (1, 2)
-    assert dataset.feature_assignment_matrix_[0, 0] == 0.0
-    assert dataset.feature_assignment_matrix_[0, 1] == dataset.feature_coefficients_[0]
-
-    # Oracles accept the reduced schema, including NumPy of the reduced width.
-    assert dataset.log_prob(X.to_numpy(), treatment).shape == (8, 1)
-    with pytest.raises(ValueError):
-        dataset.log_prob(source.load()[0], treatment)
-
-    # Released value = mean + sd * latent, so log_prob at the feature mean equals
-    # the latent density at zero minus log(sd).
-    at_mean = np.zeros((8, 2))
-    at_mean[:, 1] = income.mean()
-    means = dataset._latent_means(dataset.source_scores_, dataset.confounding_strength_)
-    latent_density = dataset._log_density(
-        np.zeros((8, 2)), np.zeros((8, 0), dtype=int), means, dataset.cut_points_
-    )
-    np.testing.assert_allclose(
-        dataset.log_prob(X, at_mean)[:, 0],
-        latent_density - np.log(income.std(ddof=0)),
-    )
-
-
-def test_feature_score_enters_assignment_and_baseline():
-    dataset = MultidimSemiSyntheticDataset(
-        ToyRealDataset(),
-        n_treatments=2,
-        confounding_loadings=[1.0, 0.0],
-        target_columns=[None, "income"],
-        random_state=6,
-    )
-    means = dataset._latent_means(dataset.source_scores_, dataset.confounding_strength_)
-    assert np.std(means[:, 1]) > 0.0
-    assert dataset.score_map_.fitted_confounder_r2.shape == (2,)
-    np.testing.assert_allclose(
-        dataset.baseline_surface_.confounder_coefficients,
-        [1.0, dataset.feature_coefficients_[0]],
-    )
-
-
-def test_feature_target_validation():
-    source = ToyRealDataset()
-    with pytest.raises(ValueError, match="not a covariate"):
-        MultidimSemiSyntheticDataset(source, n_treatments=1, target_columns="height")
-    with pytest.raises(ValueError, match="must be numeric"):
-        MultidimSemiSyntheticDataset(source, n_treatments=1, target_columns="region")
-    with pytest.raises(ValueError, match="At least one covariate"):
-        MultidimSemiSyntheticDataset(
-            KangSchaferContinuous(n=50, random_state=0),
-            n_treatments=4,
-            target_columns=["x1", "x2", "x3", "x4"],
-        )
-    mixed = MultidimSemiSyntheticDataset(
-        source,
-        n_treatments=2,
-        n_levels=[None, 2],
-        target_columns=["age", "income"],
-        random_state=1,
-    )
-    X, treatment, _ = mixed.load()
-    assert list(X.columns) == ["region"]
-    assert mixed.released_scales_[1] == 1.0
-    assert treatment.get_column("t_1").cast(pl.Utf8).is_in(["0", "1"]).all()
 
 
 def test_predict_curve_accepts_mixed_grid_rows():
     dataset = MultidimSemiSyntheticDataset(
-        ToyRealDataset(), n_treatments=2, n_levels=[None, 3], random_state=9
+        _toy_sources(), n_levels=[None, 3], random_state=9
     )
     X, _, _ = dataset.load()
     grid = dataset.get_grid(4)
@@ -561,22 +619,21 @@ def test_multidim_rejects_non_numeric_source_outcome():
             return X, t, y.with_columns(pl.lit("a").alias("source_y"))
 
     with pytest.raises(ValueError, match="must be numeric"):
-        MultidimSemiSyntheticDataset(StringOutcomeDataset(), n_treatments=1)
+        MultidimSemiSyntheticDataset(StringOutcomeDataset())
 
 
 def test_single_component_continuous_and_categorical_normalize():
-    continuous = MultidimSemiSyntheticDataset(
-        ToyRealDataset(), n_treatments=1, random_state=2
-    )
+    continuous = MultidimSemiSyntheticDataset(ToyRealDataset(), random_state=2)
     X, _, _ = continuous.load()
     grid = np.linspace(-12.0, 12.0, 4001)
     repeated_X = X.head(1).to_numpy()[np.zeros(grid.size, dtype=int)]
-    density = np.exp(continuous.log_prob(repeated_X, grid.reshape(-1, 1))[:, 0])
-    integral = np.trapezoid(density, grid)
+    released = _standardized_treatment(continuous, grid.reshape(-1, 1))
+    density = np.exp(continuous.log_prob(repeated_X, released)[:, 0])
+    integral = np.trapezoid(density * continuous.released_scales_[0], grid)
     np.testing.assert_allclose(integral, 1.0, atol=2e-3)
 
     categorical = MultidimSemiSyntheticDataset(
-        ToyRealDataset(), n_treatments=1, n_levels=4, random_state=2
+        ToyRealDataset(), n_levels=4, random_state=2
     )
     grid4 = categorical.get_grid(50)
     assert grid4.shape == (4, 1)
@@ -587,10 +644,9 @@ def test_single_component_continuous_and_categorical_normalize():
 
 
 def test_treatment_only_strength_adds_a_bias_floor_and_still_calibrates():
-    source = KangSchaferContinuous(n=300, random_state=2)
+    sources = _kang_schafer_sources(300, seeds=(2, 3))
     floor = MultidimSemiSyntheticDataset(
-        source,
-        n_treatments=2,
+        sources,
         confounding_strength=0.0,
         treatment_only_strength=1.0,
         random_state=3,
@@ -598,20 +654,20 @@ def test_treatment_only_strength_adds_a_bias_floor_and_still_calibrates():
     assert floor.confounding_bias_ratio_ > 0.0
     assert floor.confounding_strength_ == 0.0
 
+    target = floor.confounding_bias_ratio_ + 0.1
     calibrated = MultidimSemiSyntheticDataset(
-        source,
-        n_treatments=2,
+        sources,
         treatment_only_strength=1.0,
-        target_confounding_bias=0.4,
+        target_confounding_bias=target,
         random_state=3,
     )
-    np.testing.assert_allclose(calibrated.confounding_bias_ratio_, 0.4, atol=2e-3)
+    np.testing.assert_allclose(calibrated.confounding_bias_ratio_, target, atol=2e-3)
+    assert calibrated.confounding_strength_ > 0.0
 
 
 def test_confounded_categorical_sampler_matches_log_prob():
     dataset = MultidimSemiSyntheticDataset(
-        KangSchaferContinuous(n=2000, random_state=1),
-        n_treatments=2,
+        _kang_schafer_sources(2000),
         n_levels=[None, 3],
         treatment_correlation=0.5,
         confounding_strength=1.0,

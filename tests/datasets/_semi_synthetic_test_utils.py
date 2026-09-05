@@ -23,3 +23,30 @@ class ToyRealDataset(BaseDataset):
         source_t = pl.DataFrame({"source_t": np.arange(8, dtype=float)})
         source_y = pl.DataFrame({"source_y": np.linspace(-1.0, 1.0, 8)})
         return X, source_t, source_y
+
+
+class SecondToyRealDataset(BaseDataset):
+    """A ten-row source with its own covariate names and outcome."""
+
+    def _load(self):
+        X = pl.DataFrame(
+            {
+                "height": [
+                    150.0,
+                    155.0,
+                    160.0,
+                    165.0,
+                    170.0,
+                    175.0,
+                    180.0,
+                    185.0,
+                    190.0,
+                    195.0,
+                ],
+                "score": [3.0, 1.0, 4.0, 1.0, 5.0, 9.0, 2.0, 6.0, 5.0, 3.0],
+                "group": ["a", "b", "a", "c", "b", "c", "a", "b", "c", "a"],
+            }
+        )
+        source_t = pl.DataFrame({"source_t": np.zeros(10)})
+        source_y = pl.DataFrame({"other_y": np.linspace(2.0, -3.0, 10)})
+        return X, source_t, source_y

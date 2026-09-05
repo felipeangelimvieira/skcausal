@@ -6,7 +6,10 @@ import polars as pl
 import pytest
 
 from skcausal.datasets.semi_synthetic import BaseSemiSyntheticDataset
-from tests.datasets._semi_synthetic_test_utils import ToyRealDataset
+from tests.datasets._semi_synthetic_test_utils import (
+    SecondToyRealDataset,
+    ToyRealDataset,
+)
 
 
 class ToySemiSyntheticDataset(BaseSemiSyntheticDataset):
@@ -162,3 +165,70 @@ def test_base_split_source_hook_releases_reduced_covariates():
     assert dataset.n == 8
     assert treatment.shape == (8, 1)
     assert dataset.log_prob(X.to_numpy(), treatment).shape == (8, 1)
+
+
+class ConcatenatingSemiSyntheticDataset(ToySemiSyntheticDataset):
+    def _combine_sources(self, sources, rng):
+        self.alignment_draw_ = rng.random()
+        n_rows = min(X.height for X, _, _ in sources)
+        return pl.concat(
+            [
+                X.head(n_rows).select(pl.all().name.prefix(f"s{index}_"))
+                for index, (X, _, _) in enumerate(sources)
+            ],
+            how="horizontal",
+        )
+
+    def _prepare_dgp(self, X, rng):
+        self.offset_ = float(X.get_column("s0_age").mean())
+
+    def _sample_treatment(self, X, rng):
+        return pl.DataFrame({"t": X.get_column("s0_income").to_numpy() / 50.0})
+
+    def _log_prob(self, X, treatment):
+        return np.zeros(X.height)
+
+    def _predict_y(self, X, treatment):
+        return treatment.get_column("t").to_numpy()
+
+
+def test_base_rejects_invalid_source_sequences():
+    with pytest.raises(TypeError, match="non-empty sequence"):
+        ToySemiSyntheticDataset([])
+    with pytest.raises(TypeError, match="non-empty sequence"):
+        ToySemiSyntheticDataset([ToyRealDataset(), "not a dataset"])
+    with pytest.raises(TypeError, match="non-empty sequence"):
+        ToySemiSyntheticDataset(object())
+
+
+def test_base_single_source_hooks_reject_multiple_sources():
+    with pytest.raises(ValueError, match="exactly one source dataset; received 2"):
+        ToySemiSyntheticDataset([ToyRealDataset(), ToyRealDataset()])
+    single = ToySemiSyntheticDataset([ToyRealDataset()], random_state=1)
+    assert len(single.real_datasets_) == 1
+    assert single.real_dataset_ is single.real_datasets_[0]
+
+
+def test_base_combine_sources_hook_receives_every_source_and_a_seeded_stream():
+    sources = [ToyRealDataset(), SecondToyRealDataset()]
+    dataset = ConcatenatingSemiSyntheticDataset(sources, random_state=3)
+    X, treatment, _ = dataset.load()
+
+    assert len(dataset.real_datasets_) == 2
+    assert all(
+        clone is not source for clone, source in zip(dataset.real_datasets_, sources)
+    )
+    assert dataset.real_dataset_ is dataset.real_datasets_[0]
+    assert list(X.columns) == [
+        "s0_age",
+        "s0_income",
+        "s0_region",
+        "s1_height",
+        "s1_score",
+        "s1_group",
+    ]
+    assert dataset.n == 8 and treatment.shape == (8, 1)
+    again = ConcatenatingSemiSyntheticDataset(sources, random_state=3)
+    assert again.alignment_draw_ == dataset.alignment_draw_
+    other = ConcatenatingSemiSyntheticDataset(sources, random_state=4)
+    assert other.alignment_draw_ != dataset.alignment_draw_
