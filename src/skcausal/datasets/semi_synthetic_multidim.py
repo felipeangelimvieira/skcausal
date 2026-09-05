@@ -63,9 +63,10 @@ def _numeric_column(frame, name, label):
     if not series.dtype.is_numeric():
         raise ValueError(f"The {label} must be numeric.")
     values = series.cast(pl.Float64).to_numpy().astype(float)
-    finite = values[np.isfinite(values)]
-    if np.unique(finite).size < 2:
-        raise ValueError(f"The {label} must have at least two distinct finite values.")
+    if not np.isfinite(values).all():
+        raise ValueError(f"The {label} must be finite.")
+    if np.unique(values).size < 2:
+        raise ValueError(f"The {label} must have at least two distinct values.")
     return values
 
 
@@ -319,8 +320,20 @@ class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
     def _sample_treatment(self, X, rng):
         return self._fixed_treatments
 
+    def sample(self, random_state):
+        raise NotImplementedError(
+            "MultidimSemiSyntheticDataset is fixed at construction; create a new "
+            "instance with another random_state instead."
+        )
+
+    def log_prob(self, X, treatment):
+        raise NotImplementedError(
+            "Mean regressors do not define p(T | X), so this dataset does not "
+            "define log_prob."
+        )
+
     def _log_prob(self, X, treatment):
-        raise NotImplementedError("Fixed treatments do not define a density.")
+        raise NotImplementedError
 
     def _predict_y(self, X, treatment):
         return self._baseline(X) + self._evaluate_treatment_effect(treatment)

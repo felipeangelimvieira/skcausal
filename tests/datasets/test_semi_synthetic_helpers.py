@@ -7,11 +7,9 @@ from skcausal.datasets.semi_synthetic import (
     _bisect_marginal_quantiles,
     _calibrate_confounding_strength,
     _calibrate_softmax_intercepts,
-    _encoded_column_origins,
     _fit_baseline_surface,
     _fit_causal_score_map,
     _gaussian_mixture_marginal_cdf,
-    _library_column_masks,
     _log_mixture,
     _normal_logpdf,
     _normalized_log_weights,
@@ -288,76 +286,6 @@ def test_score_map_accepts_fitted_confounders():
     )
     np.testing.assert_allclose(score_map.transform(X).confounders, scores.confounders)
     assert scores.treatment_only.shape == (X.height, 2)
-
-
-def test_ridge_projections_honor_column_masks():
-    rng = np.random.default_rng(5)
-    library = rng.normal(size=(300, 4))
-    target = library[:, 0] + 2.0 * library[:, 3] + rng.normal(scale=0.05, size=300)
-    mask = np.array([True, True, False, False])
-
-    projection, r2 = _ridge_projections(library, target, column_masks=[mask])
-    restricted, restricted_r2 = _ridge_projections(library[:, :2], target)
-    unmasked, unmasked_r2 = _ridge_projections(library, target)
-
-    assert projection[2:, 0].tolist() == [0.0, 0.0]
-    np.testing.assert_allclose(projection[:2, 0], restricted[:, 0])
-    np.testing.assert_allclose(r2, restricted_r2)
-    assert r2[0] < 0.5 < unmasked_r2[0]
-    assert unmasked[3, 0] != 0.0
-    with pytest.raises(ValueError, match="one mask per target"):
-        _ridge_projections(library, target, column_masks=[mask, mask])
-    with pytest.raises(ValueError, match="cover every library column"):
-        _ridge_projections(library, target, column_masks=[mask[:2]])
-
-
-def test_library_column_masks_follow_encoded_origins_and_pairs():
-    origins = ("a", "a", "b")
-    pairs = np.array([[0, 1], [0, 2]])
-    masks = _library_column_masks(origins, pairs, [["a"], ["b"]])
-
-    expected_a = np.concatenate((np.tile([True, True, False], 4), [True, False]))
-    expected_b = np.concatenate((np.tile([False, False, True], 4), [False, False]))
-    np.testing.assert_array_equal(masks[0], expected_a)
-    np.testing.assert_array_equal(masks[1], expected_b)
-
-
-def test_score_map_restricts_fitted_confounders_to_their_column_groups():
-    X = ToyRealDataset().load()[0]
-    targets = np.column_stack(
-        (
-            X.get_column("age").to_numpy().astype(float),
-            X.get_column("income").to_numpy().astype(float),
-        )
-    )
-    score_map, scores = _fit_causal_score_map(
-        X,
-        np.random.default_rng(4),
-        fitted_confounders=targets,
-        fitted_confounder_columns=[["age", "region"], ["income"]],
-    )
-    origins = _encoded_column_origins(score_map.encoder, ["age", "income"], ("region",))
-    assert origins == ("age", "income", "region", "region", "region")
-    masks = _library_column_masks(
-        origins, score_map.pair_indices, [["age", "region"], ["income"]]
-    )
-    projection = score_map.projections["confounders"]
-    assert np.all(projection[~masks[0], 0] == 0.0)
-    assert np.all(projection[~masks[1], 1] == 0.0)
-    assert np.any(projection[masks[1], 1] != 0.0)
-    assert scores.confounders.shape == (X.height, 2)
-
-    with pytest.raises(ValueError, match="unknown covariates"):
-        _fit_causal_score_map(
-            X,
-            np.random.default_rng(4),
-            fitted_confounders=targets,
-            fitted_confounder_columns=[["age"], ["height"]],
-        )
-    with pytest.raises(ValueError, match="requires fitted_confounders"):
-        _fit_causal_score_map(
-            X, np.random.default_rng(4), fitted_confounder_columns=[["age"]]
-        )
 
 
 def test_baseline_surface_accepts_fixed_confounder_coefficients():

@@ -2,12 +2,15 @@ import numpy as np
 import polars as pl
 import pytest
 from scipy.stats import rankdata
+from sklearn.base import BaseEstimator
 from sklearn.compose import make_column_selector, make_column_transformer
+from sklearn.dummy import DummyRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
+from skcausal.datasets.base import BaseDataset
 from skcausal.datasets.semi_synthetic_multidim import (
     MultidimSemiSyntheticDataset,
     _coupled_orders,
@@ -182,3 +185,103 @@ def test_additive_spline_response_is_centered_and_supports_counterfactuals():
     grid = dataset.get_grid(100)
     assert grid.columns == ["t_0", "t_1"]
     assert grid.shape == (100, 2)
+
+
+class BadRegressor(BaseEstimator):
+    def __init__(self, kind="nan"):
+        self.kind = kind
+
+    def fit(self, X, y):
+        return self
+
+    def predict(self, X):
+        if self.kind == "nan":
+            return np.full(len(X), np.nan)
+        return np.zeros((len(X), 2))
+
+
+@pytest.mark.parametrize(
+    "overrides, message",
+    [
+        ({"real_datasets": []}, "non-empty sequence"),
+        ({"real_datasets": ToyRealDataset()}, "non-empty sequence"),
+        ({"regressors": []}, "one estimator per source"),
+        ({"regressors": [object(), object()]}, "cloneable sklearn estimator"),
+        ({"treatment_correlation": 1.0}, "treatment_correlation"),
+        ({"treatment_correlation": -1.0}, "treatment_correlation"),
+        ({"confounding_concentration": 0.0}, "confounding_concentration"),
+        ({"confounding_concentration": np.inf}, "confounding_concentration"),
+        ({"n_spline_knots": 1}, "n_spline_knots"),
+        ({"spline_degree": -1}, "spline_degree"),
+        ({"treatment_effect_scale": -1.0}, "treatment_effect_scale"),
+        ({"outcome_noise_scale": -1.0}, "outcome_noise_scale"),
+    ],
+)
+def test_multidim_rejects_invalid_configuration(overrides, message):
+    with pytest.raises((TypeError, ValueError), match=message):
+        _dataset(**overrides)
+
+
+def test_multidim_rejects_constant_mean_predictions():
+    with pytest.raises(ValueError, match="nonconstant finite predictions"):
+        _dataset(regressors=DummyRegressor(strategy="mean"))
+
+
+@pytest.mark.parametrize("kind", ["nan", "two_columns"])
+def test_multidim_rejects_non_scalar_or_nonfinite_predictions(kind):
+    with pytest.raises(ValueError, match="finite predictions"):
+        _dataset(regressors=BadRegressor(kind))
+
+
+def test_multidim_disables_resampling_and_treatment_density():
+    dataset = _dataset()
+    X, treatment, _ = dataset.load()
+    with pytest.raises(NotImplementedError, match="fixed at construction"):
+        dataset.sample(4)
+    with pytest.raises(NotImplementedError, match="does not define"):
+        dataset.log_prob(X, treatment)
+
+
+class InvalidOutcomeSource(BaseDataset):
+    def __init__(self, kind):
+        self.kind = kind
+        super().__init__()
+
+    def _load(self):
+        outcomes = {
+            "wide": pl.DataFrame(
+                {"a": [0.0, 1.0, 2.0, 3.0], "b": [3.0, 2.0, 1.0, 0.0]}
+            ),
+            "string": pl.DataFrame({"y": ["a", "b", "c", "d"]}),
+            "nan": pl.DataFrame({"y": [0.0, 1.0, np.nan, 3.0]}),
+            "constant": pl.DataFrame({"y": [1.0, 1.0, 1.0, 1.0]}),
+            "short": pl.DataFrame({"y": [0.0, 1.0, 2.0]}),
+        }
+        return (
+            pl.DataFrame({"x": [0.0, 1.0, 2.0, 3.0]}),
+            pl.DataFrame({"unused_t": [0.0, 0.0, 0.0, 0.0]}),
+            outcomes[self.kind],
+        )
+
+
+@pytest.mark.parametrize(
+    "kind, message",
+    [
+        ("wide", "exactly one outcome"),
+        ("string", "must be numeric"),
+        ("nan", "must be finite"),
+        ("constant", "at least two distinct"),
+        ("short", "one outcome per covariate row"),
+    ],
+)
+def test_multidim_rejects_invalid_source_outcomes(kind, message):
+    with pytest.raises(ValueError, match=message):
+        _dataset(real_datasets=[InvalidOutcomeSource(kind)])
+
+
+def test_single_source_requires_zero_correlation_and_has_matrix_diagnostics():
+    single = _dataset(real_datasets=[ToyRealDataset()])
+    assert single.achieved_pearson_correlation_.shape == (1, 1)
+    assert single.achieved_spearman_correlation_.shape == (1, 1)
+    with pytest.raises(ValueError, match="must be zero"):
+        _dataset(real_datasets=[ToyRealDataset()], treatment_correlation=0.1)

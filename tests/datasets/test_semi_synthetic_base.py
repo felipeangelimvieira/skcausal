@@ -176,7 +176,7 @@ class ConcatenatingSemiSyntheticDataset(ToySemiSyntheticDataset):
                 X.head(n_rows).select(pl.all().name.prefix(f"s{index}_"))
                 for index, (X, _, _) in enumerate(sources)
             ],
-            how="horizontal",
+            how="horizontal_extend",
         )
 
     def _prepare_dgp(self, X, rng):
