@@ -3,6 +3,7 @@ import polars as pl
 import pytest
 from scipy.stats import rankdata
 from sklearn.compose import make_column_selector, make_column_transformer
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
@@ -28,6 +29,19 @@ def _mean_regressor():
             remainder=StandardScaler(),
         ),
         LinearRegression(),
+    )
+
+
+def _stochastic_regressor():
+    return make_pipeline(
+        make_column_transformer(
+            (
+                OneHotEncoder(handle_unknown="ignore"),
+                make_column_selector(dtype_include=object),
+            ),
+            remainder=StandardScaler(),
+        ),
+        RandomForestRegressor(n_estimators=8),
     )
 
 
@@ -136,6 +150,14 @@ def test_dirichlet_weights_and_all_outputs_are_seeded_once_at_construction():
     np.testing.assert_allclose(first.confounding_weights_, again.confounding_weights_)
     assert all(left.equals(right) for left, right in zip(first.load(), again.load()))
     assert any(not left.equals(right) for left, right in zip(first.load(), other.load()))
+
+
+def test_nested_stochastic_regressor_is_seeded_at_construction():
+    first = _dataset(regressors=_stochastic_regressor(), outcome_noise_scale=0.3)
+    again = _dataset(regressors=_stochastic_regressor(), outcome_noise_scale=0.3)
+
+    np.testing.assert_allclose(first.source_scores_, again.source_scores_)
+    assert all(left.equals(right) for left, right in zip(first.load(), again.load()))
 
 
 def test_one_regressor_per_source_is_cloned_and_predict_is_available():

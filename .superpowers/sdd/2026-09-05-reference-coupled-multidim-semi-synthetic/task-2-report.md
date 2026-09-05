@@ -71,3 +71,46 @@ Output:
 ```text
 856 passed, 655 warnings in 5.74s
 ```
+
+## Fix Round 1: Nested stochastic regressor seeding
+
+### Files changed
+
+- `src/skcausal/datasets/semi_synthetic_multidim.py`
+- `tests/datasets/test_semi_synthetic_multidim_dgp.py`
+- `.superpowers/sdd/2026-09-05-reference-coupled-multidim-semi-synthetic/task-2-report.md`
+
+### Fix
+
+- Replaced the shallow estimator parameter lookup with `get_params(deep=True)`, assigning structural RNG seeds only to cloned `random_state` parameters whose value is `None`.
+- Added a real pipeline containing an unseeded `RandomForestRegressor`; two datasets with the same seed now produce identical source scores and frozen outputs.
+
+### RED
+
+Command:
+
+```text
+uv run pytest tests/datasets/test_semi_synthetic_multidim_dgp.py -q -k nested_stochastic_regressor
+```
+
+Output:
+
+```text
+FAILED tests/datasets/test_semi_synthetic_multidim_dgp.py::test_nested_stochastic_regressor_is_seeded_at_construction
+AssertionError: source scores differed (16 / 16 elements); maximum absolute difference 0.49965379
+1 failed, 9 deselected, 4 warnings in 1.03s
+```
+
+### GREEN
+
+Command:
+
+```text
+uv run pytest tests/datasets/test_semi_synthetic_multidim_dgp.py tests/datasets/test_all_datasets.py -q
+```
+
+Output:
+
+```text
+142 passed, 21 warnings in 1.68s
+```

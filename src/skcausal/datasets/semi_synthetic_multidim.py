@@ -237,13 +237,13 @@ class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
                 .to_numpy()
                 - self.target_means_[index]
             ) / self.target_scales_[index]
-            if (
-                "random_state" in regressor.get_params(deep=False)
-                and regressor.get_params(deep=False)["random_state"] is None
-            ):
-                regressor.set_params(
-                    random_state=int(rng.integers(np.iinfo(np.int32).max))
-                )
+            random_states = {
+                name: int(rng.integers(np.iinfo(np.int32).max))
+                for name, value in regressor.get_params(deep=True).items()
+                if name.endswith("random_state") and value is None
+            }
+            if random_states:
+                regressor.set_params(**random_states)
             regressor.fit(frame, normalized_y)
             prediction = np.asarray(regressor.predict(frame), dtype=float).reshape(-1)
             if (
