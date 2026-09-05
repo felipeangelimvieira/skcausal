@@ -5,8 +5,8 @@ execute:
     freeze: true
 ---
 
-Use this guide when you want benchmark data whose covariates are real but whose
-treatment assignment and outcome surface are known exactly.
+Use this guide when you want benchmark data with real covariates and a known
+outcome surface. The scalar datasets also provide a known treatment assignment law.
 
 ::: {.callout-note appearance="simple"}
 ## What a semi-synthetic dataset is
@@ -15,17 +15,17 @@ treatment assignment and outcome surface are known exactly.
 any `BaseDataset` as a source of covariates, keep its `X` untouched, and
 simulate treatment and outcome from a frozen structural model.
 `MultidimSemiSyntheticDataset` takes several sources and turns each source's
-real outcome into one treatment component. Because the
-model is frozen, the dataset can answer questions a real dataset cannot: what
-is $\mathbb{E}[Y(a)]$, what is $g(a \mid x)$, and how biased is the naive
-observational curve.
+real outcome into one fixed treatment component. All three expose the true
+$\mathbb{E}[Y(a)]$ for comparison with the naive observational curve; only the
+scalar datasets expose the conditional treatment density $g(a \mid x)$.
 :::
 
 Fully synthetic datasets such as `SyntheticDataset2` control everything but
 use Gaussian covariates. Real datasets have realistic covariate structure but no
-ground truth. Semi-synthetic datasets sit in between: the covariate dependence,
-categorical levels, and missingness come from real data, while confounding
-strength, overlap, effect size, and noise are configuration knobs.
+ground truth. Semi-synthetic datasets sit in between: within-source covariate
+dependence, categorical levels, and missingness come from real data, while
+effect size and outcome noise are configurable. The scalar datasets also
+control confounding strength and overlap.
 
 ## Step 1: Imports and a covariate source
 
@@ -311,9 +311,10 @@ floor raises an error naming the floor.
 
 ## Step 6: Replications for Monte Carlo studies
 
-`load()` always returns the same initial draw. `sample(random_state)` draws
-fresh treatment and outcome noise while keeping `X`, the assignment law, and
-the outcome surface fixed, so replications differ only by sampling noise.
+For the scalar categorical and continuous datasets, `load()` always returns
+the same initial draw. `sample(random_state)` draws fresh treatment and outcome
+noise while keeping `X`, the assignment law, and the outcome surface fixed,
+so replications differ only by sampling noise.
 
 ```{python}
 dataset = sweep[0.5]
@@ -347,72 +348,61 @@ dataset to `evaluate_multiple_dataset_seeds` from the
 
 ## Step 7: Multi-dimensional treatments from several sources
 
-`MultidimSemiSyntheticDataset` takes a list of source datasets and creates one
-treatment component per source. The outcome of source $k$ is fitted with a
-ridge prognostic score on that source's own covariates; the score drives the
-assignment of component $t_k$ and enters the baseline outcome, so $t_k$ is
-confounded through the real outcome it mimics. Sources that are unrelated
-have independent scores, and `treatment_correlation` is then the only channel
-that ties the components together: it correlates the latent noise. A
-continuous component is released on the mean and standard deviation of its
-source outcome, and any component can instead be released as ordered levels
-by thresholding its latent at equal-mass quantiles. The joint `log_prob` stays
-exact, and `target_confounding_bias` calibrates one strength for the whole
-vector.
+`MultidimSemiSyntheticDataset` assembles one fixed observational dataset from
+several regression sources. Source treatment columns are ignored; each selected
+source outcome is retained in its original units as component `t_j`.
+An ordinary point regressor fits each source outcome from its own covariates,
+and its predictions enter the synthetic baseline outcome to induce confounding.
 
-Rows are aligned by position: the sample size is the smallest source, larger
-sources are subsampled without replacement with a seeded stream, and the
-covariates are concatenated with a `d{k}_` prefix per source.
+The sample size is the smallest source. Larger sources are subsampled without
+replacement, then a Gaussian copula couples whole source rows by their outcome
+ranks. This changes the pairing between sources while preserving every selected
+within-source covariate/outcome pair and its values. Covariates are concatenated
+with a `d{j}_` prefix per source.
 
 ```{python}
+from sklearn.linear_model import LinearRegression
+
 from skcausal.datasets import KangSchaferContinuous, MultidimSemiSyntheticDataset
 
 multidim = MultidimSemiSyntheticDataset(
-    [source, KangSchaferContinuous(n=2000, random_state=1)],
-    treatment_correlation=0.4,
-    target_confounding_bias=0.5,
-    random_state=0,
+    real_datasets=[
+        KangSchaferContinuous(n=500, random_state=1),
+        KangSchaferContinuous(n=700, random_state=2),
+    ],
+    regressors=LinearRegression(),
+    treatment_correlation=0.6,
+    confounding_concentration=None,
+    random_state=3,
 )
 X, treatment, outcome = multidim.load()
 print(X.shape, X.columns[:2], X.columns[-2:])
 print(treatment.head())
 print(
     {
-        "prognostic R2 per source": multidim.prognostic_fit_r2_.round(3).tolist(),
+        "confounding weights": multidim.confounding_weights_.tolist(),
         "rows kept from source 1": len(multidim.source_row_indices_[1]),
-        "bias ratio": round(multidim.confounding_bias_ratio_, 3),
-        "strength": round(multidim.confounding_strength_, 3),
+        "achieved Pearson": multidim.achieved_pearson_correlation_.round(3).tolist(),
+        "achieved Spearman": multidim.achieved_spearman_correlation_.round(3).tolist(),
     }
 )
-np.corrcoef(treatment.to_numpy().astype(float).T)[0, 1]
 ```
 
-Setting `n_levels` for a component discretizes it into balanced ordered
-levels while the other component stays continuous:
+`treatment_correlation` controls latent Gaussian association; achieved Pearson
+and Spearman correlations are diagnostics, not exact targets. The mathematical
+construction below explains the coupling and the additive spline response.
 
-```{python}
-mixed = MultidimSemiSyntheticDataset(
-    [source, KangSchaferContinuous(n=2000, random_state=1)],
-    n_levels=[None, 3],
-    treatment_correlation=0.4,
-    random_state=0,
-)
-_, t_mixed, _ = mixed.load()
-t_mixed["t_1"].value_counts().sort("t_1")
-```
+Repeated `load()` calls return the same `X`, treatment, and outcome. `sample`
+and `log_prob` are unavailable and raise `NotImplementedError`: this is a fixed
+dataset, and mean regressors do not specify a conditional treatment density.
+Construct another instance with a different `random_state` for another draw.
+`get_grid(n)` returns a Cartesian grid with approximately `n` intervention
+rows over the observed treatment ranges, and `predict` averages the known
+response surface over supplied covariates.
 
-For this class the bias metric is a fixed 1024-point Monte Carlo estimate
-under the marginal treatment law rather than the exact quadrature used by the
-one-dimensional DGPs, so `confounding_bias_ratio_` has a relative resolution
-on the order of $1/\sqrt{1024} \approx 3\%$. The metric also need not be
-monotone in strength, so `target_confounding_bias` freezes the smallest
-crossing bracketed by the calibration search's strength ladder rather than
-guaranteeing the smallest strength that ever reaches the target; read the
-achieved strength back from `confounding_strength_`.
-
-`get_grid` returns a lattice over the continuous components crossed with the
-levels of the categorical ones, so `predict` evaluates the average response
-surface over the whole vector.
+Every component is continuous. Categorical treatments require a future
+categorical-aware implementation; a discretized regression target is not
+silently treated as categorical here.
 
 ## Mathematical description
 
@@ -423,6 +413,9 @@ rows, and every random coefficient is drawn once from the structural stream
 of `random_state` and then frozen.
 
 ### Covariate encoding and causal-role scores
+
+This score construction applies to the scalar categorical and continuous
+datasets. The multidimensional construction is given separately below.
 
 Numeric columns are median-imputed and standardized; every other column is
 one-hot encoded with missing values as their own category. The encoded vector
@@ -461,12 +454,12 @@ $$
 with $\gamma_C \sim \mathcal{N}(0, \tfrac{1}{3} I)$,
 $\gamma_P \sim \mathcal{N}(0, \tfrac{1}{2} I)$, and $c, s, c_C, s_C$ the
 in-sample means and standard deviations. Both $\mu_0$ and $s$ are therefore
-standardized, and the bias ratio reported by every class is a bias measured
+standardized, and the bias ratio reported by either scalar class is a bias measured
 in units of $s_0 = \operatorname{sd}(\mu_0) = 1$.
 
 ### Outcome model
 
-All three classes share the outcome surface
+The scalar categorical and continuous classes share the outcome surface
 
 $$
 m(a, x) = \mu_0(x) + b(a)^\top \beta + b(a)^\top \Gamma\, q_M(x), \qquad
@@ -482,7 +475,7 @@ Because covariates are the finite source rows, the causal curve is the
 empirical average $\mu_{\mathrm{do}}(a) = \frac{1}{n} \sum_i m(a, x_i)$, which
 is what `predict` returns.
 
-Every assignment law is a mixture with a covariate-independent component of
+Each scalar assignment law is a mixture with a covariate-independent component of
 weight $\omega$ = `randomized_weight`, which guarantees overlap: with
 probability $\omega$ the treatment is drawn from a fixed marginal that ignores
 $x$. Two shared parameters scale the confounded signal: $\lambda$ =
@@ -585,116 +578,146 @@ law moves off a fixed grid.
 
 ### Multi-dimensional treatment from several sources
 
-Given sources $(X_k, y_k)$, $k = 1, \dots, m$, with $n_k$ rows, the shared
-sample size is $n = \min_k n_k$; each larger source keeps a sorted random
-subset of $n$ rows drawn without replacement from the alignment stream, and a
-source with exactly $n$ rows keeps its order. The released covariates are the
-row-wise concatenation $x = (x_1, \dots, x_m)$ with a `d{k}_` prefix on each
-source's column names. Pairing rows by position encodes the assumption that
-distinct sources are independent.
+Let there be $P$ sources $(X_j,Y_j)$ with $n_j$ rows and let
+$n=\min_j n_j$. Select $n$ rows without replacement from each larger source,
+using a seeded stream; keep all rows from sources already of size $n$.
+All source moments below refer to these selected rows, and all standard
+deviations use the population convention (divisor $n$).
 
-The encoding and library are built on the joint $x$ as above. The confounder
-block is not random here: its $k$-th coordinate is the ridge prognostic score
-of $y_k$ on the library terms built only from the columns of $X_k$ (products
-that cross sources are excluded),
+Standardize the source targets for regression:
 
 $$
-\hat w_k = \arg\min_w \sum_{i:\, y_{ki} \text{ observed}} \bigl(y_{ki} - \bar y_k - \tilde\ell_k(x_{ki})^\top w\bigr)^2 + 0.01\, n_k^{\mathrm{obs}}\, \|w\|^2,
+\widetilde Y_{ij}=\frac{Y_{ij}-\bar Y_j}{s_{Y_j}},
 \qquad
-q_{C,k}(x) \propto \tilde\ell_k(x_k)^\top \hat w_k \ \text{(standardized)},
+\widehat m_j(x_j)=\widehat{\mathbb E}[\widetilde Y_j\mid X_j=x_j].
 $$
 
-where $\tilde\ell_k$ denotes the selected library columns scaled to unit
-variance. `prognostic_fit_r2_` reports the in-sample $R^2$ of each fit. The
-prognostic, treatment-only, and modifier scores are drawn on the joint
-library as before and may mix sources. The baseline outcome loads on every
-source with unit weight,
+Fit each cloned regressor $\widehat m_j$ to $(X_j,\widetilde Y_j)$ using
+only its source's covariates. The implementation fits on the coupled rows
+described next, so covariates and targets always share the same permutation.
+Standardization is only for the regression target; the released treatment
+keeps the original source outcome units. Each source must have one finite
+numeric outcome with at least two distinct selected values, and each fitted
+regressor must produce one finite, nonconstant prediction per row.
+Any covariate preprocessing belongs in the supplied regressor or pipeline.
+
+Define the exchangeable Gaussian-copula correlation matrix and draw
+independent latent rows:
 
 $$
-\mu_0(x) = \frac{\sum_k q_{C,k}(x) + q_P(x)^\top \gamma_P - c}{s} .
-$$
-
-The latent treatment vector $Z \in \mathbb{R}^m$ has component means
-
-$$
-\eta_j(x) = \lambda\, c_j\, q_{C,j}(x) + \zeta\, q_Z(x)^\top b_j ,
-$$
-
-with $c_j$ = `confounding_loadings[j]` and $b_j$ the columns of a
-$2 \times m$ matrix of $\mathcal{N}(0, \tfrac{1}{2})$ entries, and
-exchangeable noise
-
-$$
-Z \mid x \sim (1 - \omega)\, \mathcal{N}\bigl(\eta(x), \Sigma\bigr) + \omega\, \mathcal{N}(0, \Sigma), \qquad
-\Sigma = \sigma^2 R, \quad R = (1 - \rho) I + \rho\, \mathbf{1}\mathbf{1}^\top ,
-$$
-
-with $\rho$ = `treatment_correlation`. Component $j$ is thus confounded only
-through the outcome of its own source, and for independent sources $\rho$ is
-the sole link between components. A continuous component is released as
-$A_j = \bar y_j + \operatorname{sd}(y_j)\, Z_j$ so that it lives on the scale
-of the outcome it mimics. A component with $K_j$ = `n_levels[j]` levels is
-released as $A_j = \kappa$ when $c_{j,\kappa} < Z_j \le c_{j,\kappa+1}$, with
-$c_{j,0} = -\infty$, $c_{j,K_j} = +\infty$, and interior cut points at the
-equal-mass quantiles of the marginal latent law
-$F_j(z) = \frac{1}{n} \sum_i \bigl[(1 - \omega)\, \Phi\bigl((z - \eta_j(x_i)) / \sigma\bigr) + \omega\, \Phi(z / \sigma)\bigr]$.
-
-Writing $C$ and $D$ for the continuous and categorical index sets, the joint
-density of released values $(a_C, \kappa_D)$ is
-
-$$
-g(a_C, \kappa_D \mid x) = \prod_{j \in C} \frac{1}{\operatorname{sd}(y_j)}
-\Bigl[(1 - \omega)\, h\bigl(z_C, \kappa_D; \eta(x)\bigr) + \omega\, h\bigl(z_C, \kappa_D; 0\bigr)\Bigr],
+R_\rho=(1-\rho)I_P+\rho\mathbf 1\mathbf 1^\top,
 \qquad
-h(z_C, \kappa_D; \eta) = \varphi_{\Sigma_{CC}}(z_C - \eta_C)\;
-\mathbb{P}\bigl(Z_D \in \text{cell}(\kappa_D) \mid Z_C = z_C, \eta\bigr),
+G_i\sim\mathcal N(0,R_\rho).
 $$
 
-where the conditional law of $Z_D$ given $Z_C = z_C$ is Gaussian with mean
-$\eta_D + \Sigma_{DC} \Sigma_{CC}^{-1}(z_C - \eta_C)$ and covariance
-$\Sigma_{DD} - \Sigma_{DC} \Sigma_{CC}^{-1} \Sigma_{CD}$. With $\rho > 0$ that
-conditional cell probability is a univariate normal interval, which is why the
-class allows at most one categorical component when $\rho > 0$; with
-$\rho = 0$ the categorical components are independent and the cell
-probability factorizes.
-
-The outcome adds cross-component effects to the shared surface:
+For $P>1$, positive definiteness requires $-1/(P-1)<\rho<1$; for $P=1$,
+$\rho$ must be zero. For each source $j$, sort whole selected $(X_j,Y_j)$
+rows by $Y_j$ and rank-match them to the ranks of $G_{ij}$, breaking source
+outcome ties with the seeded stream. Concatenate the coupled covariates,
+prefixing source $j$ columns with `d{j}_`, and release
 
 $$
-m(a, x) = \mu_0(x) + \sum_j b_j(a_j)^\top \beta_j + \sum_j b_j(a_j)^\top \Gamma_j\, q_M(x)
-+ \sum_{j < l} \phi_j(a_j)^\top \Theta_{jl}\, \phi_l(a_l),
+T_i=(Y_{i1},\ldots,Y_{iP})
 $$
 
-where $b_j$ is the five-term bounded basis in $v_j = Z_j / \sigma$ for a
-continuous component and the one-hot vector of levels $1, \dots, K_j - 1$ for
-a categorical one, $\phi_j = \tanh(v_j)$ for a continuous component and the
-same one-hot vector for a categorical one, and the entries of $\Theta_{jl}$
-are $\mathcal{N}(0, \tau_\Theta^2)$ with $\tau_\Theta$ =
-`treatment_interaction_scale`. Outcomes depend only on released values: a
-categorical component enters through its level, never through its latent.
+as columns `t_0`, ..., `t_{P-1}`. Coupling preserves every selected source
+marginal and every within-source $(X_j,Y_j)$ pair exactly. Subsampling larger
+sources happens before this preservation guarantee.
+`source_row_indices_` records the original source indices in released order.
 
-The oracle bias keeps the form of the continuous case, since main effects and
-cross terms are identical under both weightings and cancel:
+The configured $\rho$ is latent; finite samples, ties, and non-Gaussian
+marginals affect observed correlations. The fitted object records
+`treatment_correlation_matrix_`, `achieved_pearson_correlation_`, and
+`achieved_spearman_correlation_`.
+
+A 45-degree rotation of observed values would mix treatment units and alter
+their marginals. It does not set their correlation in general: for centered
+values $U,V$, the rotated pair $(U+V)/\sqrt 2,(V-U)/\sqrt 2$ has covariance
+$(\operatorname{Var}(V)-\operatorname{Var}(U))/2$, and its correlation also
+depends on the original covariance through the rotated variances. Rank
+coupling instead changes which whole rows meet while leaving observed source
+outcomes unchanged.
+
+After coupling and fitting, standardize the fitted scores:
 
 $$
-\Delta(a) = \Bigl[\textstyle\sum_i w_i(a) \mu_0(x_i) - \bar\mu_0\Bigr]
-+ \sum_j b_j(a_j)^\top \Gamma_j \Bigl[\textstyle\sum_i w_i(a) q_M(x_i) - \bar q_M\Bigr],
+s_{ij}=
+\frac{\widehat m_j(X_{ij})-\overline{\widehat m_j}}
+     {\operatorname{sd}(\widehat m_j)}.
+$$
+
+Use $w_j=1/P$ when `confounding_concentration` is omitted, or draw once
+
+$$
+w\sim\operatorname{Dirichlet}(\alpha\mathbf 1_P),
+\qquad \alpha=\texttt{confounding\_concentration}>0.
+$$
+
+Then form the baseline with square-root loadings:
+
+$$
+b_i=\sum_{j=1}^P\sqrt{w_j}s_{ij},
 \qquad
-\text{bias}^2 = \mathbb{E}_{a \sim f_A}\bigl[\Delta(a)^2\bigr].
+\mu_0(X_i)=\operatorname{standardize}(b_i)
+=\frac{b_i-\bar b}{\operatorname{sd}(b)}.
 $$
 
-The expectation over the marginal law $f_A$ is estimated by Monte Carlo on
-1024 design points for the continuous coordinates, drawn once from the
-mixture (a frozen row index, mixture indicator, and noise vector per point,
-shared across every strength the calibration visits), while the categorical
-levels are enumerated exactly at each design point with weights
-$\mathbb{P}(\kappa_D \mid z_C) \propto f_A(z_C, \kappa_D)$. When every
-component is categorical a single design point enumerates all level
-combinations and the metric is exact.
+Large $\alpha$ concentrates weights near equal importance; small $\alpha$
+allows a few treatment scores to dominate. With uncorrelated standardized
+scores, $w_j$ is the fraction of baseline variance contributed by source $j$.
+With correlated scores, the weights define loadings rather than a unique
+variance decomposition. A constant weighted baseline is rejected.
+`source_scores_`, `confounding_weights_`, and `source_mu0_` expose these
+quantities. The fitted target, score, and baseline means and scales are
+retained; prediction on new covariates uses the fitted score and baseline
+constants.
+
+Fit one B-spline basis $B_j$ to each observed treatment column, using uniformly
+placed knots, the configured degree, no bias column, and continued
+extrapolation. The number of knots is capped by the number of distinct values
+(after rounding to 12 decimal places), with a minimum of two knots. If $K_j$
+is the number of basis columns, draw frozen coefficients independently:
+
+$$
+\beta_{jk}\sim\mathcal N\!\left(0,\frac{1}{PK_j}\right).
+$$
+
+Center the additive response over the observed treatments:
+
+$$
+g(t)=\lambda\left[
+\sum_{j=1}^P B_j(t_j)^\top\beta_j
+-\frac{1}{n}\sum_{i=1}^n\sum_{j=1}^P B_j(T_{ij})^\top\beta_j
+\right],
+$$
+
+where $\lambda$ is `treatment_effect_scale`. This centering makes the empirical
+mean of $g(T_i)$ zero; it does not force the response to vanish at a particular
+reference treatment. The synthetic outcome is
+
+$$
+m(t,x)=\mu_0(x)+g(t),
+\qquad
+Y_i=\mu_0(X_i)+g(T_i)+\sigma_Y\varepsilon_i,
+\qquad
+\varepsilon_i\stackrel{\mathrm{iid}}{\sim}\mathcal N(0,1),
+$$
+
+with $\sigma_Y$ = `outcome_noise_scale`. `predict_y(X, treatment)` evaluates
+$m(t,x)$ row by row, and `predict(X, grid)` returns its empirical average over
+the supplied covariates for each intervention. Here $Y_i$ denotes the
+synthetic outcome, whereas $Y_{ij}$ above denotes source $j$'s outcome.
+
+Construction freezes source selection, coupling, tie breaking, any regressor
+seeds supplied by the dataset, weights, spline coefficients, and outcome
+noise. For repeatable fits, use deterministic regressors or seeded estimators;
+unset nested `random_state` parameters are seeded from the dataset stream.
+`load()` returns this fixed draw. A mean regressor specifies no conditional
+treatment law, so both `sample` and `log_prob` raise `NotImplementedError`.
 
 ### Calibrating the confounding strength
 
-Let $M(\lambda)$ be the bias ratio of a class as a function of
+For either scalar class, let $M(\lambda)$ be its bias ratio as a function of
 `confounding_strength` with every other frozen quantity held fixed. The
 floor $M(0)$ is zero unless treatment-only predictors are on. Given
 `target_confounding_bias` $= \tau$, the search rejects $\tau < M(0)$,
@@ -708,41 +731,56 @@ between two ladder points is invisible to the search. The achieved
 
 ## Configuration reference
 
+For the scalar categorical and continuous datasets:
+
 | Parameter | Applies to | What it controls |
 | --- | --- | --- |
 | `real_dataset` | categorical, continuous | Source of covariates; cloned, only `X` is used. |
-| `real_datasets` | multidim | Source datasets; one treatment component per source, each mimicking that source's outcome. |
-| `confounding_strength` | all | Scale $\lambda$ of the outcome-predictive assignment signal. Zero means no confounding. |
-| `target_confounding_bias` | all | Calibrates $\lambda$ so the oracle bias, in baseline-outcome standard deviations, equals this value. Overrides `confounding_strength`. |
-| `treatment_only_strength` | all | Scale $\zeta$ of residualized treatment-only predictors. Opt-in; adds a small bias floor. |
-| `randomized_weight` | all | Share $\omega$ of covariate-independent assignments; the main overlap knob. |
+| `confounding_strength` | both scalar | Scale $\lambda$ of the outcome-predictive assignment signal. Zero means no confounding. |
+| `target_confounding_bias` | both scalar | Calibrates $\lambda$ so the oracle bias, in baseline-outcome standard deviations, equals this value. Overrides `confounding_strength`. |
+| `treatment_only_strength` | both scalar | Scale $\zeta$ of residualized treatment-only predictors. Opt-in; adds a small bias floor. |
+| `randomized_weight` | both scalar | Share $\omega$ of covariate-independent assignments; the main overlap knob. |
 | `n_treatments`, `target_probabilities` | categorical | Number of levels and the empirical marginal the intercepts are calibrated to. |
 | `treatment_domain` | continuous | `"real"`, `"positive"`, or a finite `(lower, upper)` interval. |
-| `treatment_noise_scale` | continuous, multidim | Latent Gaussian standard deviation $\sigma$; smaller values sharpen assignment. |
-| `confounding_loadings` | multidim | Each component's loading $c_j$ on its own prognostic score. |
-| `n_levels` | multidim | Per-component discretization into ordered levels; `None` keeps a component continuous. |
-| `treatment_correlation` | multidim | Exchangeable latent noise correlation $\rho$ in `[0, 1)`; zero when two or more components are categorical. |
-| `treatment_interaction_scale` | multidim | Size of bounded cross-component effects. |
-| `outcome_effect_scale` | all | Size of treatment main effects relative to the unit-variance baseline outcome. |
-| `effect_heterogeneity_scale` | all | Size of treatment-by-covariate interactions. |
-| `outcome_noise_scale` | all | Gaussian outcome noise $\sigma_Y$. |
-| `random_state` | all | Seeds the frozen structure, the source alignment, and the initial sample. |
+| `treatment_noise_scale` | continuous | Latent Gaussian standard deviation $\sigma$; smaller values sharpen assignment. |
+| `outcome_effect_scale` | both scalar | Size of treatment main effects relative to the unit-variance baseline outcome. |
+| `effect_heterogeneity_scale` | both scalar | Size of treatment-by-covariate interactions. |
+| `outcome_noise_scale` | both scalar | Gaussian outcome noise $\sigma_Y$. |
+| `random_state` | both scalar | Seeds the frozen structure and the initial sample. |
 
-Fitted attributes worth reporting alongside benchmark results are
+Scalar fitted attributes worth reporting alongside benchmark results are
 `confounding_strength_`, `confounding_bias_`, `confounding_bias_ratio_`, and
-`baseline_standard_deviation_`; the multidim class adds
-`prognostic_fit_r2_` and `source_row_indices_`.
+`baseline_standard_deviation_`.
+
+For `MultidimSemiSyntheticDataset`:
+
+| Parameter | What it controls |
+| --- | --- |
+| `real_datasets` | Non-empty sequence of regression sources; selected outcomes become treatments in original units. |
+| `regressors` | One cloneable point regressor for all sources, or one per source; fits standardized targets. |
+| `treatment_correlation` | Latent copula $\rho$, default `0.0`; $-1/(P-1)<\rho<1$ for $P>1$, zero for one source. |
+| `confounding_concentration` | `None` gives exact equal weights; positive finite $\alpha$ draws symmetric Dirichlet weights. |
+| `n_spline_knots` | Maximum knots per treatment basis, default `6`; integer at least `2`. |
+| `spline_degree` | Nonnegative integer B-spline degree, default `3`. |
+| `treatment_effect_scale` | Nonnegative multiplier $\lambda$ of the centered additive response, default `1.0`. |
+| `outcome_noise_scale` | Nonnegative Gaussian outcome noise scale $\sigma_Y$, default `1.0`. |
+| `random_state` | Seeds selection, coupling, unset regressor seeds, weights, coefficients, and outcome noise; default `42`. |
+
+Report `source_row_indices_`, `confounding_weights_`,
+`treatment_correlation_matrix_`, `achieved_pearson_correlation_`, and
+`achieved_spearman_correlation_` to describe the realized multidimensional draw.
 
 ## Extending the family
 
 All three classes subclass `BaseSemiSyntheticDataset`, which owns the
-lifecycle and the public `load`, `sample`, `predict`, `predict_y`, `log_prob`,
-and `get_grid` methods. A new DGP implements six hooks: `_prepare_dgp`,
+lifecycle and the public prediction and loading interfaces. The scalar classes
+also support `sample` and `log_prob`; the fixed multidimensional class overrides
+these methods to raise `NotImplementedError`. A new DGP implements six hooks: `_prepare_dgp`,
 `_sample_treatment`, `_log_prob`, `_predict_y`, `_sample_outcome`, and
 `_get_grid`. A DGP that needs several source datasets overrides
 `_combine_sources`, which receives every loaded source and a seeded stream for
 row alignment and returns the covariates to release. The base class also
-provides the frozen causal score map, the standardized baseline outcome
-surface, and confounding-strength calibration against any bias metric you
-supply, so vector, ordinal, count, or non-Gaussian outcome variants only need
-to write the assignment and outcome mathematics.
+provides optional helpers for causal scores, standardized baselines, and
+confounding-strength calibration. The scalar classes use those helpers;
+the multidimensional class supplies its own regression-score baseline and
+fixed treatment construction.
