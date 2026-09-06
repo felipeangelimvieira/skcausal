@@ -715,6 +715,18 @@ unset nested `random_state` parameters are seeded from the dataset stream.
 `load()` returns this fixed draw. A mean regressor specifies no conditional
 treatment law, so both `sample` and `log_prob` raise `NotImplementedError`.
 
+There is no separate overlap knob here. The scalar classes mix in a
+covariate-independent component through `randomized_weight`; this class has no
+such component, so overlap is set entirely by how predictable each source
+outcome is from its own covariates. The scores $s_{ij}$ are in-sample fitted
+values, so as $R^2_j \to 1$ they approach the standardized treatment itself,
+$\mu_0(X_i)$ becomes a near-deterministic function of $T_i$, and the residual
+covariate variation at fixed treatment vanishes — a severe positivity
+violation. Choose sources whose outcomes are only partly explained by their
+covariates, and inspect the fit before trusting a benchmark built on them.
+`KangSchaferContinuous`, used in the example above, is nearly deterministic in
+this sense; it demonstrates the mechanics rather than a well-posed benchmark.
+
 ### Calibrating the confounding strength
 
 For either scalar class, let $M(\lambda)$ be its bias ratio as a function of

@@ -1,5 +1,4 @@
 from skcausal.datasets import (
-    BaseSemiSyntheticDataset,
     CategoricalSemiSyntheticDataset,
     ContinuousSemiSyntheticDataset,
     MultidimSemiSyntheticDataset,
@@ -24,13 +23,13 @@ def test_all_causal_average_response_estimators_returns_registered_classes():
 
 
 def test_semi_synthetic_datasets_are_public_and_discoverable():
-    discovered = all_datasets(return_names=True)
-    names = {name for name, _ in discovered}
+    discovered = dict(all_datasets(return_names=True))
 
-    assert BaseSemiSyntheticDataset.__name__ == "BaseSemiSyntheticDataset"
-    assert CategoricalSemiSyntheticDataset.__name__ == "CategoricalSemiSyntheticDataset"
-    assert ContinuousSemiSyntheticDataset.__name__ == "ContinuousSemiSyntheticDataset"
-    assert MultidimSemiSyntheticDataset.__name__ == "MultidimSemiSyntheticDataset"
-    assert "CategoricalSemiSyntheticDataset" in names
-    assert "ContinuousSemiSyntheticDataset" in names
-    assert "MultidimSemiSyntheticDataset" in names
+    assert "BaseSemiSyntheticDataset" not in discovered
+    assert (
+        discovered["CategoricalSemiSyntheticDataset"] is CategoricalSemiSyntheticDataset
+    )
+    assert (
+        discovered["ContinuousSemiSyntheticDataset"] is ContinuousSemiSyntheticDataset
+    )
+    assert discovered["MultidimSemiSyntheticDataset"] is MultidimSemiSyntheticDataset

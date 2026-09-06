@@ -76,15 +76,21 @@ def test_coupled_orders_are_permutations_with_the_requested_rank_direction(
 ):
     targets = [np.linspace(-2.0, 2.0, 2000), np.linspace(7.0, -1.0, 2000)]
     orders, latent = _coupled_orders(targets, rho, np.random.default_rng(9))
-    coupled = np.column_stack(
-        [target[order] for target, order in zip(targets, orders)]
-    )
+    coupled = np.column_stack([target[order] for target, order in zip(targets, orders)])
 
     for order in orders:
         np.testing.assert_array_equal(np.sort(order), np.arange(2000))
     assert latent.shape == (2000, 2)
     achieved = np.corrcoef(rankdata(coupled, axis=0), rowvar=False)[0, 1]
     assert direction * achieved > 0.8
+
+
+@pytest.mark.parametrize("rho, direction", [(0.8, 1), (-0.8, -1)])
+def test_requested_correlation_sets_the_achieved_rank_direction(rho, direction):
+    dataset = _dataset(treatment_correlation=rho)
+    dataset.load()
+
+    assert direction * dataset.achieved_spearman_correlation_[0, 1] > 0
 
 
 def test_coupled_orders_break_target_ties_reproducibly():
@@ -119,7 +125,9 @@ def test_source_outcomes_become_fixed_treatments_without_breaking_rows():
                 source_X[original].to_numpy()[rows],
             )
     np.testing.assert_allclose(dataset.predict_y(X, treatment), outcome)
-    assert all(left.equals(right) for left, right in zip(dataset.load(), dataset.load()))
+    assert all(
+        left.equals(right) for left, right in zip(dataset.load(), dataset.load())
+    )
 
 
 def test_copula_diagnostics_and_default_confounding_baseline_are_exposed():
@@ -130,7 +138,9 @@ def test_copula_diagnostics_and_default_confounding_baseline_are_exposed():
     raw = dataset.source_scores_ @ np.sqrt(dataset.confounding_weights_)
     expected = (raw - raw.mean()) / raw.std(ddof=0)
     np.testing.assert_allclose(dataset.source_mu0_, expected)
-    np.testing.assert_allclose(dataset.treatment_correlation_matrix_, [[1, 0.7], [0.7, 1]])
+    np.testing.assert_allclose(
+        dataset.treatment_correlation_matrix_, [[1, 0.7], [0.7, 1]]
+    )
     np.testing.assert_allclose(
         dataset.achieved_pearson_correlation_,
         np.corrcoef(treatment.to_numpy(), rowvar=False),
@@ -152,7 +162,9 @@ def test_dirichlet_weights_and_all_outputs_are_seeded_once_at_construction():
     np.testing.assert_allclose(first.confounding_weights_.sum(), 1.0)
     np.testing.assert_allclose(first.confounding_weights_, again.confounding_weights_)
     assert all(left.equals(right) for left, right in zip(first.load(), again.load()))
-    assert any(not left.equals(right) for left, right in zip(first.load(), other.load()))
+    assert any(
+        not left.equals(right) for left, right in zip(first.load(), other.load())
+    )
 
 
 def test_nested_stochastic_regressor_is_seeded_at_construction():
@@ -181,7 +193,9 @@ def test_additive_spline_response_is_centered_and_supports_counterfactuals():
     shifted = treatment.with_columns((pl.col("t_0") + 0.25).alias("t_0"))
 
     assert observed.mean() == pytest.approx(0.0, abs=1e-12)
-    assert not np.allclose(dataset.predict_y(X, treatment), dataset.predict_y(X, shifted))
+    assert not np.allclose(
+        dataset.predict_y(X, treatment), dataset.predict_y(X, shifted)
+    )
     grid = dataset.get_grid(100)
     assert grid.columns == ["t_0", "t_1"]
     assert grid.shape == (100, 2)
@@ -227,9 +241,15 @@ def test_multidim_rejects_constant_mean_predictions():
         _dataset(regressors=DummyRegressor(strategy="mean"))
 
 
-@pytest.mark.parametrize("kind", ["nan", "two_columns"])
-def test_multidim_rejects_non_scalar_or_nonfinite_predictions(kind):
-    with pytest.raises(ValueError, match="finite predictions"):
+@pytest.mark.parametrize(
+    "kind, message",
+    [
+        ("nan", "nonconstant finite predictions"),
+        ("two_columns", "predict one value per row"),
+    ],
+)
+def test_multidim_rejects_non_scalar_or_nonfinite_predictions(kind, message):
+    with pytest.raises(ValueError, match=message):
         _dataset(regressors=BadRegressor(kind))
 
 

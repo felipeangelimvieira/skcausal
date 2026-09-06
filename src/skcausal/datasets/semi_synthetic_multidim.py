@@ -15,10 +15,6 @@ from skcausal.datasets.semi_synthetic import (
 __all__ = ["MultidimSemiSyntheticDataset"]
 
 
-def _source_prefix(index):
-    return f"d{index}_"
-
-
 def _exchangeable_correlation(n_components, correlation):
     rho = float(correlation)
     if not np.isfinite(rho):
@@ -44,10 +40,8 @@ def _coupled_orders(targets, correlation, rng):
     arrays = [np.asarray(target, dtype=float).reshape(-1) for target in targets]
     if not arrays or len({array.size for array in arrays}) != 1:
         raise ValueError("Coupling requires equally sized source targets.")
-    covariance = _exchangeable_correlation(len(arrays), correlation)
-    latent = rng.multivariate_normal(
-        np.zeros(len(arrays)), covariance, size=arrays[0].size
-    ).reshape(arrays[0].size, len(arrays))
+    factor = np.linalg.cholesky(_exchangeable_correlation(len(arrays), correlation))
+    latent = rng.standard_normal((arrays[0].size, len(arrays))) @ factor.T
     orders = []
     for index, target in enumerate(arrays):
         latent_order = np.argsort(latent[:, index], kind="stable")
@@ -78,7 +72,61 @@ def _correlation_matrix(values):
 
 
 class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
-    """A fixed multi-source treatment dataset with regression-score confounding."""
+    r"""Semi-synthetic DGP with a fixed multi-dimensional treatment vector.
+
+    Each source dataset contributes one treatment coordinate, taken verbatim
+    from that source's own outcome column, so the released treatment marginals
+    are real data. Rows of the different sources are aligned through a Gaussian
+    copula with exchangeable correlation ``treatment_correlation``, which
+    induces rank dependence between coordinates while preserving each marginal
+    exactly. Confounding comes from regressors fitted on each source's own
+    covariates against its standardized treatment coordinate: the fitted scores
+    are standardized and combined with Dirichlet weights into the baseline
+    outcome ``mu0``. The dose response is a random spline in each coordinate,
+    so :meth:`predict` returns the true ``E[Y(t)]`` on the released covariates.
+
+    The treatment values are frozen at construction. :meth:`sample` and
+    :meth:`log_prob` therefore raise :class:`NotImplementedError`: there is no
+    parametric assignment law to draw from or evaluate.
+
+    Because the fitted scores are in-sample, the amount of confounding is set
+    by how predictable each source outcome is from its own covariates. A source
+    whose outcome is nearly deterministic in its covariates leaves almost no
+    residual covariate variation at fixed treatment, which is a severe
+    positivity violation; check ``achieved_pearson_correlation_`` and the
+    spread of ``source_mu0_`` against the treatments before trusting a
+    benchmark built on such a source.
+
+    Parameters
+    ----------
+    real_datasets : sequence of BaseDataset
+        Source datasets, one per treatment coordinate. Each must supply exactly
+        one numeric, finite, nonconstant outcome column. Sources of unequal
+        length are subsampled without replacement to the shortest.
+    regressors : estimator or sequence of estimator
+        One cloneable sklearn regressor, or one per source, mapping a source's
+        covariates to its standardized treatment coordinate. Unset nested
+        ``random_state`` parameters are seeded at construction.
+    treatment_correlation : float, default=0.0
+        Off-diagonal entry of the exchangeable latent copula correlation. Must
+        satisfy ``-1 / (P - 1) < treatment_correlation < 1`` for ``P`` sources,
+        and must be zero for a single source.
+    confounding_concentration : float or None, default=None
+        Optional strictly positive Dirichlet concentration for the per-source
+        confounding weights. ``None`` gives equal weights.
+    n_spline_knots : int, default=6
+        Knot count of each per-coordinate spline basis, at least 2, capped by
+        the number of distinct treatment values.
+    spline_degree : int, default=3
+        Nonnegative spline degree of the dose-response basis.
+    treatment_effect_scale : float, default=1.0
+        Nonnegative scale of the dose-response contribution to the outcome.
+    outcome_noise_scale : float, default=1.0
+        Nonnegative Gaussian outcome-noise standard deviation.
+    random_state : int, default=42
+        Seed controlling source subsampling, copula coupling, regressor
+        seeding, confounding weights, and spline coefficients.
+    """
 
     def __init__(
         self,
@@ -150,9 +198,7 @@ class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
             selected_X.append(X[rows])
             selected_y.append(y[rows])
             selected_rows.append(rows)
-        orders, self.copula_latent_ = _coupled_orders(
-            selected_y, self.treatment_correlation, rng
-        )
+        orders, _ = _coupled_orders(selected_y, self.treatment_correlation, rng)
         self.source_row_indices_ = [
             rows[order] for rows, order in zip(selected_rows, orders)
         ]
@@ -203,9 +249,7 @@ class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
 
     def _source_frames(self, X):
         return [
-            X.select(prefixed)
-            .rename(dict(zip(prefixed, original)))
-            .to_pandas()
+            X.select(prefixed).rename(dict(zip(prefixed, original))).to_pandas()
             for prefixed, original in zip(
                 self.source_columns_, self.source_feature_names_
             )
@@ -221,7 +265,9 @@ class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
         ):
             prediction = np.asarray(regressor.predict(frame), dtype=float).reshape(-1)
             if prediction.size != X.height or not np.isfinite(prediction).all():
-                raise ValueError("Each regressor must predict one finite value per row.")
+                raise ValueError(
+                    "Each regressor must predict one finite value per row."
+                )
             columns.append((prediction - center) / scale)
         return np.column_stack(columns)
 
@@ -233,9 +279,9 @@ class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
         fitted = []
         for index, (regressor, frame) in enumerate(zip(self.regressors_, frames)):
             normalized_y = (
-                self._fixed_treatments
-                .get_column(self.treatment_columns_[index])
-                .to_numpy()
+                self._fixed_treatments.get_column(
+                    self.treatment_columns_[index]
+                ).to_numpy()
                 - self.target_means_[index]
             ) / self.target_scales_[index]
             random_states = {
@@ -247,11 +293,11 @@ class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
                 regressor.set_params(**random_states)
             regressor.fit(frame, normalized_y)
             prediction = np.asarray(regressor.predict(frame), dtype=float).reshape(-1)
-            if (
-                prediction.size != self.n
-                or not np.isfinite(prediction).all()
-                or prediction.std(ddof=0) <= 0.0
-            ):
+            if prediction.size != self.n:
+                raise ValueError(
+                    "Each fitted regressor must predict one value per row."
+                )
+            if not np.isfinite(prediction).all() or prediction.std(ddof=0) <= 0.0:
                 raise ValueError(
                     "Each fitted regressor must produce nonconstant finite predictions."
                 )
@@ -295,8 +341,7 @@ class MultidimSemiSyntheticDataset(BaseSemiSyntheticDataset):
             )
             basis = transformer.fit_transform(values.reshape(-1, 1))
             coefficients = rng.normal(
-                scale=1.0
-                / np.sqrt(len(self.treatment_columns_) * basis.shape[1]),
+                scale=1.0 / np.sqrt(len(self.treatment_columns_) * basis.shape[1]),
                 size=basis.shape[1],
             )
             self.spline_transformers_.append(transformer)
