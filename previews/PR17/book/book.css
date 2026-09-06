@@ -1,0 +1,26 @@
+:root {
+    --sk-book-accent: #0f766e;
+    --sk-book-ink: #122033;
+    --sk-book-paper: #f5f8fc;
+}
+
+.quarto-title-banner {
+    background:
+        radial-gradient(circle at top left, rgba(15, 118, 110, 0.28), transparent 36%),
+        linear-gradient(135deg, #f5f8fc 0%, #eef4fb 100%);
+    color: var(--sk-book-ink);
+}
+
+.sidebar-title,
+.quarto-title-meta-heading,
+.quarto-title .title {
+    letter-spacing: 0.01em;
+}
+
+.callout.callout-style-default {
+    border-left: 4px solid var(--sk-book-accent);
+}
+
+.book-page-link {
+    font-weight: 600;
+}
