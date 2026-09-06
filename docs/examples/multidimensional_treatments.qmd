@@ -123,6 +123,12 @@ This gives a benchmark where:
 - the continuous dose matters
 - the categorical label matters
 - treatment assignment is still confounded through `X`
+
+For the same estimand on *real* covariates, use
+[`MultidimSemiSyntheticDataset`](../research/semi_synthetic_datasets.qmd), which
+builds each treatment coordinate from a different real dataset's own outcome
+and couples the sources with a Gaussian copula. Everything below this section
+applies unchanged; only the dataset in Step 2 differs.
 :::
 
 ::: {.callout-important}

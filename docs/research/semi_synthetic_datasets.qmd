@@ -358,7 +358,10 @@ The sample size is the smallest source. Larger sources are subsampled without
 replacement, then a Gaussian copula couples whole source rows by their outcome
 ranks. This changes the pairing between sources while preserving every selected
 within-source covariate/outcome pair and its values. Covariates are concatenated
-with a `d{j}_` prefix per source.
+with a `d{j}_` prefix per source. For an end-to-end estimation workflow on a
+multi-column treatment table, see the
+[multidimensional treatments tutorial](../examples/multidimensional_treatments.qmd);
+only the dataset construction differs.
 
 ```{python}
 from sklearn.linear_model import LinearRegression
