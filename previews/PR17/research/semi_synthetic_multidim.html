@@ -294,7 +294,7 @@ window.Quarto = {
 
 
 
-<p><code>ModelInducedConfoundingMultidim</code> turns one real classification table into a mixed-treatment causal dataset with a known response surface. Use it when you want to study how an estimator copes with <strong>dependent treatment coordinates</strong> while keeping real covariates.</p>
+<p><code>ModelInducedConfounding</code> turns one real classification table into a mixed-treatment causal dataset with a known response surface. Use it when you want to study how an estimator copes with <strong>dependent treatment coordinates</strong> while keeping real covariates.</p>
 <div class="callout callout-style-simple callout-note callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -340,7 +340,7 @@ window.Quarto = {
 </section>
 <section id="step-1-build-the-dataset" class="level2">
 <h2 class="anchored" data-anchor-id="step-1-build-the-dataset">Step 1: Build the dataset</h2>
-<div id="3c0d4acf" class="cell" data-execution_count="1">
+<div id="9d650c33" class="cell" data-execution_count="1">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
@@ -350,16 +350,16 @@ window.Quarto = {
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> scipy.stats <span class="im">import</span> gaussian_kde</span>
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.linear_model <span class="im">import</span> LogisticRegression</span>
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skcausal.datasets <span class="im">import</span> ModelInducedConfoundingMultidim, SklearnDataset</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> skcausal.datasets <span class="im">import</span> ModelInducedConfounding, SklearnDataset</span>
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>LEVEL_COLORS <span class="op">=</span> [<span class="st">"#2a78d6"</span>, <span class="st">"#eb6834"</span>, <span class="st">"#1baf7a"</span>]</span>
 <span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>plt.rcParams.update({<span class="st">"axes.spines.top"</span>: <span class="va">False</span>, <span class="st">"axes.spines.right"</span>: <span class="va">False</span>})</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
 <p>The source is scikit-learn’s wine table, with three classes. A regularized classifier keeps the propensity away from 0 and 1, which is what gives the categorical coordinate any overlap at all.</p>
-<div id="81cac822" class="cell" data-execution_count="2">
+<div id="c94e85d1" class="cell" data-execution_count="2">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> make_dataset(rho<span class="op">=</span><span class="fl">0.0</span>, <span class="op">**</span>kwargs):</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> ModelInducedConfoundingMultidim(</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> ModelInducedConfounding(</span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>        classifier<span class="op">=</span>LogisticRegression(max_iter<span class="op">=</span><span class="dv">2000</span>, C<span class="op">=</span><span class="fl">0.01</span>),</span>
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>        dataset<span class="op">=</span>SklearnDataset(name<span class="op">=</span><span class="st">"wine"</span>),</span>
 <span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>        treatment_correlation<span class="op">=</span>rho,</span>
@@ -393,23 +393,23 @@ window.Quarto = {
 </thead>
 <tbody>
 <tr class="odd">
-<td>1.736385</td>
+<td>1.73823</td>
 <td>"0"</td>
 </tr>
 <tr class="even">
-<td>0.935914</td>
+<td>0.524707</td>
 <td>"1"</td>
 </tr>
 <tr class="odd">
-<td>1.038011</td>
+<td>0.356005</td>
 <td>"1"</td>
 </tr>
 <tr class="even">
-<td>2.315881</td>
+<td>2.406096</td>
 <td>"0"</td>
 </tr>
 <tr class="odd">
-<td>0.405518</td>
+<td>-0.332792</td>
 <td>"1"</td>
 </tr>
 </tbody>
@@ -418,7 +418,7 @@ window.Quarto = {
 </div>
 </div>
 <p>The categorical levels come from the source target, so <code>t_1</code> has the three wine classes. They are not a parameter.</p>
-<div id="19d2a84f" class="cell" data-execution_count="3">
+<div id="69e21d11" class="cell" data-execution_count="3">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>dataset.treatment_levels_</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-display" data-execution_count="3">
 <pre><code>['0', '1', '2']</code></pre>
@@ -428,7 +428,7 @@ window.Quarto = {
 <section id="step-2-see-where-the-coordinates-come-from" class="level2">
 <h2 class="anchored" data-anchor-id="step-2-see-where-the-coordinates-come-from">Step 2: See where the coordinates come from</h2>
 <p>The continuous coordinate is the standardized reference-class log-odds plus assignment noise. Recomputing that score from the fitted classifier lets us look at the pieces separately.</p>
-<div id="a284444e" class="cell" data-execution_count="4">
+<div id="08e9cbeb" class="cell" data-execution_count="4">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> score(dataset, X):</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Standardized reference-class log-odds h(x), as in the docstring."""</span></span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    p <span class="op">=</span> np.clip(dataset.classifier_.predict_proba(X.to_numpy())[:, <span class="dv">0</span>], <span class="fl">1e-6</span>, <span class="dv">1</span> <span class="op">-</span> <span class="fl">1e-6</span>)</span>
@@ -438,7 +438,7 @@ window.Quarto = {
 <span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>h <span class="op">=</span> score(dataset, X)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<div id="9199b713" class="cell" data-execution_count="5">
+<div id="919db61c" class="cell" data-execution_count="5">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">7</span>, <span class="dv">4</span>), constrained_layout<span class="op">=</span><span class="va">True</span>)</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>labels <span class="op">=</span> t.get_column(<span class="st">"t_1"</span>).cast(pl.Utf8).to_numpy()</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> level, color <span class="kw">in</span> <span class="bu">zip</span>(dataset.treatment_levels_, LEVEL_COLORS):</span>
@@ -464,17 +464,17 @@ window.Quarto = {
 <section id="step-3-the-rho-knob" class="level2">
 <h2 class="anchored" data-anchor-id="step-3-the-rho-knob">Step 3: The <span class="math inline">\(\rho\)</span> knob</h2>
 <p>What <span class="math inline">\(\rho\)</span> changes is the relation between the coordinates <em>after</em> the covariates are accounted for. The cleanest way to see it is to subtract the score from <code>t_0</code> and look at what is left, per level.</p>
-<div id="e86ebc4c" class="cell" data-execution_count="6">
+<div id="670c85d3" class="cell" data-execution_count="6">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> residuals_by_level(rho):</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    d <span class="op">=</span> make_dataset(rho<span class="op">=</span>rho)</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    X, t, _ <span class="op">=</span> d.load()</span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    r <span class="op">=</span> t.get_column(<span class="st">"t_0"</span>).to_numpy() <span class="op">-</span> score(d, X)</span>
 <span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> r, t.get_column(<span class="st">"t_1"</span>).cast(pl.Utf8).to_numpy(), d.treatment_levels_</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<div id="2aad17e5" class="cell" data-execution_count="7">
+<div id="b914cf84" class="cell" data-execution_count="7">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>rhos <span class="op">=</span> [<span class="fl">0.0</span>, <span class="fl">0.5</span>, <span class="fl">0.9</span>, <span class="fl">0.99</span>]</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="bu">len</span>(rhos), figsize<span class="op">=</span>(<span class="dv">12</span>, <span class="fl">3.4</span>), sharey<span class="op">=</span><span class="va">True</span>, constrained_layout<span class="op">=</span><span class="va">True</span>)</span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>grid <span class="op">=</span> np.linspace(<span class="op">-</span><span class="dv">2</span>, <span class="dv">2</span>, <span class="dv">200</span>)</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>grid <span class="op">=</span> np.linspace(<span class="op">-</span><span class="dv">6</span>, <span class="dv">6</span>, <span class="dv">200</span>)</span>
 <span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> ax, rho <span class="kw">in</span> <span class="bu">zip</span>(axes, rhos):</span>
 <span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    r, labels, levels <span class="op">=</span> residuals_by_level(rho)</span>
 <span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> level, color <span class="kw">in</span> <span class="bu">zip</span>(levels, LEVEL_COLORS):</span>
@@ -496,7 +496,7 @@ window.Quarto = {
 <section id="measuring-the-dependence-exactly" class="level3">
 <h3 class="anchored" data-anchor-id="measuring-the-dependence-exactly">Measuring the dependence exactly</h3>
 <p>Because the assignment law is known, the conditional dependence can be computed rather than estimated. The quantity below is the mutual information between the two coordinates given <span class="math inline">\(x\)</span>, divided by the entropy of the categorical coordinate given <span class="math inline">\(x\)</span>, averaged over the rows. It is 0 when <span class="math inline">\(p(t_0, t_1 \mid x)\)</span> factorizes and 1 when <span class="math inline">\(t_1\)</span> is determined by <span class="math inline">\(t_0\)</span> and <span class="math inline">\(x\)</span>.</p>
-<div id="c36cf7b4" class="cell" data-execution_count="8">
+<div id="64f0b513" class="cell" data-execution_count="8">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> conditional_dependence(dataset, X, rho):</span>
@@ -516,7 +516,7 @@ window.Quarto = {
 <span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">float</span>(np.mean((entropy <span class="op">-</span> entropy_given_noise) <span class="op">/</span> entropy))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
-<div id="9b60f57b" class="cell" data-execution_count="9">
+<div id="813b8810" class="cell" data-execution_count="9">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>rho_grid <span class="op">=</span> np.linspace(<span class="dv">0</span>, <span class="fl">0.99</span>, <span class="dv">34</span>)</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>dependence <span class="op">=</span> [conditional_dependence(dataset, X, rho) <span class="cf">for</span> rho <span class="kw">in</span> rho_grid]</span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -555,7 +555,7 @@ window.Quarto = {
 <section id="the-propensity-stays-put" class="level3">
 <h3 class="anchored" data-anchor-id="the-propensity-stays-put">The propensity stays put</h3>
 <p>Whatever <span class="math inline">\(\rho\)</span> is, the categorical coordinate is drawn from the fitted class distribution. The observed level frequencies track the mean propensity at every setting.</p>
-<div id="b2821e98" class="cell" data-execution_count="10">
+<div id="c90f6ede" class="cell" data-execution_count="10">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>rows <span class="op">=</span> []</span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> rho <span class="kw">in</span> (<span class="fl">0.0</span>, <span class="fl">0.9</span>):</span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    d <span class="op">=</span> make_dataset(rho<span class="op">=</span>rho)</span>
@@ -636,11 +636,11 @@ window.Quarto = {
 <section id="step-4-the-response-surface" class="level2">
 <h2 class="anchored" data-anchor-id="step-4-the-response-surface">Step 4: The response surface</h2>
 <p>The outcome is additive in the coordinates: the score, a random spline in <code>t_0</code>, and a random offset per level of <code>t_1</code>. <code>get_grid</code> crosses the continuous range with every level, and <code>predict_curve</code> averages the true response over the covariates.</p>
-<div id="5caf6ab7" class="cell" data-execution_count="11">
+<div id="b143bda3" class="cell" data-execution_count="11">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>grid <span class="op">=</span> dataset.get_grid(<span class="dv">60</span>)</span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>truth <span class="op">=</span> dataset.predict_curve(X, grid)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<div id="34439d2f" class="cell" data-execution_count="12">
+<div id="ec80227a" class="cell" data-execution_count="12">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">7</span>, <span class="dv">4</span>), constrained_layout<span class="op">=</span><span class="va">True</span>)</span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> level, color <span class="kw">in</span> <span class="bu">zip</span>(dataset.treatment_levels_, LEVEL_COLORS):</span>
 <span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    mask <span class="op">=</span> grid.get_column(<span class="st">"t_1"</span>).cast(pl.Utf8).to_numpy() <span class="op">==</span> level</span>
@@ -659,12 +659,12 @@ window.Quarto = {
 </div>
 </div>
 <p><code>predict_y</code> gives the noise-free potential outcome for any covariate row and any treatment table, so counterfactual contrasts are exact:</p>
-<div id="7bcb0415" class="cell" data-execution_count="13">
+<div id="1424769e" class="cell" data-execution_count="13">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>at_reference <span class="op">=</span> dataset.predict_y(X, t.with_columns(pl.lit(<span class="st">"0"</span>).alias(<span class="st">"t_1"</span>)))</span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>at_last <span class="op">=</span> dataset.predict_y(X, t.with_columns(pl.lit(<span class="st">"2"</span>).alias(<span class="st">"t_1"</span>)))</span>
 <span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="bu">float</span>((at_reference <span class="op">-</span> at_last).mean())</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-display" data-execution_count="13">
-<pre><code>-0.19176489405230202</code></pre>
+<pre><code>-0.9588244702615097</code></pre>
 </div>
 </div>
 <p>To estimate this surface from <code>(X, t, y)</code>, hand the three tables to any estimator that accepts a mixed treatment table. The <a href="../examples/multidimensional_treatments.html">multidimensional treatments tutorial</a> walks through that with the same column layout.</p>
@@ -672,7 +672,7 @@ window.Quarto = {
 <section id="step-5-more-than-two-coordinates" class="level2">
 <h2 class="anchored" data-anchor-id="step-5-more-than-two-coordinates">Step 5: More than two coordinates</h2>
 <p><code>treatment_types</code> lists the coordinates and <code>treatment_correlation</code> becomes a correlation matrix over their latents. Continuous coordinates after the first use the log-odds of the next classes.</p>
-<div id="45cf9d66" class="cell" data-execution_count="14">
+<div id="c1dd3f09" class="cell" data-execution_count="14">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>wide <span class="op">=</span> make_dataset(</span>
 <span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>    treatment_types<span class="op">=</span>[<span class="st">"continuous"</span>, <span class="st">"categorical"</span>, <span class="st">"continuous"</span>],</span>
 <span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>    rho<span class="op">=</span>[[<span class="fl">1.0</span>, <span class="fl">0.6</span>, <span class="fl">0.0</span>], [<span class="fl">0.6</span>, <span class="fl">1.0</span>, <span class="op">-</span><span class="fl">0.5</span>], [<span class="fl">0.0</span>, <span class="op">-</span><span class="fl">0.5</span>, <span class="fl">1.0</span>]],</span>
@@ -703,36 +703,36 @@ window.Quarto = {
 </thead>
 <tbody>
 <tr class="odd">
-<td>1.736385</td>
+<td>1.73823</td>
 <td>"0"</td>
-<td>-1.319141</td>
+<td>-1.920213</td>
 </tr>
 <tr class="even">
-<td>0.627687</td>
+<td>-0.708201</td>
 <td>"1"</td>
-<td>-0.564674</td>
+<td>-1.299576</td>
 </tr>
 <tr class="odd">
-<td>1.295418</td>
+<td>1.385634</td>
 <td>"0"</td>
-<td>-1.210259</td>
+<td>-3.043054</td>
 </tr>
 <tr class="even">
-<td>1.975571</td>
+<td>1.044859</td>
 <td>"0"</td>
-<td>-1.968758</td>
+<td>-2.010092</td>
 </tr>
 <tr class="odd">
-<td>0.704328</td>
+<td>0.86245</td>
 <td>"1"</td>
-<td>0.174022</td>
+<td>1.012084</td>
 </tr>
 </tbody>
 </table>
 </div>
 </div>
 </div>
-<div id="3d53eed2" class="cell" data-execution_count="15">
+<div id="4c5cb9c0" class="cell" data-execution_count="15">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="fl">6.5</span>, <span class="fl">4.2</span>), constrained_layout<span class="op">=</span><span class="va">True</span>)</span>
 <span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>labels <span class="op">=</span> t_wide.get_column(<span class="st">"t_1"</span>).cast(pl.Utf8).to_numpy()</span>
 <span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> level, color <span class="kw">in</span> <span class="bu">zip</span>(wide.treatment_levels_, LEVEL_COLORS):</span>
@@ -753,7 +753,7 @@ window.Quarto = {
 </div>
 </div>
 <p>The grid grows multiplicatively: <code>n</code> points per continuous coordinate times the level count per categorical one.</p>
-<div id="2aefd0ba" class="cell" data-execution_count="16">
+<div id="001b0b7e" class="cell" data-execution_count="16">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>wide.get_grid(<span class="dv">10</span>).height</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-display" data-execution_count="16">
 <pre><code>300</code></pre>
