@@ -1,0 +1,172 @@
+[
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "skcausal Book",
+    "section": "",
+    "text": "1 Welcome\nThis book lives inside the main documentation site, but it is rendered by its own Quarto project. That separation is intentional: the website stays a website project, while the book gets book-specific navigation, chapter structure, and cross-reference support.",
+    "crumbs": [
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>Welcome</span>"
+    ]
+  },
+  {
+    "objectID": "index.html#reading-path",
+    "href": "index.html#reading-path",
+    "title": "skcausal Book",
+    "section": "1.1 Reading Path",
+    "text": "1.1 Reading Path\n\n\n\n\n\nflowchart LR\n  A[\"Getting started\"] --&gt; B[\"Estimator contract\"]\n  B --&gt; C[\"Continuous workflows\"]\n  C --&gt; D[\"Back to examples and API docs\"]\n\n\n\n\n\n\nUse this book when you want a more linear reading experience than the website provides.\n\nStart with Getting Started for installation and the core X, t, y contract.\nContinue to Estimator Contract for the package’s fit and predict semantics.\nFinish with Continuous Workflows for the treatment-grid and ADRF workflow.\n\n\n\n\n\n\n\nTip\n\n\n\nReturn to the main site from any chapter with the main docs homepage.",
+    "crumbs": [
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>Welcome</span>"
+    ]
+  },
+  {
+    "objectID": "getting-started.html",
+    "href": "getting-started.html",
+    "title": "2  Getting Started",
+    "section": "",
+    "text": "2.1 Install The Package\nskcausal is easiest to understand if you keep one mental model in mind: every estimator is built around observed covariates X, treatment assignments t, and outcomes y.\nIf you also want the plotting helpers introduced in the docs examples, install the plotting extra:",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>Getting Started</span>"
+    ]
+  },
+  {
+    "objectID": "getting-started.html#install-the-package",
+    "href": "getting-started.html#install-the-package",
+    "title": "2  Getting Started",
+    "section": "",
+    "text": "pip install skcausal\n\npip install \"skcausal[plotting]\"",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>Getting Started</span>"
+    ]
+  },
+  {
+    "objectID": "getting-started.html#the-core-data-contract",
+    "href": "getting-started.html#the-core-data-contract",
+    "title": "2  Getting Started",
+    "section": "2.2 The Core Data Contract",
+    "text": "2.2 The Core Data Contract\nThe package expects three aligned tables with the same number of rows.\n\n\n\n\n\ngraph LR\n  X[\"X: covariates\"] --&gt; F[\"fit(X, t, y)\"]\n  T[\"t: treatment\"] --&gt; F\n  Y[\"y: outcome\"] --&gt; F\n  F --&gt; P[\"predict(requested treatments)\"]\n\n\n\n\n\n\nIn the documentation examples, those tables are typically polars.DataFrame objects. The important part is not the library choice, but the semantics:\n\nX contains pre-treatment covariates.\nt contains the intervention variable you want to reason about.\ny contains the observed outcome.",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>Getting Started</span>"
+    ]
+  },
+  {
+    "objectID": "getting-started.html#minimal-dataset-example",
+    "href": "getting-started.html#minimal-dataset-example",
+    "title": "2  Getting Started",
+    "section": "2.3 Minimal Dataset Example",
+    "text": "2.3 Minimal Dataset Example\nfrom skcausal.datasets import SimpleLinearDataset\n\ndataset = SimpleLinearDataset(\n    n=250,\n    t_types=(\"continuous\",),\n    n_features=4,\n    random_state=0,\n)\nX, t, y = dataset.load()\nThe built-in synthetic datasets are useful because they also expose predict(...), which is separate from the estimator API and gives you the known target quantity for benchmarking.",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>Getting Started</span>"
+    ]
+  },
+  {
+    "objectID": "getting-started.html#where-to-go-next",
+    "href": "getting-started.html#where-to-go-next",
+    "title": "2  Getting Started",
+    "section": "2.4 Where To Go Next",
+    "text": "2.4 Where To Go Next\nIf you want to understand what estimators are expected to return, continue to Estimator Contract.",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>Getting Started</span>"
+    ]
+  },
+  {
+    "objectID": "estimator-contract.html",
+    "href": "estimator-contract.html",
+    "title": "3  Estimator Contract",
+    "section": "",
+    "text": "3.1 One Interface, Different Estimands\nThe package is organized around a small public contract: fit on observed data, then call predict(...) at requested treatment levels or treatment grids.\nflowchart TD\n  A[\"Binary or categorical treatment\"] --&gt; B[\"Average potential outcomes\"]\n  C[\"Continuous treatment\"] --&gt; D[\"Average dose-response function\"]\n  E[\"Density estimator\"] --&gt; F[\"Treatment assignment score\"]\nThe method names stay compact, but the returned quantity depends on the estimator family.",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>Estimator Contract</span>"
+    ]
+  },
+  {
+    "objectID": "estimator-contract.html#one-interface-different-estimands",
+    "href": "estimator-contract.html#one-interface-different-estimands",
+    "title": "3  Estimator Contract",
+    "section": "",
+    "text": "Family\nTypical output\nInterpretation\n\n\n\n\nCategorical response estimators\nOne value per requested treatment level\nAverage potential outcome\n\n\nContinuous response estimators\nOne value per requested grid point\nAverage dose-response function\n\n\nDensity estimators\nOne value per observed row\nTreatment density or stabilized density ratio",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>Estimator Contract</span>"
+    ]
+  },
+  {
+    "objectID": "estimator-contract.html#prediction-requires-a-requested-treatment-table",
+    "href": "estimator-contract.html#prediction-requires-a-requested-treatment-table",
+    "title": "3  Estimator Contract",
+    "section": "3.2 Prediction Requires A Requested Treatment Table",
+    "text": "3.2 Prediction Requires A Requested Treatment Table\nThe package does not treat prediction as “just give me X”. It treats prediction as “give me the intervention I want to evaluate”, and average-response estimators then average over the covariate sample stored during fit.\nestimator.fit(X, t, y)\nestimated_effect = estimator.predict(requested_treatment)\nThat means the shape of requested_treatment matters:\n\nFor binary or categorical problems, it usually contains a small set of treatment levels.\nFor continuous problems, it usually contains a dense treatment grid.",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>Estimator Contract</span>"
+    ]
+  },
+  {
+    "objectID": "estimator-contract.html#density-outputs-need-interpretation-discipline",
+    "href": "estimator-contract.html#density-outputs-need-interpretation-discipline",
+    "title": "3  Estimator Contract",
+    "section": "3.3 Density Outputs Need Interpretation Discipline",
+    "text": "3.3 Density Outputs Need Interpretation Discipline\nNot every density-like quantity is a normalized density.\n\n\n\n\n\n\nImportant\n\n\n\nIn skcausal, some density estimators return a conditional density p(t | x) while others return a stabilized ratio p(t | x) / p(t). Always check estimator.get_tag(\"density_kind\") before interpreting the output.\n\n\nThat distinction is why the density docs separate SkproDensityEstimator from PermutationWeighting.",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>Estimator Contract</span>"
+    ]
+  },
+  {
+    "objectID": "estimator-contract.html#reading-the-examples-correctly",
+    "href": "estimator-contract.html#reading-the-examples-correctly",
+    "title": "3  Estimator Contract",
+    "section": "3.4 Reading The Examples Correctly",
+    "text": "3.4 Reading The Examples Correctly\nThe examples compare estimators on synthetic datasets, but they are not all trying to estimate the exact same intermediate object. They are trying to estimate the same causal target, sometimes through different nuisance models.\nContinue to Continuous Workflows for the cleanest grid-based example.",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>Estimator Contract</span>"
+    ]
+  },
+  {
+    "objectID": "continuous-workflows.html",
+    "href": "continuous-workflows.html",
+    "title": "4  Continuous Workflows",
+    "section": "",
+    "text": "4.1 The Core Workflow\nContinuous-treatment workflows are where the package’s design becomes most visible: instead of asking for a single treated-vs-control contrast, you ask for a whole response curve.\nflowchart LR\n  A[\"Observed data: X, t, y\"] --&gt; B[\"Fit estimator\"]\n  B --&gt; C[\"Build treatment grid\"]\n  C --&gt; D[\"Predict on the grid\"]\n  D --&gt; E[\"Plot ADRF or compare to truth\"]",
+    "crumbs": [
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Continuous Workflows</span>"
+    ]
+  },
+  {
+    "objectID": "continuous-workflows.html#step-1-build-a-grid",
+    "href": "continuous-workflows.html#step-1-build-a-grid",
+    "title": "4  Continuous Workflows",
+    "section": "4.2 Step 1: Build A Grid",
+    "text": "4.2 Step 1: Build A Grid\nimport numpy as np\nimport polars as pl\n\ngrid = pl.DataFrame(\n    {\"t0\": np.linspace(float(t[\"t0\"].min()), float(t[\"t0\"].max()), X.height)}\n)\nThe grid can have any row count: predict(t) returns one average response per requested treatment row and averages over the covariate sample stored during fit.",
+    "crumbs": [
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Continuous Workflows</span>"
+    ]
+  },
+  {
+    "objectID": "continuous-workflows.html#step-2-predict-a-curve",
+    "href": "continuous-workflows.html#step-2-predict-a-curve",
+    "title": "4  Continuous Workflows",
+    "section": "4.3 Step 2: Predict A Curve",
+    "text": "4.3 Step 2: Predict A Curve\nfrom skcausal.causal_estimators import DirectRegressor\nfrom sklearn.linear_model import LinearRegression\n\nestimator = DirectRegressor(outcome_regressor=LinearRegression())\nestimator.fit(X, t, y)\ncurve = estimator.predict(grid)\nFor a direct method, the returned curve is the average of \\hat{E}[Y | X, T=t] over the observed covariate sample.",
+    "crumbs": [
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Continuous Workflows</span>"
+    ]
+  },
+  {
+    "objectID": "continuous-workflows.html#step-3-compare-methods-carefully",
+    "href": "continuous-workflows.html#step-3-compare-methods-carefully",
+    "title": "4  Continuous Workflows",
+    "section": "4.4 Step 3: Compare Methods Carefully",
+    "text": "4.4 Step 3: Compare Methods Carefully\nThe docs examples pair DirectRegressor with GPS, but the important point is not that one is “regression” and one is “weighting”. The important point is that they use different nuisance-model structure to target the same ADRF.\n\n\n\n\n\n\nTip\n\n\n\nUse the continuous treatments example when you want the short version, and the SyntheticDataset2 walkthrough when you want a fuller benchmark with multiple estimators.",
+    "crumbs": [
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Continuous Workflows</span>"
+    ]
+  },
+  {
+    "objectID": "continuous-workflows.html#the-main-habit-to-keep",
+    "href": "continuous-workflows.html#the-main-habit-to-keep",
+    "title": "4  Continuous Workflows",
+    "section": "4.5 The Main Habit To Keep",
+    "text": "4.5 The Main Habit To Keep\nWhen a continuous-treatment result looks surprising, check three things before trusting the curve:\n\nWhether the requested treatment grid stays inside the observed treatment support.\nWhether the estimator returns a response curve or a density-like score.\nWhether the observed association is clearly confounded relative to the synthetic truth or domain knowledge.",
+    "crumbs": [
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Continuous Workflows</span>"
+    ]
+  }
+]
