@@ -6,6 +6,7 @@ import base64
 import html
 import inspect
 import io
+import math
 import re
 from typing import Any
 
@@ -19,7 +20,7 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from skcausal.causal_estimators import DirectNoCovariates
 from skcausal.datatypes import collect_column_types, convert
-from skcausal.plotting import plot_marginal_curves
+from skcausal.plotting import plot_joint_curves, plot_marginal_curves
 from skcausal.utils.lookup import all_datasets
 
 _INLINE_RST_PATTERN = re.compile(
@@ -661,27 +662,84 @@ def _style_observed_outcome_as_scatter(axes, treatments, curves: dict[str, np.nd
         _refresh_legend(axes[0])
 
 
+def _split_treatment_columns(treatments):
+    frame = convert(treatments, "pandas").reset_index(drop=True)
+    column_types = collect_column_types(frame)
+    continuous = [c for c in frame.columns if column_types[c] == "continuous"]
+    categorical = [c for c in frame.columns if column_types[c] == "categorical"]
+    return frame, continuous, categorical
+
+
+def _scatter_observed_by_group(
+    axes, frame, categorical_columns, continuous_column, curves
+) -> None:
+    """Replace the joint-curve "Observed outcome" line with a per-group scatter."""
+    observed = curves.get("Observed outcome")
+    if observed is None:
+        return
+
+    observed = np.asarray(observed, dtype=float)
+    groups = frame.groupby(categorical_columns, observed=True, sort=True)
+
+    for axis_index, (axis, (_, group_frame)) in enumerate(zip(axes, groups)):
+        for line in list(axis.lines):
+            if line.get_label() == "Observed outcome":
+                line.remove()
+
+        axis.scatter(
+            group_frame[continuous_column].to_numpy(dtype=float),
+            observed[group_frame.index.to_numpy()],
+            label="Observed outcome" if axis_index == 0 else None,
+            alpha=0.2,
+            s=24,
+        )
+
+    if len(curves) > 1:
+        _refresh_legend(axes[0])
+
+
 def make_dataset_figure(example: dict[str, Any]):
-    n_axes = len(example["treatment_columns"])
+    frame, continuous, categorical = _split_treatment_columns(
+        example["plot_treatments"]
+    )
+    curves = example["curves"]
+
+    # With a mixed multidimensional treatment, a marginal plot averages every
+    # class of the categorical column into one curve. Draw one panel per class
+    # instead so the curves stay separated.
+    split_by_group = (
+        len(frame.columns) > 1 and len(continuous) == 1 and bool(categorical)
+    )
+    n_axes = (
+        frame.groupby(categorical, observed=True).ngroups
+        if split_by_group
+        else len(frame.columns)
+    )
+
+    n_cols = min(n_axes, 4)
+    n_rows = math.ceil(n_axes / n_cols)
     fig, axes = plt.subplots(
-        1,
-        n_axes,
-        figsize=(max(6.0, 4.8 * n_axes), 4.2),
+        n_rows,
+        n_cols,
+        figsize=(max(6.0, 4.4 * n_cols), 3.8 * n_rows),
         squeeze=False,
         sharey=True,
     )
-    axes = axes[0]
+    axes = axes.reshape(-1)
+    for unused_axis in axes[n_axes:]:
+        unused_axis.set_visible(False)
+    axes = axes[:n_axes]
+    single_or_many = axes[0] if n_axes == 1 else axes
 
-    plot_marginal_curves(
-        example["plot_treatments"],
-        example["curves"],
-        ax=axes[0] if n_axes == 1 else axes,
-    )
-    _style_observed_outcome_as_scatter(
-        axes,
-        example["plot_treatments"],
-        example["curves"],
-    )
+    if split_by_group:
+        plot_joint_curves(
+            frame, curves, ax=single_or_many, separate_axes_by_group=True
+        )
+        _scatter_observed_by_group(axes, frame, categorical, continuous[0], curves)
+    else:
+        plot_marginal_curves(frame, curves, ax=single_or_many)
+        _style_observed_outcome_as_scatter(axes, frame, curves)
+
     fig.suptitle(example["instance_name"], fontsize=14)
     fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.94))
     return fig
@@ -809,5 +867,22 @@ if __name__ == "__main__":
     # ModelInducedConfounding needs a classifier and a source, so it falls back.
     instance, _ = _catalog_instance(ModelInducedConfounding)
     assert instance is not None and instance.classifier is not None, instance
+
+    # Mixed multidimensional treatments get one panel per categorical class,
+    # in sorted class order.
+    plt.switch_backend("Agg")
+    mixed = pd.DataFrame({"t_0": [0.0, 1.0, 0.0, 1.0], "t_1": ["b", "b", "a", "a"]})
+    figure = make_dataset_figure(
+        {
+            "instance_name": "check",
+            "plot_treatments": mixed,
+            "curves": {
+                "Observed outcome": np.arange(4.0),
+                "Groundtruth": np.arange(4.0),
+            },
+        }
+    )
+    titles = [axis.get_title() for axis in figure.axes if axis.get_visible()]
+    assert titles == ["t_1=a", "t_1=b"], titles
 
     print("ok:", summary)

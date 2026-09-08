@@ -371,7 +371,7 @@ def plot_joint_curves(
                     group_frame.sort_values(continuous_column, kind="stable"),
                 )
                 for group_key, group_frame in plot_frame.groupby(
-                    categorical_columns, observed=True, sort=False
+                    categorical_columns, observed=True, sort=True
                 )
             ]
             if not group_keys:
