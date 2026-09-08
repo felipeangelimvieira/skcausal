@@ -14,9 +14,7 @@ def _sigmoid(values: np.ndarray) -> np.ndarray:
 
 
 def _as_2d_float_array(values, *, expected_width: int, name: str) -> np.ndarray:
-    if isinstance(values, pl.DataFrame):
-        values = values.to_numpy()
-    elif hasattr(values, "to_numpy"):
+    if isinstance(values, pl.DataFrame) or hasattr(values, "to_numpy"):
         values = values.to_numpy()
 
     array = np.asarray(values, dtype=float)
@@ -85,6 +83,7 @@ class SyntheticVCNet(BaseSyntheticDataset):
 
     """
 
+    _tags = {"task": "regression"}
     column_types = {"t": "continuous"}
 
     def __init__(

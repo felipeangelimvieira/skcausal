@@ -1,7 +1,7 @@
 import numpy as np
 import polars as pl
 
-from skcausal.datasets.categorical import ExampleCategorical
+from skcausal.datasets.synthetic.categorical import ExampleCategorical
 
 
 def test_confounded_categorical_dataset_load_returns_named_polars_frames():

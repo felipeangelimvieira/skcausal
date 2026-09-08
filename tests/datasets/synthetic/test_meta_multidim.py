@@ -2,9 +2,9 @@ import numpy as np
 import polars as pl
 import pytest
 
-from skcausal.datasets.meta_multidim import MetaMultidimDataset
-from skcausal.datasets.synthetic2 import SyntheticDataset2
-from skcausal.datasets.synthetic2_multidim import Synthetic2MultidimDataset
+from skcausal.datasets.synthetic.meta_multidim import MetaMultidimDataset
+from skcausal.datasets.synthetic.synthetic2 import SyntheticDataset2
+from skcausal.datasets.synthetic.synthetic2_multidim import Synthetic2MultidimDataset
 
 
 def test_meta_multidim_requires_explicit_base_dataset():

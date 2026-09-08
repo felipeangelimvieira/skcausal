@@ -1,5 +1,5 @@
 from skbase.base import BaseObject
-from skcausal.datasets.base import BaseSyntheticDataset
+from skcausal.datasets.base import BaseKnownResponseDataset
 from skcausal.causal_estimators.base import BaseAverageCausalResponseEstimator
 from skcausal.utils.treatment_grid import sample_treatment_rows
 import numpy as np
@@ -22,14 +22,14 @@ class AverageResponseMetric(BaseObject):
 
     def evaluate(
         self,
-        dataset: BaseSyntheticDataset,
+        dataset: BaseKnownResponseDataset,
         estimator: BaseAverageCausalResponseEstimator,
     ):
         """Evaluate the metric on the given dataset and estimator.
 
         Parameters
         ----------
-        dataset : BaseSyntheticDataset
+        dataset : BaseKnownResponseDataset
             The dataset to evaluate on.
         estimator : BaseAverageCausalResponseEstimator
             The estimator to evaluate.
@@ -39,9 +39,9 @@ class AverageResponseMetric(BaseObject):
         float
             The value of the metric.
         """
-        if not isinstance(dataset, BaseSyntheticDataset):
+        if not isinstance(dataset, BaseKnownResponseDataset):
             raise TypeError(
-                "dataset must be an instance of BaseSyntheticDataset. "
+                "dataset must be an instance of BaseKnownResponseDataset. "
                 f"Got {type(dataset).__name__}."
             )
         if not isinstance(estimator, BaseAverageCausalResponseEstimator):
@@ -55,7 +55,7 @@ class AverageResponseMetric(BaseObject):
 
     def _evaluate(
         self,
-        dataset: BaseSyntheticDataset,
+        dataset: BaseKnownResponseDataset,
         estimator: BaseAverageCausalResponseEstimator,
     ):
         """Evaluate the metric on the given dataset and estimator.
@@ -64,7 +64,7 @@ class AverageResponseMetric(BaseObject):
 
         Parameters
         ----------
-        dataset : BaseSyntheticDataset
+        dataset : BaseKnownResponseDataset
             The dataset to evaluate on.
         estimator : BaseAverageCausalResponseEstimator
             The estimator to evaluate.

@@ -384,10 +384,31 @@ def _render_docstring_html(doc: str) -> str:
     return "\n".join(blocks)
 
 
+_MAX_PARAM_REPR = 60
+
+
+def _format_param_value(value: Any) -> str:
+    """Render one parameter value, keeping a data-carrying object short.
+
+    A supervised source holds its whole table, so its repr prints every row.
+    The catalog wants to say which source an example used, not to print it.
+    """
+
+    text = repr(value)
+    if len(text) <= _MAX_PARAM_REPR:
+        return text
+    if hasattr(value, "get_params"):
+        return f"{type(value).__name__}(...)"
+    return text[: _MAX_PARAM_REPR - 3] + "..."
+
+
 def _format_params(params: dict[str, Any]) -> str:
+    # Nested estimator params ("classifier__C") only repeat what the
+    # estimator's own repr already shows, and there can be dozens of them.
     return ", ".join(
-        f"{key}={value!r}"
+        f"{key}={_format_param_value(value)}"
         for key, value in sorted(params.items(), key=lambda item: item[0])
+        if "__" not in key
     )
 
 
@@ -476,6 +497,23 @@ def _build_example(instance_name: str, dataset) -> dict[str, Any]:
     }
 
 
+def _catalog_instance(dataset_cls):
+    """Return the instance the catalog should show, and its label.
+
+    A catalog should show what a caller gets by writing ``Dataset()``, not the
+    test instance: ``get_test_params`` deliberately pins non-default values so
+    the object sweep exercises them. Datasets with required constructor
+    arguments have no default instance, so those fall back to the first test
+    instance.
+    """
+
+    try:
+        return dataset_cls(), dataset_cls.__name__
+    except TypeError:
+        instances, names = dataset_cls.create_test_instances_and_names()
+        return next(zip(instances, names), (None, None))
+
+
 def iter_dataset_sections() -> list[dict[str, Any]]:
     dataset_frame = all_datasets(as_dataframe=True)
     dataset_frame = dataset_frame.sort_values("name", kind="stable").reset_index(
@@ -485,8 +523,7 @@ def iter_dataset_sections() -> list[dict[str, Any]]:
     sections = []
     for _, row in dataset_frame.iterrows():
         dataset_cls = row["object"]
-        instances, instance_names = dataset_cls.create_test_instances_and_names()
-        first_example = next(zip(instances, instance_names), None)
+        instance, instance_name = _catalog_instance(dataset_cls)
         sections.append(
             {
                 "dataset_name": row["name"],
@@ -497,8 +534,8 @@ def iter_dataset_sections() -> list[dict[str, Any]]:
                 "docstring_html": _render_docstring_html(_get_docstring(dataset_cls)),
                 "examples": (
                     []
-                    if first_example is None
-                    else [_build_example(first_example[1], first_example[0])]
+                    if instance is None
+                    else [_build_example(instance_name, instance)]
                 ),
             }
         )
@@ -735,3 +772,42 @@ def render_dataset_browser_html(sections: list[dict[str, Any]] | None = None) ->
             "</div>",
         ]
     )
+
+
+if __name__ == "__main__":
+    import pandas as pd
+    from sklearn.linear_model import LogisticRegression
+
+    from skcausal.datasets.real.supervised import SupervisedFrame
+
+    frame = SupervisedFrame(
+        features=pd.DataFrame({"x": [1.0, 2.0, 3.0]}),
+        target=[0.5, 1.5, 2.5],
+    )
+    summary = _format_params(
+        {
+            "classifier": LogisticRegression(C=0.01, max_iter=2000),
+            "classifier__C": 0.01,
+            "classifier__solver": "lbfgs",
+            "dataset": frame,
+            "random_state": 0,
+        }
+    )
+    assert "classifier__" not in summary, summary
+    assert "dataset=SupervisedFrame(...)" in summary, summary
+    assert "classifier=LogisticRegression(C=0.01, max_iter=2000)" in summary, summary
+    assert "random_state=0" in summary, summary
+
+    from skcausal.datasets import (
+        ModelInducedConfounding,
+        ModelInducedDigitsContinuous,
+    )
+
+    # The shipped default, not the 2.0 that get_test_params pins.
+    instance, _ = _catalog_instance(ModelInducedDigitsContinuous)
+    assert instance.get_params()["treatment_effect_scale"] == 5.0, instance
+    # ModelInducedConfounding needs a classifier and a source, so it falls back.
+    instance, _ = _catalog_instance(ModelInducedConfounding)
+    assert instance is not None and instance.classifier is not None, instance
+
+    print("ok:", summary)

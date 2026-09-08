@@ -88,6 +88,7 @@ class ExampleCategorical(BaseSyntheticDataset):
     with :math:`\sigma_Y =` ``outcome_noise``.
     """
 
+    _tags = {"task": "regression"}
     column_types = {"treatment": "categorical"}
 
     def __init__(

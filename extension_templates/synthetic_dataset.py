@@ -3,7 +3,16 @@
 Purpose of this template
 ------------------------
 Use this file as a starting point when adding a new dataset under
-``skcausal.datasets``.
+``skcausal.datasets`` that generates its own covariates, and whose sample size
+is the caller's to choose.
+
+If the covariates come from somewhere else — a file, a study extract, a
+supervised source — the row count is not a parameter, and the base to subclass
+is ``BaseKnownResponseDataset`` instead. Everything in this template applies
+unchanged except ``n``: drop it from ``__init__`` and call ``self._prepare()``
+with no argument. ``IHDPContinuous`` is the in-repo example, and
+``semi_synthetic_dataset.py`` is the template when the source is a supervised
+table.
 
 How to use this template
 ------------------------
@@ -19,8 +28,11 @@ How to use this template
 
 Repo-specific contract notes
 ----------------------------
-* ``BaseSyntheticDataset.load`` returns covariates, treatments, and outcomes as
-  backend-native frames.
+* ``BaseSyntheticDataset`` is ``BaseKnownResponseDataset`` plus one thing: the
+  sample size, as ``n`` in ``__init__`` and as an argument to ``prepare``.
+  Everything else below is inherited from the parent.
+* ``load`` returns covariates, treatments, and outcomes as backend-native
+  frames.
 * ``predict_y`` should expose the noiseless structural response and accept the
   treatment tables returned by ``load``.
 * ``predict_curve`` is already implemented in the base class and averages
@@ -54,6 +66,7 @@ class MySyntheticDataset(BaseSyntheticDataset):
             Seed forwarded to the dataset RNG.
     """
 
+    _tags = {"task": "regression"}
     column_types = {"t_0": "continuous"}
 
     def __init__(

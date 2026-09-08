@@ -8,10 +8,10 @@ from skcausal.datasets.base import BaseSyntheticDataset
 
 __all__ = [
     "KangSchaferBinary",
+    "KangSchaferBinaryCrossValidation",
     "KangSchaferBinaryMisspecified",
     "KangSchaferContinuous",
     "KangSchaferContinuousMisspecified",
-    "KangSchaferBinaryCrossValidation",
 ]
 
 _LATENT_COLUMNS = ["x1", "x2", "x3", "x4"]
@@ -27,10 +27,7 @@ def _sigmoid(values: np.ndarray) -> np.ndarray:
 
 def _to_numpy_and_columns(values, *, expected_width: int, name: str):
     columns = None
-    if isinstance(values, pl.DataFrame):
-        columns = list(values.columns)
-        values = values.to_numpy()
-    elif isinstance(values, pd.DataFrame):
+    if isinstance(values, pl.DataFrame) or isinstance(values, pd.DataFrame):
         columns = list(values.columns)
         values = values.to_numpy()
 
@@ -242,6 +239,7 @@ class KangSchaferBinary(_BaseKangSchafer):
     The true average treatment effect is exactly 1.
     """
 
+    _tags = {"task": "regression"}
     column_types = {"a": "categorical"}
     TRUE_EFFECT = 1.0
 
@@ -308,6 +306,7 @@ class KangSchaferContinuous(_BaseKangSchafer):
         + 27.4X_1 + 13.7X_2 + 13.7X_3 + 13.7X_4, 1).
     """
 
+    _tags = {"task": "regression"}
     column_types = {"a": "continuous"}
 
     def _get_treatments(self, covariates) -> pl.DataFrame:

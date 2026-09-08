@@ -18,9 +18,9 @@ from __future__ import annotations
 import numpy as np
 import polars as pl
 
+from skcausal.datasets.base import BaseKnownResponseDataset
+from skcausal.datasets.synthetic.synthetic2 import SyntheticDataset2
 from skcausal.datatypes import collect_column_types, convert
-from skcausal.datasets.base import BaseSyntheticDataset
-from skcausal.datasets.synthetic2 import SyntheticDataset2
 
 __all__ = ["MetaMultidimDataset"]
 
@@ -57,7 +57,7 @@ def _validate_nonnegative_float(value, *, name: str) -> float:
     return value
 
 
-class MetaMultidimDataset(BaseSyntheticDataset):
+class MetaMultidimDataset(BaseKnownResponseDataset):
     r"""Mixed continuous/categorical treatment wrapper for synthetic datasets.
 
     The wrapped base dataset must expose exactly one continuous treatment
@@ -77,7 +77,7 @@ class MetaMultidimDataset(BaseSyntheticDataset):
 
     Parameters
     ----------
-        base_dataset : BaseSyntheticDataset
+        base_dataset : BaseKnownResponseDataset
             One-dimensional continuous-treatment synthetic dataset to wrap.
     n_categorical_treatments : int, default=4
             Number of percentile bins used to form the categorical treatment.
@@ -94,19 +94,22 @@ class MetaMultidimDataset(BaseSyntheticDataset):
             Seed used for both the wrapped dataset and the label permutation step.
     """
 
+    _tags = {"task": "regression"}
     column_types = {"t_0": "continuous", "t_0_bin": "categorical"}
 
     def __init__(
         self,
-        base_dataset: BaseSyntheticDataset,
+        base_dataset: BaseKnownResponseDataset,
         n_categorical_treatments: int = 4,
         mutual_info: float = 1.0,
         categorical_effect_scale: float = 0.15,
         categorical_column: str | None = None,
         random_state: int = 0,
     ):
-        if not isinstance(base_dataset, BaseSyntheticDataset):
-            raise TypeError("base_dataset must be an instance of BaseSyntheticDataset.")
+        if not isinstance(base_dataset, BaseKnownResponseDataset):
+            raise TypeError(
+                "base_dataset must be an instance of BaseKnownResponseDataset."
+            )
 
         self.base_dataset = base_dataset
         self.n_categorical_treatments = _validate_n_categorical_treatments(
@@ -119,20 +122,18 @@ class MetaMultidimDataset(BaseSyntheticDataset):
         )
         self.categorical_column = categorical_column
         self._resolved_base_dataset = base_dataset
+        # The sample size is the base dataset's; reuse its own value rather than
+        # recounting rows, so that a subclass which does take n as a parameter
+        # keeps the very object it was constructed with and stays cloneable.
+        self.n = base_dataset.n
 
-        super().__init__(n=int(base_dataset.n), random_state=random_state)
+        super().__init__(random_state=random_state)
         self._prepare()
 
-    def _make_base_dataset(self) -> BaseSyntheticDataset:
+    def _make_base_dataset(self) -> BaseKnownResponseDataset:
         return self._resolved_base_dataset.clone()
 
-    def _prepare(self, n: int = None):
-        if n is not None:
-            raise ValueError(
-                "MetaMultidimDataset derives its sample size from base_dataset; "
-                "construct a base dataset with the desired n instead."
-            )
-
+    def _prepare(self):
         base_dataset = self._make_base_dataset()
         covariates, treatments, outcomes = base_dataset.load()
 

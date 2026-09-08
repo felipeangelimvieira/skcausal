@@ -38,6 +38,10 @@ The library is designed around small, composable base classes. You can implement
 | Extension point | Base class | Typical use |
 |---|---|---|
 | Synthetic benchmark dataset | `BaseSyntheticDataset` | You know the data-generating process and want ground-truth response curves |
+| Semi-synthetic dataset | `BaseSemiSyntheticDataset` | You want real covariates with a treatment and response surface you still control |
+| Dataset with a simulated outcome over real covariates | `BaseKnownResponseDataset` | Parent of both of the above: subclass it directly when the response surface is known but the sample size is not the caller's to choose |
+| Observational dataset | `BaseDataset` | You have a real table of covariates, treatment, and outcome |
+| Supervised table source | `BaseSupervisedDataset` | You want to feed a new classification or regression benchmark to the semi-synthetic datasets |
 | Density estimator | `BaseDensityEstimator` | You want a new conditional density or stabilized density-ratio model |
 | Average-response estimator | `BaseAverageCausalResponseEstimator` | You want a new ADRF or average-response algorithm |
 | Benchmark metric | `AverageResponseMetric` | You want to compare estimators with a custom score on truth-known synthetic data |
@@ -95,6 +99,45 @@ show_extension_template("synthetic_dataset.py")
 Use this when you want a controlled benchmark with known truth. Once your dataset subclasses `BaseSyntheticDataset`, existing estimator benchmarks can score against its true response curve.
 :::
 
+::: {.callout-note collapse="true"}
+## Semi-synthetic dataset template
+
+Full template: [semi_synthetic_dataset.py](https://github.com/felipeangelimvieira/skcausal/blob/main/extension_templates/semi_synthetic_dataset.py)
+
+```{python}
+#| echo: false
+show_extension_template("semi_synthetic_dataset.py")
+```
+
+Use this when you want the covariate structure of real data but still need known truth. The covariates come from a supervised source, while the treatment and the response surface are induced from a model fitted on it.
+:::
+
+::: {.callout-note collapse="true"}
+## Observational dataset template
+
+Full template: [observational_dataset.py](https://github.com/felipeangelimvieira/skcausal/blob/main/extension_templates/observational_dataset.py)
+
+```{python}
+#| echo: false
+show_extension_template("observational_dataset.py")
+```
+
+Use this when the treatment is already in your data and there is no ground-truth curve to expose. Estimators can be fit on it, but truth-based benchmark metrics cannot.
+:::
+
+::: {.callout-note collapse="true"}
+## Supervised table source template
+
+Full template: [supervised_dataset.py](https://github.com/felipeangelimvieira/skcausal/blob/main/extension_templates/supervised_dataset.py)
+
+```{python}
+#| echo: false
+show_extension_template("supervised_dataset.py")
+```
+
+Use this to bring your own classification or regression table into the library. It has no treatment of its own; the semi-synthetic datasets consume it and generate one.
+:::
+
 ## Use AI with the templates
 
 ::: {.callout-tip}
@@ -121,7 +164,7 @@ Use AI to scaffold, not to skip validation. After it fills the template, run the
 
 ## Benchmark a new average-response estimator
 
-If your algorithm subclasses `BaseAverageCausalResponseEstimator`, you can benchmark it directly on any synthetic dataset that subclasses `BaseSyntheticDataset`.
+If your algorithm subclasses `BaseAverageCausalResponseEstimator`, you can benchmark it directly on any dataset that subclasses `BaseKnownResponseDataset`, synthetic or semi-synthetic.
 
 ```python
 from skcausal.causal_estimators.benchmarking import evaluate_multiple_dataset_seeds
@@ -144,7 +187,7 @@ summary
 This helper clones the dataset across random seeds, fits a fresh clone of your estimator on each seed, and returns one row per seed. The built-in average-response metrics compare your estimator's predicted curve against the dataset's known truth.
 
 ::: {.callout-important}
-Average-response benchmarking requires a `BaseSyntheticDataset` because the metric needs access to the true response function, not just observed outcomes.
+Average-response benchmarking requires a `BaseKnownResponseDataset` because the metric needs access to the true response function, not just observed outcomes. `BaseSyntheticDataset` is the subclass that also lets the caller choose the sample size.
 :::
 
 ## Benchmark a new density estimator

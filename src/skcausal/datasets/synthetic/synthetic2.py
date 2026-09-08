@@ -82,6 +82,7 @@ class SyntheticDataset2(BaseSyntheticDataset):
     with :math:`\sigma_Y^2 =` ``outcome_noise``.
     """
 
+    _tags = {"task": "regression"}
     column_types = {"t_0": "continuous"}
 
     def __init__(
@@ -152,7 +153,7 @@ class SyntheticDataset2(BaseSyntheticDataset):
     def _get_outcomes(
         self, covariates: np.ndarray, treatments: np.ndarray
     ) -> np.ndarray:
-        """
+        r"""
         Get the array of outcomes for the given covariates and treatments.
 
         Sample $Y \sim \mathcal{N}(u2, \sigma^2)$
@@ -253,6 +254,7 @@ class SyntheticDataset2Discrete(SyntheticDataset2):
         Y \mid X, A \sim \mathcal{N}(m(X, A), \sigma_Y^2).
     """
 
+    _tags = {"task": "regression"}
     column_types = {"treatment": "categorical"}
 
     def _get_treatments(self, covariates: np.ndarray) -> np.ndarray:

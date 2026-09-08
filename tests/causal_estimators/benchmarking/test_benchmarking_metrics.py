@@ -7,7 +7,10 @@ from skbase.testing.test_all_objects import BaseFixtureGenerator, QuickTester
 
 from skcausal.causal_estimators.base import BaseAverageCausalResponseEstimator
 from skcausal.causal_estimators.benchmarking import AverageResponseMetric, MAE, RMSE
-from skcausal.datasets.base import BaseSyntheticDataset
+from skcausal.datasets.base import (
+    BaseKnownResponseDataset,
+    BaseSyntheticDataset,
+)
 
 CURRENT_METRIC_TAGS = {"object_type", "metric_name"}
 
@@ -71,7 +74,7 @@ class _OffsetAverageResponseEstimator(BaseAverageCausalResponseEstimator):
 
 @dataclass
 class _MetricScenario:
-    dataset: BaseSyntheticDataset
+    dataset: BaseKnownResponseDataset
     estimator: BaseAverageCausalResponseEstimator
 
 

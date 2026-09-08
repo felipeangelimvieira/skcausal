@@ -27,7 +27,7 @@ We will compare two estimators on `SyntheticDataset2`:
 This is a good teaching example because `SyntheticDataset2` is confounded by construction. Treatment depends on the covariates, and the outcome depends on them too. The naive model therefore mixes confounding with treatment effect, while the direct model has a chance to adjust for it.
 
 ::: {.callout-important}
-`evaluate_multiple_dataset_seeds` is designed for synthetic datasets that subclass `BaseSyntheticDataset`, because the metrics compare predicted curves against the dataset's known ground-truth response.
+`evaluate_multiple_dataset_seeds` requires a dataset that subclasses `BaseKnownResponseDataset`, because the metrics compare predicted curves against the dataset's known ground-truth response. Both fully synthetic datasets (`BaseSyntheticDataset`) and the semi-synthetic ones qualify.
 :::
 
 ## Step 1: Imports
@@ -142,7 +142,7 @@ The main pattern to look for is whether the direct model beats the naive baselin
 
 Once this pattern works, you can swap in:
 
-1. Another synthetic dataset such as a new subclass of `BaseSyntheticDataset`.
+1. Another dataset with known truth, such as a new subclass of `BaseSyntheticDataset` or one of the semi-synthetic datasets.
 2. Another estimator such as `GPS` or `DoublyRobustPseudoOutcome`.
 3. Another metric, including your own subclass of `AverageResponseMetric`.
 4. A longer list of dataset seeds for a more stable benchmark.

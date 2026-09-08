@@ -100,6 +100,7 @@ class NurseStaffing(BaseSyntheticDataset):
     (Statistical Methodology), 79(4):1229-1245, 2017.
     """
 
+    _tags = {"task": "regression"}
     column_types = {"a": "continuous"}
     TREATMENT_MAX = 20.0
 
