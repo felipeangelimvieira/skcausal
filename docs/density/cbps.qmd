@@ -1,0 +1,76 @@
+---
+title: "Covariate Balancing Propensity Score (CBPS)"
+bibliography: ../references.bib
+execute:
+  warning: false
+---
+
+`CBPSCategorical` and `CBPSContinuous` are pure-Python ports of the parametric routines in the R package [`CBPS`](https://github.com/kosukeimai/CBPS). Instead of fitting the treatment model by maximum likelihood alone, CBPS estimates the propensity score by GMM using both the likelihood score *and* covariate-balance conditions, so the resulting inverse-probability weights balance covariate means by construction [@imai2014cbps; @fong2018cbgps].
+
+```python
+from skcausal.density.cbps import CBPSCategorical, CBPSContinuous
+```
+
+## Categorical treatments
+
+`CBPSCategorical` handles binary and multi-valued treatments (any number of levels; R supports up to four). `predict_density(X, t)` returns $P(T = t_i \mid x_i)$ and `predict_proba(X)` returns the probability of every level in `classes_` order.
+
+```{python}
+import numpy as np
+import polars as pl
+from skcausal.density.cbps import CBPSCategorical
+
+rng = np.random.default_rng(0)
+n = 500
+X = pl.DataFrame(rng.normal(size=(n, 3)), schema=["x0", "x1", "x2"])
+treated = X.to_numpy() @ [1.0, -0.5, 0.3] + rng.normal(size=n) > 0
+t = pl.DataFrame({"t": treated})
+
+cbps = CBPSCategorical(method="over").fit(X, t)
+cbps.predict_density(X, t)[:5]
+```
+
+The fitted balancing weights are available as `fitted_weights_` (normalised within each level, as in R). With `method="exact"` the weights balance the covariate means exactly:
+
+```{python}
+w = cbps.fitted_weights_
+X_np = X.to_numpy()
+treated_mean = (w[treated, None] * X_np[treated]).sum(axis=0) / w[treated].sum()
+control_mean = (w[~treated, None] * X_np[~treated]).sum(axis=0) / w[~treated].sum()
+np.round(treated_mean - control_mean, 4)
+```
+
+Parameters:
+
+| Parameter | Meaning |
+| --- | --- |
+| `method` | `"over"` combines score and balance conditions (over-identified GMM); `"exact"` uses balance conditions only. |
+| `att` | `0` for ATE weights; `1` / `2` for ATT weights treating the second / first level as treated (binary only). |
+| `twostep` | Two-step GMM with the weighting matrix fixed at the MLE (default) or continuous updating. |
+| `standardize` | Normalise `fitted_weights_` within each level. |
+
+## Continuous treatments
+
+`CBPSContinuous` implements the covariate balancing *generalised* propensity score. The treatment is modelled as $t \mid x \sim N(x^\top\beta, \sigma^2)$ and the balance condition asks the weighted covariance between $x$ and $t$ to vanish.
+
+```{python}
+from skcausal.density.cbps import CBPSContinuous
+
+t_cont = pl.DataFrame({"t": X.to_numpy() @ [1.0, -0.5, 0.3] + rng.normal(scale=1.5, size=n)})
+
+conditional = CBPSContinuous().fit(X, t_cont)
+stabilized = CBPSContinuous(density_kind="stabilized").fit(X, t_cont)
+
+conditional.predict_density(X, t_cont)[:3], stabilized.predict_density(X, t_cont)[:3]
+```
+
+`density_kind="conditional"` returns $p(t \mid x)$ on the original treatment scale; `"stabilized"` returns $p(t \mid x) / p(t)$ with $p(t)$ the Gaussian fitted to the marginal treatment distribution, which is the reciprocal of R's (unstandardised) weights.
+
+## Compatibility with the R package
+
+The implementation mirrors `CBPS.fit` (intercept, standardisation and SVD of the design), `CBPS.2Treat`, `CBPS.3Treat`/`CBPS.4Treat` and `CBPS.Continuous`, and is tested against reference outputs generated with the R package (`tests/density/cbps/fixtures`). Two differences are deliberate:
+
+* Multi-valued treatments use "level $j$ versus baseline" balance contrasts for any number of levels. Because the GMM weighting matrix is the model-implied covariance of the moments, the objective is identical to R's hand-coded 3- and 4-level contrasts.
+* The ATT gradient in R (`gmm.gradient` in `CBPSBinary.R`) scales the balance block by $1/n_t$ instead of $1/n$; skcausal uses the correct gradient, so ATT solutions with `method="over"` can differ slightly from R while attaining a lower value of R's own objective.
+
+Survey sampling weights and the asymptotic variance of the coefficients are not implemented.

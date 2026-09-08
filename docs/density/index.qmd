@@ -51,6 +51,12 @@ Use this when treatment has multiple columns and you want a factorized or autore
 :::
 
 ::: {.docs-card}
+### CBPSCategorical / CBPSContinuous
+
+Use these when you want propensity scores whose inverse-probability weights balance covariate means by construction (ports of the R `CBPS` package).
+:::
+
+::: {.docs-card}
 ### `evaluate(...)`
 
 Use this when you want cross-validated density scoring with `LogLikelihoodMetric()` or another explicit metric.
