@@ -1,7 +1,7 @@
 import numpy as np
 import polars as pl
 
-from skcausal.datasets.kang_schafer import (
+from skcausal.datasets.synthetic.kang_schafer import (
     KangSchaferBinary,
     KangSchaferBinaryMisspecified,
     KangSchaferContinuous,

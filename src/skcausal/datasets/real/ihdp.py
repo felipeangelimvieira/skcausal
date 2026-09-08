@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 
-from skcausal.datasets.base import BaseSyntheticDataset
+from skcausal.datasets.base import BaseKnownResponseDataset
 
 __all__ = ["IHDPContinuous"]
 
@@ -22,9 +22,7 @@ def _sigmoid(values: np.ndarray) -> np.ndarray:
 
 
 def _as_2d_float_array(values, *, expected_width: int, name: str) -> np.ndarray:
-    if isinstance(values, pl.DataFrame):
-        values = values.to_numpy()
-    elif hasattr(values, "to_numpy"):
+    if isinstance(values, pl.DataFrame) or hasattr(values, "to_numpy"):
         values = values.to_numpy()
 
     array = np.asarray(values, dtype=float)
@@ -102,7 +100,7 @@ def _load_ihdp_covariates(source_path: str | Path | None) -> tuple[np.ndarray, P
     return covariates, path
 
 
-class IHDPContinuous(BaseSyntheticDataset):
+class IHDPContinuous(BaseKnownResponseDataset):
     r"""Semi-synthetic IHDP benchmark with generated continuous treatment.
 
     This dataset reads the standard Hill IHDP benchmark CSV with shape
@@ -117,8 +115,16 @@ class IHDPContinuous(BaseSyntheticDataset):
     IHDP layout before the semi-synthetic responses are generated. This class
     exposes the full 747-row semi-synthetic dataset and leaves train/test
     splitting to downstream split objects.
+
+    The covariates are the real ones and there are exactly as many of them as
+    the file holds, so this is a
+    :class:`~skcausal.datasets.base.BaseKnownResponseDataset` and not a
+    :class:`~skcausal.datasets.base.BaseSyntheticDataset`: the response surface
+    is known and benchmarkable, but the sample size is the file's and not the
+    caller's to choose.
     """
 
+    _tags = {"task": "regression"}
     column_types = {"t": "continuous"}
 
     def __init__(
@@ -140,7 +146,7 @@ class IHDPContinuous(BaseSyntheticDataset):
         self.c1_ = None
         self.c2_ = None
 
-        super().__init__(n=_EXPECTED_RAW_SHAPE[0], random_state=random_state)
+        super().__init__(random_state=random_state)
         self._prepare()
 
     def _covariate_frame(self, covariates: np.ndarray) -> pl.DataFrame:
@@ -239,7 +245,7 @@ class IHDPContinuous(BaseSyntheticDataset):
         )
         return self._outcome_frame(outcomes)
 
-    def _prepare(self, n: int = None):
+    def _prepare(self):
         covariates, source_path = _load_ihdp_covariates(self.source_path)
         covariates = _standardize_covariates(covariates)
         self.source_path_ = source_path

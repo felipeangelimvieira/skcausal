@@ -1,22 +1,35 @@
-from importlib import import_module
-
-from .categorical import ExampleCategorical
-from .ihdp import IHDPContinuous
-from .kang_schafer import (
+from .base import BaseTabularDataset
+from .real.ihdp import IHDPContinuous
+from .real.nurse_staffing import NurseStaffing
+from .real.openml import OpenMLDataset
+from .real.sklearn import SklearnDataset
+from .real.supervised import BaseSupervisedDataset, SupervisedFrame
+from .semisynthetic._model_induced_base import BaseSemiSyntheticDataset
+from .semisynthetic.model_induced import ModelInducedConfounding
+from .semisynthetic.model_induced_benchmarks import (
+    ModelInducedBreastCancerBinary,
+    ModelInducedDigitsContinuous,
+    ModelInducedDigitsContinuous2D,
+    ModelInducedDigitsMixed,
+    ModelInducedGasDriftContinuous2D,
+    ModelInducedGasDriftMixed,
+)
+from .synthetic.categorical import ExampleCategorical
+from .synthetic.kang_schafer import (
     KangSchaferBinary,
     KangSchaferBinaryMisspecified,
     KangSchaferContinuous,
     KangSchaferContinuousMisspecified,
 )
-from .meta_multidim import MetaMultidimDataset
-from .nurse_staffing import NurseStaffing
-from .semi_synthetic_classifier import SemiSyntheticClassifier
-from .semi_synthetic_regressor import SemiSyntheticRegressor
-from .synthetic_vcnet import SyntheticVCNet
-from .synthetic2 import SyntheticDataset2, SyntheticDataset2Discrete
-from .synthetic2_multidim import Synthetic2MultidimDataset
+from .synthetic.meta_multidim import MetaMultidimDataset
+from .synthetic.synthetic2 import SyntheticDataset2, SyntheticDataset2Discrete
+from .synthetic.synthetic2_multidim import Synthetic2MultidimDataset
+from .synthetic.vcnet import SyntheticVCNet
 
 __all__ = [
+    "BaseSemiSyntheticDataset",
+    "BaseSupervisedDataset",
+    "BaseTabularDataset",
     "ExampleCategorical",
     "IHDPContinuous",
     "KangSchaferBinary",
@@ -24,11 +37,19 @@ __all__ = [
     "KangSchaferContinuous",
     "KangSchaferContinuousMisspecified",
     "MetaMultidimDataset",
+    "ModelInducedBreastCancerBinary",
+    "ModelInducedConfounding",
+    "ModelInducedDigitsContinuous",
+    "ModelInducedDigitsContinuous2D",
+    "ModelInducedDigitsMixed",
+    "ModelInducedGasDriftContinuous2D",
+    "ModelInducedGasDriftMixed",
     "NurseStaffing",
-    "SemiSyntheticClassifier",
-    "SemiSyntheticRegressor",
-    "SyntheticVCNet",
+    "OpenMLDataset",
+    "SklearnDataset",
+    "SupervisedFrame",
+    "Synthetic2MultidimDataset",
     "SyntheticDataset2",
     "SyntheticDataset2Discrete",
-    "Synthetic2MultidimDataset",
+    "SyntheticVCNet",
 ]

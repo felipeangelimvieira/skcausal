@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from skcausal.datasets.meta_multidim import MetaMultidimDataset
-from skcausal.datasets.synthetic2 import SyntheticDataset2
+from skcausal.datasets.synthetic.meta_multidim import MetaMultidimDataset
+from skcausal.datasets.synthetic.synthetic2 import SyntheticDataset2
 
 __all__ = ["Synthetic2MultidimDataset"]
 
@@ -10,8 +10,8 @@ class Synthetic2MultidimDataset(MetaMultidimDataset):
     r"""Meta-multidimensional wrapper specialized to :class:`SyntheticDataset2`.
 
     This convenience dataset keeps the mixed-treatment construction from
-    :class:`~skcausal.datasets.meta_multidim.MetaMultidimDataset` while fixing
-    the wrapped base generator to :class:`~skcausal.datasets.synthetic2.SyntheticDataset2`.
+    :class:`~skcausal.datasets.synthetic.meta_multidim.MetaMultidimDataset` while fixing
+    the wrapped base generator to :class:`~skcausal.datasets.synthetic.synthetic2.SyntheticDataset2`.
     """
 
     def __init__(

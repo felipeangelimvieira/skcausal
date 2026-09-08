@@ -12,7 +12,10 @@ from skcausal.causal_estimators.benchmarking import (
 from skcausal.causal_estimators.benchmarking.evaluate import (
     evaluate_multiple_dataset_seeds,
 )
-from skcausal.datasets.base import BaseSyntheticDataset
+from skcausal.datasets.base import (
+    BaseKnownResponseDataset,
+    BaseSyntheticDataset,
+)
 
 
 class _LinearSyntheticDataset(BaseSyntheticDataset):
@@ -155,7 +158,7 @@ def test_evaluate_one_rejects_duplicate_metric_names():
 def test_evaluate_one_rejects_invalid_dataset_and_estimator_types():
     dataset, estimator = _build_dataset_and_estimator()
 
-    with pytest.raises(TypeError, match="BaseSyntheticDataset"):
+    with pytest.raises(TypeError, match="BaseKnownResponseDataset"):
         evaluate_one(object(), estimator, MAE(n_treatments=4, random_state=0))
 
     with pytest.raises(TypeError, match="BaseAverageCausalResponseEstimator"):

@@ -4,13 +4,13 @@ import pandas as pd
 
 from skcausal.causal_estimators.base import BaseAverageCausalResponseEstimator
 from skcausal.causal_estimators.benchmarking.metrics import AverageResponseMetric
-from skcausal.datasets.base import BaseSyntheticDataset
+from skcausal.datasets.base import BaseKnownResponseDataset
 
 __all__ = ["evaluate_one", "evaluate_multiple_dataset_seeds"]
 
 
 def evaluate_one(
-    dataset: BaseSyntheticDataset,
+    dataset: BaseKnownResponseDataset,
     estimator: BaseAverageCausalResponseEstimator,
     metrics,
     return_fitted: bool = False,
@@ -19,7 +19,7 @@ def evaluate_one(
 
     Parameters
     ----------
-    dataset : BaseSyntheticDataset
+    dataset : BaseKnownResponseDataset
             Synthetic dataset used for fitting and ground-truth evaluation.
     estimator : BaseAverageCausalResponseEstimator
             Estimator to fit and benchmark.
@@ -85,9 +85,9 @@ def _get_metric_result_key(metric: AverageResponseMetric) -> str:
 
 def _validate_dataset_and_estimator(dataset, estimator) -> None:
     """Validate the public evaluate contract."""
-    if not isinstance(dataset, BaseSyntheticDataset):
+    if not isinstance(dataset, BaseKnownResponseDataset):
         raise TypeError(
-            "dataset must be an instance of BaseSyntheticDataset. "
+            "dataset must be an instance of BaseKnownResponseDataset. "
             f"Got {type(dataset).__name__}."
         )
     if not isinstance(estimator, BaseAverageCausalResponseEstimator):

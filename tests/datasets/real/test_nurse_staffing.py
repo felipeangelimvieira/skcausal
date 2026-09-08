@@ -2,7 +2,7 @@ import numpy as np
 import polars as pl
 import pytest
 
-from skcausal.datasets.nurse_staffing import NurseStaffing
+from skcausal.datasets.real.nurse_staffing import NurseStaffing
 
 
 def test_nurse_staffing_load_returns_named_polars_frames():

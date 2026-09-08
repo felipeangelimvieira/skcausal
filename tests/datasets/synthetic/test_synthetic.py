@@ -1,7 +1,7 @@
 import numpy as np
 import polars as pl
 
-from skcausal.datasets.synthetic2 import SyntheticDataset2, SyntheticDataset2Discrete
+from skcausal.datasets.synthetic.synthetic2 import SyntheticDataset2, SyntheticDataset2Discrete
 
 
 def test_synthetic2_load_and_predict_y_accept_polars_outputs():

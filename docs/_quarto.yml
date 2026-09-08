@@ -32,6 +32,8 @@ website:
             text: "Benchmarking"
           - href: research/dataset_catalog.qmd
             text: "Dataset Catalog"
+          - href: research/semi_synthetic_multidim.qmd
+            text: "Semi-Synthetic Multidim"
           - href: research/extending.qmd
             text: "Implement your own method"
       - text: "Tutorials"
