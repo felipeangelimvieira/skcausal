@@ -21,6 +21,7 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from skcausal.causal_estimators import DirectNoCovariates
 from skcausal.datatypes import collect_column_types, convert
 from skcausal.plotting import plot_joint_curves, plot_marginal_curves
+from skcausal.plotting.matplotlib import _sorted_categories
 from skcausal.utils.lookup import all_datasets
 
 _INLINE_RST_PATTERN = re.compile(
@@ -663,7 +664,9 @@ def _style_observed_outcome_as_scatter(axes, treatments, curves: dict[str, np.nd
 
 
 def _split_treatment_columns(treatments):
-    frame = convert(treatments, "pandas").reset_index(drop=True)
+    # Sorted the same way the plotting helpers do, so the observed-outcome
+    # scatter lands on the axis its group belongs to.
+    frame = _sorted_categories(convert(treatments, "pandas").reset_index(drop=True))
     column_types = collect_column_types(frame)
     continuous = [c for c in frame.columns if column_types[c] == "continuous"]
     categorical = [c for c in frame.columns if column_types[c] == "categorical"]
@@ -871,7 +874,13 @@ if __name__ == "__main__":
     # Mixed multidimensional treatments get one panel per categorical class,
     # in sorted class order.
     plt.switch_backend("Agg")
-    mixed = pd.DataFrame({"t_0": [0.0, 1.0, 0.0, 1.0], "t_1": ["b", "b", "a", "a"]})
+    mixed = pd.DataFrame(
+        {
+            "t_0": [0.0, 1.0, 0.0, 1.0],
+            # Categories declared out of order, the way polars hands them over.
+            "t_1": pd.Categorical(["b", "b", "a", "a"], categories=["b", "a"]),
+        }
+    )
     figure = make_dataset_figure(
         {
             "instance_name": "check",
