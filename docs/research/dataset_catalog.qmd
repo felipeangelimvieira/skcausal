@@ -11,7 +11,7 @@ execute:
   warning: false
 ---
 
-This page is generated from the dataset registry. It enumerates the classes returned by `all_datasets`, calls `create_test_instances_and_names()`, and renders each returned example with `plot_marginal_curves`.
+This page is generated from the dataset registry. It enumerates the classes returned by `all_datasets`, calls `create_test_instances_and_names()`, and renders each returned example with `plot_marginal_curves`, or with `plot_joint_curves` (one panel per class) when the treatment mixes one continuous column with categorical ones.
 
 Datasets expose a single sample. Any train/test or cross-fitting holdout should be created outside the dataset layer with a split object.
 

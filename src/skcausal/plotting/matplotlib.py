@@ -159,6 +159,26 @@ def _coerce_curve_values(
     return curves
 
 
+def _sorted_categories(t):
+    """Return ``t`` with categorical columns in sorted category order.
+
+    polars hands categories to pandas in physical (first-appearance) order, so
+    the declared order carries no meaning for a polars-backed frame. Sorting
+    keeps bars and group panels in a readable, stable order.
+    """
+    categorical_columns = [c for c in t.columns if hasattr(t[c], "cat")]
+    if not categorical_columns:
+        return t
+
+    t = t.copy(deep=False)
+    for column in categorical_columns:
+        series = t[column]
+        t[column] = series.cat.reorder_categories(
+            sorted(series.cat.categories, key=str)
+        )
+    return t
+
+
 def _coerce_axes(ax, n_axes: int):
     mpl = _require_matplotlib()
 
@@ -246,7 +266,7 @@ def plot_marginal_curves(t: DataFrameLike, y: dict[str, np.array], ax=None):
     `y` can contain curves of multiple models, the keys of `y` are used as
     labels in the legend.
     """
-    t = convert(t, "pandas")
+    t = _sorted_categories(convert(t, "pandas"))
     column_types = collect_column_types(t)
     curves = _coerce_curve_values(y, len(t))
     axes = _coerce_axes(ax, len(t.columns))
@@ -336,7 +356,7 @@ def plot_joint_curves(
     When ``separate_axes_by_group`` is True, each categorical group is drawn
     on its own axis while model colors stay aligned across axes.
     """
-    t = convert(t, "pandas")
+    t = _sorted_categories(convert(t, "pandas"))
     column_types = collect_column_types(t)
     curves = _coerce_curve_values(y, len(t))
 
@@ -371,7 +391,7 @@ def plot_joint_curves(
                     group_frame.sort_values(continuous_column, kind="stable"),
                 )
                 for group_key, group_frame in plot_frame.groupby(
-                    categorical_columns, observed=True, sort=False
+                    categorical_columns, observed=True, sort=True
                 )
             ]
             if not group_keys:
